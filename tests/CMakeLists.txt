@@ -1,0 +1,8 @@
+function(setup_test_target target)
+    add_executable(${target} ${target}.cc)
+    target_link_libraries(${target} gtest hermes gtest_main)
+    target_include_directories(${target} PRIVATE ../src ../extern/googletest/googletest/include)
+    gtest_discover_tests(${target})
+endfunction()
+
+setup_test_target(test_event)

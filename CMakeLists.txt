@@ -6,3 +6,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 find_package(PyArrow REQUIRED)
 
 add_subdirectory(src)
+
+# tests
+add_subdirectory(extern/googletest)
+include(GoogleTest)
+include (CTest)
+enable_testing()
+add_subdirectory(tests)
