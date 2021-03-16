@@ -1,0 +1,4 @@
+#ifndef HERMES_OBJECT_HH
+#define HERMES_OBJECT_HH
+
+#endif  // HERMES_OBJECT_HH
