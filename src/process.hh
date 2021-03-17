@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 // forward declare
@@ -21,6 +22,22 @@ public:
 private:
     std::unique_ptr<subprocess::Popen> process_;
 };
+
+class PlasmaServer {
+public:
+    PlasmaServer(uint64_t mem_size, std::string server_path) noexcept
+        : mem_size_(mem_size), server_path_(std::move(server_path)) {}
+    explicit PlasmaServer(uint64_t mem_size) noexcept : mem_size_(mem_size) {}
+
+    bool start();
+    void stop();
+
+private:
+    std::string server_path_;
+    std::unique_ptr<Process> server_ = nullptr;
+    uint64_t mem_size_;
+};
+
 }  // namespace hermes
 
 #endif  // HERMES_PROCESS_HH

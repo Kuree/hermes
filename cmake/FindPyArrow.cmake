@@ -47,3 +47,5 @@ IF (NOT EXISTS ${PLASMA_STORE_SERVER})
     FILE(DOWNLOAD "https://github.com/Kuree/binaries/raw/master/plasma-store-server" ${PLASMA_STORE_SERVER})
     EXECUTE_PROCESS(COMMAND chmod +x ${PLASMA_STORE_SERVER})
 endif()
+
+add_compile_definitions(PLASMA_STORE_SERVER_PATH="${PLASMA_STORE_SERVER}")
