@@ -40,3 +40,10 @@ if (LIBPLASMA_LIBRARY)
     add_library(arrow::plasma INTERFACE IMPORTED)
     set_property(TARGET arrow::plasma PROPERTY INTERFACE_LINK_LIBRARIES ${LIBPLASMA_LIBRARY})
 endif()
+
+# need to download the plasma file server
+set(PLASMA_STORE_SERVER ${CMAKE_CURRENT_BINARY_DIR}/bin/plasma-store-server)
+IF (NOT EXISTS ${PLASMA_STORE_SERVER})
+    FILE(DOWNLOAD "https://github.com/Kuree/binaries/raw/master/plasma-store-server" ${PLASMA_STORE_SERVER})
+    EXECUTE_PROCESS(COMMAND chmod +x ${PLASMA_STORE_SERVER})
+endif()

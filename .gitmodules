@@ -1,3 +1,6 @@
 [submodule "extern/googletest"]
 	path = extern/googletest
 	url = https://github.com/google/googletest
+[submodule "extern/cpp-subprocess"]
+	path = extern/cpp-subprocess
+	url = https://github.com/Kuree/cpp-subprocess

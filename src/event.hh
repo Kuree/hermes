@@ -29,6 +29,8 @@ public:
 
     [[nodiscard]] uint64_t time() const { return time_; }
 
+    [[nodiscard]] auto const &values() const { return values_; }
+
 private:
     using EventValue = std::variant<uint64_t, uint32_t, uint16_t, uint8_t, std::string>;
     uint64_t time_;
