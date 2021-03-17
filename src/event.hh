@@ -2,8 +2,10 @@
 #define HERMES_EVENT_HH
 
 #include <map>
+#include <memory>
 #include <string>
 #include <variant>
+#include <vector>
 
 namespace hermes {
 
@@ -31,11 +33,16 @@ public:
 
     [[nodiscard]] auto const &values() const { return values_; }
 
+    [[nodiscard]] uint64_t size() const;
+
 private:
     using EventValue = std::variant<uint64_t, uint32_t, uint16_t, uint8_t, std::string>;
     uint64_t time_;
     std::map<std::string, EventValue> values_;
 };
+
+// a batch of events
+class EventBatch : public std::vector<std::unique_ptr<Event>> {};
 
 }  // namespace hermes
 
