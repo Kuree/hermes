@@ -27,10 +27,12 @@ bool PlasmaServer::start() {
     if (server_path_.empty()) return false;
 
     auto path = std::filesystem::absolute(server_path_);
-    auto temp_path = std::filesystem::temp_directory_path() / "plasma";
+    auto temp_path = pipe_filename_.empty()
+                         ? std::string(std::filesystem::temp_directory_path() / "plasma")
+                         : pipe_filename_;
     // start the server
-    auto commands = std::vector<std::string>{server_path_, "-m", std::to_string(mem_size_), "-s",
-                                             temp_path.string()};
+    auto commands =
+        std::vector<std::string>{server_path_, "-m", std::to_string(mem_size_), "-s", temp_path};
     server_ = std::make_unique<Process>(commands);
     return true;
 }

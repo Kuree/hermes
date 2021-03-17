@@ -32,10 +32,13 @@ public:
     bool start();
     void stop();
 
+    void set_pipe_filename(const std::string &name) { pipe_filename_ = name; }
+
 private:
     std::string server_path_;
     std::unique_ptr<Process> server_ = nullptr;
     uint64_t mem_size_;
+    std::string pipe_filename_;
 };
 
 }  // namespace hermes
