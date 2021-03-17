@@ -1,16 +1,19 @@
 #ifndef HERMES_EVENT_HH
 #define HERMES_EVENT_HH
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
 #include <variant>
 #include <vector>
 
-
 namespace arrow {
 class Buffer;
+namespace ipc {
+class RecordBatchWriter;
 }
+}  // namespace arrow
 
 namespace hermes {
 
@@ -35,11 +38,9 @@ public:
     }
 
     [[nodiscard]] uint64_t time() const { return time_; }
+    void set_time(uint64_t time) { time_ = time; }
 
     [[nodiscard]] auto const &values() const { return values_; }
-
-    [[nodiscard]] uint64_t size() const;
-    void serialize(const std::shared_ptr<arrow::Buffer> &buffer) const;
 
     using EventValue = std::variant<uint64_t, uint32_t, uint16_t, uint8_t, std::string>;
 
@@ -49,7 +50,21 @@ private:
 };
 
 // a batch of events
-class EventBatch : public std::vector<std::unique_ptr<Event>> {};
+class EventBatch : public std::vector<std::unique_ptr<Event>> {
+public:
+    explicit EventBatch(std::string event_name) : event_name_(std::move(event_name)) {}
+    bool serialize(
+        const std::function<const std::shared_ptr<arrow::Buffer> &(uint64_t)> &buffer_allocator);
+    [[nodiscard]] bool validate() const noexcept;
+    [[nodiscard]] const std::string &event_name() const { return event_name_; }
+    void set_event_name(std::string name) { event_name_ = std::move(name); }
+
+    // factory method to construct event batch
+    static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Buffer> &buffer);
+
+private:
+    std::string event_name_;
+};
 
 }  // namespace hermes
 
