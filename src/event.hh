@@ -7,6 +7,11 @@
 #include <variant>
 #include <vector>
 
+
+namespace arrow {
+class Buffer;
+}
+
 namespace hermes {
 
 class Event {
@@ -34,9 +39,11 @@ public:
     [[nodiscard]] auto const &values() const { return values_; }
 
     [[nodiscard]] uint64_t size() const;
+    void serialize(const std::shared_ptr<arrow::Buffer> &buffer) const;
+
+    using EventValue = std::variant<uint64_t, uint32_t, uint16_t, uint8_t, std::string>;
 
 private:
-    using EventValue = std::variant<uint64_t, uint32_t, uint16_t, uint8_t, std::string>;
     uint64_t time_;
     std::map<std::string, EventValue> values_;
 };
