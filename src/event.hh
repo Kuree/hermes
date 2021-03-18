@@ -10,9 +10,6 @@
 
 namespace arrow {
 class Buffer;
-namespace ipc {
-class RecordBatchWriter;
-}
 }  // namespace arrow
 
 namespace hermes {
@@ -53,8 +50,8 @@ private:
 class EventBatch : public std::vector<std::unique_ptr<Event>> {
 public:
     explicit EventBatch(std::string event_name) : event_name_(std::move(event_name)) {}
-    bool serialize(
-        const std::function<const std::shared_ptr<arrow::Buffer> &(uint64_t)> &buffer_allocator);
+    std::shared_ptr<arrow::Buffer> serialize(
+        const std::function<std::shared_ptr<arrow::Buffer>(uint64_t)> &buffer_allocator);
     [[nodiscard]] bool validate() const noexcept;
     [[nodiscard]] const std::string &event_name() const { return event_name_; }
     void set_event_name(std::string name) { event_name_ = std::move(name); }

@@ -40,9 +40,9 @@ std::shared_ptr<arrow::Schema> get_schema(Event *event) {
 }
 
 // TODO: better handling
-bool EventBatch::serialize(
-    const std::function<const std::shared_ptr<arrow::Buffer> &(uint64_t)> &buffer_allocator) {
-    if (empty()) return false;
+std::shared_ptr<arrow::Buffer> EventBatch::serialize(
+    const std::function<std::shared_ptr<arrow::Buffer>(uint64_t)> &buffer_allocator) {
+    if (empty()) return nullptr;
     // we assume it is already validated
     std::shared_ptr<arrow::Schema> schema;
     {
@@ -66,10 +66,10 @@ bool EventBatch::serialize(
                                builders.emplace_back(std::make_unique<arrow::UInt16Builder>(pool));
                            },
                            [pool, &builders](uint32_t) {
-                               builders.emplace_back(std::make_unique<arrow::UInt16Builder>(pool));
+                               builders.emplace_back(std::make_unique<arrow::UInt32Builder>(pool));
                            },
                            [pool, &builders](uint64_t) {
-                               builders.emplace_back(std::make_unique<arrow::UInt16Builder>(pool));
+                               builders.emplace_back(std::make_unique<arrow::UInt64Builder>(pool));
                            },
                            [pool, &builders](const std::string &) {
                                builders.emplace_back(std::make_unique<arrow::StringBuilder>(pool));
@@ -81,8 +81,9 @@ bool EventBatch::serialize(
     for (auto const &event : *this) {
         (void)time_builder->Append(event->time());
         auto const &values = event->values();
+        uint64_t idx = 0;
         for (auto const &[name, value] : values) {
-            auto *ptr = builders[value.index()].get();
+            auto *ptr = builders[idx++].get();
             // visit the variant
             std::visit(overloaded{[ptr](uint8_t arg) {
                                       auto *p = reinterpret_cast<arrow::UInt8Builder *>(ptr);
@@ -120,7 +121,7 @@ bool EventBatch::serialize(
     auto batch = arrow::RecordBatch::Make(schema, size(), arrays);
     auto mock_sink = arrow::io::MockOutputStream();
     auto stream_writer_r = arrow::ipc::MakeStreamWriter(&mock_sink, schema);
-    if (!stream_writer_r.ok()) return false;
+    if (!stream_writer_r.ok()) return nullptr;
     auto &stream_writer = *stream_writer_r;
     (void)stream_writer->WriteRecordBatch(*batch);
     (void)stream_writer->Close();
@@ -129,10 +130,10 @@ bool EventBatch::serialize(
     // TODO: refactor the code later if we want to save the data
     arrow::io::FixedSizeBufferWriter stream(buff);
     auto writer = arrow::ipc::MakeStreamWriter(&stream, schema);
-    if (!writer.ok()) return false;
+    if (!writer.ok()) return nullptr;
     (void)(*writer)->WriteRecordBatch(*batch);
     (void)(*writer)->Close();
-    return true;
+    return buff;
 }
 
 std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow::Buffer> &buffer) {
