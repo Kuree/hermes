@@ -1,7 +1,5 @@
 #include "event.hh"
 
-#include <type_traits>
-#include <unordered_map>
 #include <variant>
 
 #include "arrow/api.h"
@@ -13,46 +11,33 @@
 
 namespace hermes {
 
-static std::unordered_map<std::size_t, std::shared_ptr<arrow::DataType>> types_;
-
-void init_type_mapping() {
-    if (!types_.empty()) return;
-#define ADD_ELEMENT(x) types_.emplace(typeid(x##_t).hash_code(), arrow::x())
-    ADD_ELEMENT(uint8);
-    ADD_ELEMENT(uint16);
-    ADD_ELEMENT(uint32);
-    ADD_ELEMENT(uint64);
-#undef ADD_ELEMENT
-    // string is special
-    types_.emplace(typeid(std::string).hash_code(), arrow::utf8());
-}
-
-template <class V>
-std::type_info const &var_type(V const &v) {
-    return std::visit([](auto &&x) -> decltype(auto) { return typeid(x); }, v);
-}
-
-std::shared_ptr<arrow::Schema> get_schema(const Event &event) {
-    auto const &values = event.values();
-    init_type_mapping();
-    std::vector<std::shared_ptr<arrow::Field>> schema_vector;
-
-    for (auto const &[name, v] : values) {
-        const auto &type = var_type(v);
-        auto filed = std::make_shared<arrow::Field>(name, types_.at(type.hash_code()));
-    }
-    // time is last
-    schema_vector.emplace_back(std::make_shared<arrow::Field>("time", arrow::uint64()));
-
-    return std::make_shared<arrow::Schema>(schema_vector);
-}
-
 template <class... Ts>
 struct overloaded : Ts... {
     using Ts::operator()...;
 };
 template <class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
+
+std::shared_ptr<arrow::Schema> get_schema(Event *event) {
+    auto const &values = event->values();
+    std::vector<std::shared_ptr<arrow::Field>> schema_vector;
+
+    for (auto const &[name, v] : values) {
+        std::shared_ptr<arrow::DataType> type;
+        std::visit(overloaded{[&type](uint8_t) { type = arrow::uint8(); },
+                              [&type](uint16_t) { type = arrow::uint16(); },
+                              [&type](uint32_t) { type = arrow::uint32(); },
+                              [&type](uint64_t) { type = arrow::uint64(); },
+                              [&type](const std::string &) { type = arrow::utf8(); }},
+                   v);
+        auto field = std::make_shared<arrow::Field>(name, type);
+        schema_vector.emplace_back(field);
+    }
+    // time is last
+    schema_vector.emplace_back(std::make_shared<arrow::Field>("time", arrow::uint64()));
+
+    return std::make_shared<arrow::Schema>(schema_vector);
+}
 
 // TODO: better handling
 bool EventBatch::serialize(
@@ -61,7 +46,7 @@ bool EventBatch::serialize(
     // we assume it is already validated
     std::shared_ptr<arrow::Schema> schema;
     {
-        auto const &event = *(*this)[0];
+        auto *event = front().get();
         schema = get_schema(event);
     }
     // we need to initialize the type builder
