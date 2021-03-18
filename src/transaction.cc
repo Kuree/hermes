@@ -9,7 +9,8 @@
 
 namespace hermes {
 
-void Transaction::add_event(const std::unique_ptr<Event> &event) {
+bool Transaction::add_event(const std::unique_ptr<Event> &event) {
+    if (is_done_) return false;
     if (start_time_ > event->time()) {
         start_time_ = event->time();
     }
@@ -18,6 +19,7 @@ void Transaction::add_event(const std::unique_ptr<Event> &event) {
     }
 
     events_ids_.emplace_back(event->id());
+    return true;
 }
 
 std::shared_ptr<arrow::Buffer> TransactionBatch::serialize(

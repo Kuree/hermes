@@ -10,7 +10,7 @@ class TransactionBatch;
 class Transaction {
 public:
     explicit Transaction(uint64_t id) noexcept : id_(id) {}
-    void add_event(const std::unique_ptr<Event> &event);
+    bool add_event(const std::unique_ptr<Event> &event);
     void finish() { is_done_ = true; }
     [[nodiscard]] bool finished() const { return is_done_; }
     [[nodiscard]] uint64_t id() const { return id_; }
@@ -29,6 +29,7 @@ private:
 };
 
 class TransactionBatch : public std::vector<std::unique_ptr<Transaction>> {
+public:
     std::shared_ptr<arrow::Buffer> serialize(
         const std::function<std::shared_ptr<arrow::Buffer>(uint64_t)> &buffer_allocator);
     // factory method to construct transaction batch

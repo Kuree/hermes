@@ -1,7 +1,6 @@
 #include "event.hh"
 #include "gtest/gtest.h"
 
-#include "plasma/client.h"
 #include "arrow/api.h"
 
 

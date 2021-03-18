@@ -6,3 +6,4 @@ function(setup_test_target target)
 endfunction()
 
 setup_test_target(test_event)
+setup_test_target(test_transaction)
