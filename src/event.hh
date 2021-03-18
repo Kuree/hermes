@@ -28,7 +28,7 @@ public:
     }
 
     template <typename T>
-    std::optional<T> get_value(const std::string &name) noexcept {
+    std::optional<T> get_value(const std::string &name) const noexcept {
         if (values_.find(name) == values_.end()) {
             return std::nullopt;
         } else {
@@ -45,9 +45,13 @@ public:
     }
 
     bool remove_value(const std::string &name);
+    [[nodiscard]] bool has_value(const std::string &name) const noexcept {
+        return values_.find(name) != values_.end();
+    }
 
     [[nodiscard]] uint64_t time() const { return time_; }
     void set_time(uint64_t time);
+    [[nodiscard]] uint64_t id() const { return id_; }
 
     [[nodiscard]] auto const &values() const { return values_; }
 

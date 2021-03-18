@@ -2,12 +2,12 @@
 
 #include <variant>
 
+#include "arrow.hh"
 #include "arrow/api.h"
 #include "arrow/io/memory.h"
 #include "arrow/ipc/reader.h"
 #include "arrow/ipc/writer.h"
 #include "parquet/stream_writer.h"
-#include "plasma/client.h"
 
 namespace hermes {
 
@@ -133,32 +133,12 @@ std::shared_ptr<arrow::Buffer> EventBatch::serialize(
     }
 
     auto batch = arrow::RecordBatch::Make(schema, size(), arrays);
-    auto mock_sink = arrow::io::MockOutputStream();
-    auto stream_writer_r = arrow::ipc::MakeStreamWriter(&mock_sink, schema);
-    if (!stream_writer_r.ok()) return nullptr;
-    auto &stream_writer = *stream_writer_r;
-    (void)stream_writer->WriteRecordBatch(*batch);
-    (void)stream_writer->Close();
-    auto data_size = *mock_sink.Tell();
-    auto buff = buffer_allocator(data_size);
-    // TODO: refactor the code later if we want to save the data
-    arrow::io::FixedSizeBufferWriter stream(buff);
-    auto writer = arrow::ipc::MakeStreamWriter(&stream, schema);
-    if (!writer.ok()) return nullptr;
-    (void)(*writer)->WriteRecordBatch(*batch);
-    (void)(*writer)->Close();
-    return buff;
+    return ::hermes::serialize(batch, schema, buffer_allocator);
 }
 
 std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow::Buffer> &buffer) {
-    auto buff = arrow::io::BufferReader(buffer);
-    auto reader_r = arrow::ipc::RecordBatchStreamReader::Open(&buff);
-    if (!reader_r.ok()) return nullptr;
-    auto &reader = *reader_r;
-
-    std::shared_ptr<arrow::RecordBatch> batch;
-    auto r = reader->ReadNext(&batch);
-    if (!r.ok()) return nullptr;
+    auto batch = get_batch(buffer);
+    if (!batch) return nullptr;
 
     // construct the event batch
     auto event_batch = std::make_unique<EventBatch>();
@@ -185,24 +165,21 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow:
             if (!r_.ok()) return nullptr;
             auto const &v = *r_;
             if (type->Equals(str_)) {
-                auto str_val_ = std::reinterpret_pointer_cast<arrow::StringScalar>(v);
-                auto str_val = std::string(reinterpret_cast<const char *>(str_val_->value->data()));
-                (*event_batch)[j]->add_value(name, str_val);
+                (*event_batch)[j]->add_value(name, get_string(v));
             } else if (type->Equals(uint8)) {
-                auto int_val_ = std::reinterpret_pointer_cast<arrow::UInt8Scalar>(v);
-                (*event_batch)[j]->add_value(name, int_val_->value);
+                (*event_batch)[j]->add_value(name, get_uint8(v));
             } else if (type->Equals(uint16)) {
                 auto int_val_ = std::reinterpret_pointer_cast<arrow::UInt16Scalar>(v);
-                (*event_batch)[j]->add_value(name, int_val_->value);
+                (*event_batch)[j]->add_value(name, get_uint16(v));
             } else if (type->Equals(uint32)) {
                 auto int_val_ = std::reinterpret_pointer_cast<arrow::UInt32Scalar>(v);
-                (*event_batch)[j]->add_value(name, int_val_->value);
+                (*event_batch)[j]->add_value(name, get_uint32(v));
             } else if (type->Equals(uint64)) {
-                auto int_val_ = std::reinterpret_pointer_cast<arrow::UInt64Scalar>(v);
+                auto int_val = get_uint64(v);
                 if (name == "time") {
-                    (*event_batch)[j]->set_time(int_val_->value);
+                    (*event_batch)[j]->set_time(int_val);
                 } else {
-                    (*event_batch)[j]->add_value(name, int_val_->value);
+                    (*event_batch)[j]->add_value(name, int_val);
                 }
             } else {
                 throw std::runtime_error("Unknown type " + type->ToString());
