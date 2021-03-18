@@ -34,6 +34,13 @@ public:
         }
     }
 
+    template <typename T>
+    bool change_value(const std::string &name, const T &value) noexcept {
+        if (values_.find(name) == values_.end()) return false;
+        values_[name] = value;
+        return true;
+    }
+
     [[nodiscard]] uint64_t time() const { return time_; }
     void set_time(uint64_t time) { time_ = time; }
 
@@ -49,18 +56,12 @@ private:
 // a batch of events
 class EventBatch : public std::vector<std::unique_ptr<Event>> {
 public:
-    explicit EventBatch(std::string event_name) : event_name_(std::move(event_name)) {}
     std::shared_ptr<arrow::Buffer> serialize(
         const std::function<std::shared_ptr<arrow::Buffer>(uint64_t)> &buffer_allocator);
     [[nodiscard]] bool validate() const noexcept;
-    [[nodiscard]] const std::string &event_name() const { return event_name_; }
-    void set_event_name(std::string name) { event_name_ = std::move(name); }
 
     // factory method to construct event batch
     static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Buffer> &buffer);
-
-private:
-    std::string event_name_;
 };
 
 }  // namespace hermes

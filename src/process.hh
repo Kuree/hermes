@@ -6,6 +6,9 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <queue>
+#include <thread>
+#include <functional>
 
 // forward declare
 namespace subprocess {
@@ -21,6 +24,19 @@ public:
 
 private:
     std::unique_ptr<subprocess::Popen> process_;
+};
+
+
+class Dispatcher {
+public:
+    void dispatch(const std::function<void()>& task);
+
+    ~Dispatcher();
+
+private:
+    std::queue<std::thread> threads_;
+
+    void clean_up();
 };
 
 }  // namespace hermes
