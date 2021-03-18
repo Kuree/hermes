@@ -29,7 +29,7 @@ TEST(event, event_set_get) {    // NOLINT
 
 TEST(event_batch, serilizattion) {  // NOLINT
     // create random events
-    hermes::EventBatch batch("test");
+    hermes::EventBatch batch;
     auto constexpr num_events = 100;
     for (auto i = 0; i < num_events; i++) {
         auto event = std::make_unique<hermes::Event>(i);

@@ -16,7 +16,10 @@ namespace hermes {
 
 class Event {
 public:
-    explicit Event(uint64_t time) noexcept : time_(time) {}
+    static constexpr auto TIME_NAME = "time";
+    static constexpr auto ID_NAME = "id";
+
+    explicit Event(uint64_t time) noexcept;
     template <typename T>
     bool add_value(const std::string &name, const T &value) noexcept {
         if (values_.find(name) != values_.end()) return false;
@@ -41,8 +44,10 @@ public:
         return true;
     }
 
+    bool remove_value(const std::string &name);
+
     [[nodiscard]] uint64_t time() const { return time_; }
-    void set_time(uint64_t time) { time_ = time; }
+    void set_time(uint64_t time);
 
     [[nodiscard]] auto const &values() const { return values_; }
 
@@ -50,7 +55,10 @@ public:
 
 private:
     uint64_t time_;
+    uint64_t id_;
     std::map<std::string, EventValue> values_;
+
+    static uint64_t event_id_count_;
 };
 
 // a batch of events

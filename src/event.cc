@@ -11,6 +11,25 @@
 
 namespace hermes {
 
+uint64_t Event::event_id_count_ = 0;
+
+Event::Event(uint64_t time) noexcept : time_(time), id_(event_id_count_++) {
+    add_value(TIME_NAME, time);
+    add_value(ID_NAME, id_);
+}
+
+bool Event::remove_value(const std::string &name) {
+    if (name == TIME_NAME || name == ID_NAME) return false;
+    if (values_.find(name) == values_.end()) return false;
+    values_.erase(name);
+    return true;
+}
+
+void Event::set_time(uint64_t time) {
+    time_ = time;
+    values_[TIME_NAME] = time;
+}
+
 template <class... Ts>
 struct overloaded : Ts... {
     using Ts::operator()...;
@@ -33,8 +52,6 @@ std::shared_ptr<arrow::Schema> get_schema(Event *event) {
         auto field = std::make_shared<arrow::Field>(name, type);
         schema_vector.emplace_back(field);
     }
-    // time is last
-    schema_vector.emplace_back(std::make_shared<arrow::Field>("time", arrow::uint64()));
 
     return std::make_shared<arrow::Schema>(schema_vector);
 }
@@ -52,7 +69,6 @@ std::shared_ptr<arrow::Buffer> EventBatch::serialize(
     // we need to initialize the type builder
     auto *pool = arrow::default_memory_pool();
     std::vector<std::unique_ptr<arrow::ArrayBuilder>> builders;
-    auto time_builder = std::make_unique<arrow::UInt64Builder>(pool);
     // initialize the builders based on the index sequence
     {
         auto const &event = *(*this)[0];
@@ -79,7 +95,6 @@ std::shared_ptr<arrow::Buffer> EventBatch::serialize(
     }
     // write each row
     for (auto const &event : *this) {
-        (void)time_builder->Append(event->time());
         auto const &values = event->values();
         uint64_t idx = 0;
         for (auto const &[name, value] : values) {
@@ -109,7 +124,6 @@ std::shared_ptr<arrow::Buffer> EventBatch::serialize(
         }
     }
     // arrays
-    builders.emplace_back(std::move(time_builder));
     std::vector<std::shared_ptr<arrow::Array>> arrays;
     arrays.reserve(builders.size());
     for (auto &builder : builders) {
@@ -147,7 +161,7 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow:
     if (!r.ok()) return nullptr;
 
     // construct the event batch
-    auto event_batch = std::make_unique<EventBatch>("");
+    auto event_batch = std::make_unique<EventBatch>();
     event_batch->reserve(batch->num_rows());
     // create each batch
     for (auto i = 0; i < batch->num_rows(); i++) {
