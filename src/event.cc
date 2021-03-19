@@ -134,15 +134,12 @@ EventBatch::serialize() const noexcept {
     return {batch, schema};
 }
 
-std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow::Buffer> &buffer) {
-    auto batch = get_batch(buffer);
-    if (!batch) return nullptr;
-
+std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow::Table> &table) {   // NOLINT
     // construct the event batch
     auto event_batch = std::make_unique<EventBatch>();
-    event_batch->reserve(batch->num_rows());
+    event_batch->reserve(table->num_rows());
     // create each batch
-    for (auto i = 0; i < batch->num_rows(); i++) {
+    for (auto i = 0; i < table->num_rows(); i++) {
         event_batch->emplace_back(std::make_unique<Event>(0));
     }
 
@@ -153,34 +150,38 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow:
     auto str_ = arrow::utf8();
 
     // look through each column and fill in data
-    auto const &schema = batch->schema();
-    for (int i = 0; i < batch->num_columns(); i++) {
-        auto const &name = batch->column_name(i);
-        auto type = schema->field(i)->type();
-        auto const &column = batch->column(i);
-        for (int j = 0; j < batch->num_rows(); j++) {
-            auto r_ = column->GetScalar(j);
-            if (!r_.ok()) return nullptr;
-            auto const &v = *r_;
-            if (type->Equals(str_)) {
-                (*event_batch)[j]->add_value(name, get_string(v));
-            } else if (type->Equals(uint8)) {
-                (*event_batch)[j]->add_value(name, get_uint8(v));
-            } else if (type->Equals(uint16)) {
-                auto int_val_ = std::reinterpret_pointer_cast<arrow::UInt16Scalar>(v);
-                (*event_batch)[j]->add_value(name, get_uint16(v));
-            } else if (type->Equals(uint32)) {
-                auto int_val_ = std::reinterpret_pointer_cast<arrow::UInt32Scalar>(v);
-                (*event_batch)[j]->add_value(name, get_uint32(v));
-            } else if (type->Equals(uint64)) {
-                auto int_val = get_uint64(v);
-                if (name == "time") {
-                    (*event_batch)[j]->set_time(int_val);
+    auto const &schema = table->schema();
+    auto const &fields = schema->fields();
+    for (int i = 0; i < table->num_columns(); i++) {
+        auto const &name = fields[i]->name();
+        auto type = fields[i]->type();
+        auto const &column_chunks = table->column(i);
+        for (auto chunk_idx = 0; chunk_idx < column_chunks->num_chunks(); chunk_idx++) {
+            auto const &column = column_chunks->chunk(chunk_idx);
+            for (int j = 0; j < column->length(); j++) {
+                auto r_ = column->GetScalar(j);
+                if (!r_.ok()) return nullptr;
+                auto const &v = *r_;
+                if (type->Equals(str_)) {
+                    (*event_batch)[j]->add_value(name, get_string(v));
+                } else if (type->Equals(uint8)) {
+                    (*event_batch)[j]->add_value(name, get_uint8(v));
+                } else if (type->Equals(uint16)) {
+                    auto int_val_ = std::reinterpret_pointer_cast<arrow::UInt16Scalar>(v);
+                    (*event_batch)[j]->add_value(name, get_uint16(v));
+                } else if (type->Equals(uint32)) {
+                    auto int_val_ = std::reinterpret_pointer_cast<arrow::UInt32Scalar>(v);
+                    (*event_batch)[j]->add_value(name, get_uint32(v));
+                } else if (type->Equals(uint64)) {
+                    auto int_val = get_uint64(v);
+                    if (name == "time") {
+                        (*event_batch)[j]->set_time(int_val);
+                    } else {
+                        (*event_batch)[j]->add_value(name, int_val);
+                    }
                 } else {
-                    (*event_batch)[j]->add_value(name, int_val);
+                    throw std::runtime_error("Unknown type " + type->ToString());
                 }
-            } else {
-                throw std::runtime_error("Unknown type " + type->ToString());
             }
         }
     }

@@ -2,9 +2,7 @@
 
 #include "arrow.hh"
 #include "arrow/api.h"
-#include "arrow/io/memory.h"
 #include "arrow/ipc/reader.h"
-#include "arrow/ipc/writer.h"
 #include "parquet/stream_writer.h"
 
 namespace hermes {
@@ -72,38 +70,45 @@ TransactionBatch::serialize() const noexcept {
 }
 
 std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
-    const std::shared_ptr<arrow::Buffer> &buffer) {
-    auto batch = get_batch(buffer);
-    if (!batch) return nullptr;
-
-    auto id_column = batch->column(0);
-    auto start_time = batch->column(1);
-    auto end_time = batch->column(2);
-    auto events = batch->column(3);
+    const std::shared_ptr<arrow::Table> &table) {
+    auto id = table->column(0);
+    auto start = table->column(1);
+    auto end = table->column(2);
+    auto e = table->column(3);
 
     auto transactions = std::make_unique<TransactionBatch>();
-    transactions->reserve(batch->num_rows());
-    for (auto i = 0; i < batch->num_rows(); i++) {
-        transactions->emplace_back(std::make_unique<Transaction>(0));
-    }
+    transactions->reserve(table->num_rows());
 
-    for (uint64_t i = 0; i < transactions->size(); i++) {
-        auto &transaction = *(*transactions)[i];
-        transaction.id_ = get_uint64(*id_column->GetScalar(i));
-        transaction.start_time_ = get_uint64(*start_time->GetScalar(i));
-        transaction.end_time_ = get_uint64(*end_time->GetScalar(i));
+    // need to iterate over the chunks
+    auto num_chunks = id->num_chunks();
+    for (auto idx = 0; idx < num_chunks; idx++) {
+        auto id_column = id->chunk(idx);
+        auto start_time = start->chunk(idx);
+        auto end_time = end->chunk(idx);
+        auto events = e->chunk(idx);
 
-        // TODO, refactor this once it's working
-        auto event_scalar_r = events->GetScalar(i);
-        auto event_scalar = std::reinterpret_pointer_cast<arrow::ListScalar>(*event_scalar_r);
-        auto size = event_scalar->value->length();
-        std::vector<uint64_t> ids(size);
-        for (uint64_t j = 0; j < ids.size(); j++) {
-            auto v = get_uint64(*event_scalar->value->GetScalar(j));
-            ids[j] = v;
+        for (auto i = 0; i < id_column->length(); i++) {
+            auto tid = get_uint64(*id_column->GetScalar(i));
+            auto transaction = std::make_unique<Transaction>(tid);
+
+            transaction->start_time_ = get_uint64(*start_time->GetScalar(i));
+            transaction->end_time_ = get_uint64(*end_time->GetScalar(i));
+
+            // TODO, refactor this once it's working
+            auto event_scalar_r = events->GetScalar(i);
+            auto event_scalar = std::reinterpret_pointer_cast<arrow::ListScalar>(*event_scalar_r);
+            auto size = event_scalar->value->length();
+            std::vector<uint64_t> ids(size);
+            for (uint64_t j = 0; j < ids.size(); j++) {
+                auto v = get_uint64(*event_scalar->value->GetScalar(j));
+                ids[j] = v;
+            }
+            transaction->events_ids_ = std::move(ids);
+
+            transactions->emplace_back(std::move(transaction));
         }
-        transaction.events_ids_ = std::move(ids);
     }
+
     return std::move(transactions);
 }
 

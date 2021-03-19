@@ -52,6 +52,14 @@ std::shared_ptr<arrow::RecordBatch> get_batch(const std::shared_ptr<arrow::Buffe
     return batch;
 }
 
+std::shared_ptr<arrow::Table> deserialize(const std::shared_ptr<arrow::Buffer> &buffer) {
+    auto batch = get_batch(buffer);
+    if (!batch) return nullptr;
+    auto table = arrow::Table::FromRecordBatches({batch});
+    if (!table.ok()) return nullptr;
+    return *table;
+}
+
 std::shared_ptr<arrow::Table> load_table(const std::string &filename) {
     auto *pool = arrow::default_memory_pool();
     // the arrow cpp documentation is so bad that it seems impossible to create a RandomAccessFile

@@ -9,9 +9,9 @@
 #include <vector>
 
 namespace arrow {
-class Buffer;
 class RecordBatch;
 class Schema;
+class Table;
 }  // namespace arrow
 
 namespace hermes {
@@ -70,12 +70,12 @@ private:
 // a batch of events
 class EventBatch : public std::vector<std::unique_ptr<Event>> {
 public:
-    std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>> serialize()
-        const noexcept;
+    [[nodiscard]] std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>>
+    serialize() const noexcept;
     [[nodiscard]] bool validate() const noexcept;
 
     // factory method to construct event batch
-    static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Buffer> &buffer);
+    static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Table> &table);
 };
 
 }  // namespace hermes

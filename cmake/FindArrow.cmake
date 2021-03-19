@@ -3,6 +3,10 @@ set(ARROW_INCLUDE_DIR "${CMAKE_BINARY_DIR}/arrow/install/include")
 
 find_library(LIBARROW_LIBRARY NAMES arrow
         HINTS ${ARROW_LIBS_DIR})
+find_library(LIBPARQUET_LIBRARY NAMES parquet
+        HINTS ${ARROW_LIBS_DIR})
+find_library(LIBPLASMA_LIBRARY NAMES plasma
+        HINTS ${ARROW_LIBS_DIR})
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_Args(Arrow DEFAULT_MSG

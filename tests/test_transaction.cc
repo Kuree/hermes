@@ -22,7 +22,9 @@ TEST(transaction, serialization) {  // NOLINT
     auto buffer = hermes::serialize(record, schema);
     EXPECT_TRUE(buffer);
 
-    auto new_batch_ptr = hermes::TransactionBatch::deserialize(buffer);
+    auto table = hermes::deserialize(buffer);
+
+    auto new_batch_ptr = hermes::TransactionBatch::deserialize(table);
     auto &new_batch = *new_batch_ptr;
     EXPECT_EQ(new_batch.size(), batch.size());
     auto const &ref_t = batch[42];

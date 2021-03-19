@@ -30,11 +30,11 @@ private:
 
 class TransactionBatch : public std::vector<std::unique_ptr<Transaction>> {
 public:
-    std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>> serialize()
-        const noexcept;
+    [[nodiscard]] std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>>
+    serialize() const noexcept;
     // factory method to construct transaction batch
     static std::unique_ptr<TransactionBatch> deserialize(
-        const std::shared_ptr<arrow::Buffer> &buffer);
+        const std::shared_ptr<arrow::Table> &table);
 };
 
 }  // namespace hermes
