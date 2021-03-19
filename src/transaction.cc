@@ -22,9 +22,9 @@ bool Transaction::add_event(const std::unique_ptr<Event> &event) {
     return true;
 }
 
-std::shared_ptr<arrow::Buffer> TransactionBatch::serialize(
-    const std::function<std::shared_ptr<arrow::Buffer>(uint64_t)> &buffer_allocator)
-    const noexcept {
+std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>>
+TransactionBatch::serialize() const noexcept {
+    auto error_return = std::make_pair(nullptr, nullptr);
     // we need to serialize a list of event ids
     auto const &list = *this;
     auto *pool = arrow::default_memory_pool();
@@ -49,16 +49,16 @@ std::shared_ptr<arrow::Buffer> TransactionBatch::serialize(
     }
     std::shared_ptr<arrow::Array> id_array;
     auto r = id_builder.Finish(&id_array);
-    if (!r.ok()) return nullptr;
+    if (!r.ok()) return error_return;
     std::shared_ptr<arrow::Array> start_array;
     r = start_builder.Finish(&start_array);
-    if (!r.ok()) return nullptr;
+    if (!r.ok()) return error_return;
     std::shared_ptr<arrow::Array> end_array;
     r = end_builder.Finish(&end_array);
-    if (!r.ok()) return nullptr;
+    if (!r.ok()) return error_return;
     std::shared_ptr<arrow::Array> event_id_array;
     r = event_ids_list_builder.Finish(&event_id_array);
-    if (!r.ok()) return nullptr;
+    if (!r.ok()) return error_return;
 
     std::vector<std::shared_ptr<arrow::Field>> schema_vector = {
         arrow::field("id", arrow::uint64()), arrow::field("start_time", arrow::uint64()),
@@ -68,7 +68,7 @@ std::shared_ptr<arrow::Buffer> TransactionBatch::serialize(
 
     auto batch = arrow::RecordBatch::Make(schema, size(),
                                           {id_array, start_array, end_array, event_id_array});
-    return ::hermes::serialize(batch, schema, buffer_allocator);
+    return {batch, schema};
 }
 
 std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(

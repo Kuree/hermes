@@ -15,8 +15,7 @@ namespace hermes {
 
 // helper functions to deal with arrow
 std::shared_ptr<arrow::Buffer> serialize(
-    const std::shared_ptr<arrow::RecordBatch> &batch, const std::shared_ptr<arrow::Schema> &schema,
-    const std::function<std::shared_ptr<arrow::Buffer>(uint64_t)> &buffer_allocator);
+    const std::shared_ptr<arrow::RecordBatch> &batch, const std::shared_ptr<arrow::Schema> &schema);
 
 std::shared_ptr<arrow::RecordBatch> get_batch(const std::shared_ptr<arrow::Buffer> &buffer);
 

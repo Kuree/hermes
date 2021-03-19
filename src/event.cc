@@ -4,9 +4,7 @@
 
 #include "arrow.hh"
 #include "arrow/api.h"
-#include "arrow/io/memory.h"
 #include "arrow/ipc/reader.h"
-#include "arrow/ipc/writer.h"
 #include "parquet/stream_writer.h"
 
 namespace hermes {
@@ -56,10 +54,10 @@ std::shared_ptr<arrow::Schema> get_schema(Event *event) {
     return std::make_shared<arrow::Schema>(schema_vector);
 }
 
-// TODO: better handling
-std::shared_ptr<arrow::Buffer> EventBatch::serialize(
-    const std::function<std::shared_ptr<arrow::Buffer>(uint64_t)> &buffer_allocator) {
-    if (empty()) return nullptr;
+std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>>
+EventBatch::serialize() const noexcept {
+    auto const error_return = std::make_pair(nullptr, nullptr);
+    if (empty()) return error_return;
     // we assume it is already validated
     std::shared_ptr<arrow::Schema> schema;
     {
@@ -133,7 +131,7 @@ std::shared_ptr<arrow::Buffer> EventBatch::serialize(
     }
 
     auto batch = arrow::RecordBatch::Make(schema, size(), arrays);
-    return ::hermes::serialize(batch, schema, buffer_allocator);
+    return {batch, schema};
 }
 
 std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow::Buffer> &buffer) {

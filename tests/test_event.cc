@@ -1,4 +1,5 @@
 #include "event.hh"
+#include "arrow.hh"
 #include "gtest/gtest.h"
 
 #include "arrow/api.h"
@@ -39,17 +40,8 @@ TEST(event_batch, serilizattion) {  // NOLINT
     }
     EXPECT_TRUE(batch.validate());
 
-    auto buffer_allocator = [](uint64_t size) -> std::shared_ptr<arrow::Buffer> {
-        auto r = arrow::AllocateBuffer(static_cast<int64_t>(size));
-        if (!r.ok()) {
-            return nullptr;
-        } else {
-            std::shared_ptr<arrow::Buffer> ptr = std::move(*r);
-            return ptr;
-        }
-    };
-
-    auto r = batch.serialize(buffer_allocator);
+    auto [record, schema] = batch.serialize();
+    auto r = hermes::serialize(record, schema);
     EXPECT_TRUE(r);
 
     auto new_batch_ = hermes::EventBatch::deserialize(r);

@@ -8,9 +8,18 @@
 
 namespace hermes {
 
-std::shared_ptr<arrow::Buffer> serialize(
-    const std::shared_ptr<arrow::RecordBatch> &batch, const std::shared_ptr<arrow::Schema> &schema,
-    const std::function<std::shared_ptr<arrow::Buffer>(uint64_t)> &buffer_allocator) {
+std::shared_ptr<arrow::Buffer> allocate_buffer(uint64_t size) {
+    auto r = arrow::AllocateBuffer(static_cast<int64_t>(size));
+    if (!r.ok()) {
+        return nullptr;
+    } else {
+        std::shared_ptr<arrow::Buffer> ptr = std::move(*r);
+        return ptr;
+    }
+}
+
+std::shared_ptr<arrow::Buffer> serialize(const std::shared_ptr<arrow::RecordBatch> &batch,
+                                         const std::shared_ptr<arrow::Schema> &schema) {
     auto mock_sink = arrow::io::MockOutputStream();
     auto stream_writer_r = arrow::ipc::MakeStreamWriter(&mock_sink, schema);
     if (!stream_writer_r.ok()) return nullptr;
@@ -18,7 +27,7 @@ std::shared_ptr<arrow::Buffer> serialize(
     (void)stream_writer->WriteRecordBatch(*batch);
     (void)stream_writer->Close();
     auto data_size = *mock_sink.Tell();
-    auto buff = buffer_allocator(data_size);
+    auto buff = allocate_buffer(data_size);
     // TODO: refactor the code later if we want to save the data
     arrow::io::FixedSizeBufferWriter stream(buff);
     auto writer = arrow::ipc::MakeStreamWriter(&stream, schema);

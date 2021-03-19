@@ -30,8 +30,7 @@ private:
 
 class TransactionBatch : public std::vector<std::unique_ptr<Transaction>> {
 public:
-    std::shared_ptr<arrow::Buffer> serialize(
-        const std::function<std::shared_ptr<arrow::Buffer>(uint64_t)> &buffer_allocator)
+    std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>> serialize()
         const noexcept;
     // factory method to construct transaction batch
     static std::unique_ptr<TransactionBatch> deserialize(

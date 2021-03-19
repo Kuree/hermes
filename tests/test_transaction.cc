@@ -1,3 +1,4 @@
+#include "arrow.hh"
 #include "arrow/api.h"
 #include "gtest/gtest.h"
 #include "transaction.hh"
@@ -17,17 +18,9 @@ TEST(transaction, serialization) {  // NOLINT
         batch.emplace_back(std::move(transaction));
     }
 
-    auto buffer_allocator = [](uint64_t size) -> std::shared_ptr<arrow::Buffer> {
-        auto r = arrow::AllocateBuffer(static_cast<int64_t>(size));
-        if (!r.ok()) {
-            return nullptr;
-        } else {
-            std::shared_ptr<arrow::Buffer> ptr = std::move(*r);
-            return ptr;
-        }
-    };
-
-    auto buffer = batch.serialize(buffer_allocator);
+    auto [record, schema] = batch.serialize();
+    auto buffer = hermes::serialize(record, schema);
+    EXPECT_TRUE(buffer);
 
     auto new_batch_ptr = hermes::TransactionBatch::deserialize(buffer);
     auto &new_batch = *new_batch_ptr;
