@@ -30,7 +30,9 @@ std::shared_ptr<arrow::Buffer> TransactionBatch::serialize(
     arrow::UInt64Builder id_builder(pool);
     arrow::UInt64Builder start_builder(pool);
     arrow::UInt64Builder end_builder(pool);
-    arrow::ListBuilder event_ids_builder(pool, std::make_shared<arrow::UInt64Builder>(pool));
+    arrow::ListBuilder event_ids_list_builder(pool, std::make_shared<arrow::UInt64Builder>(pool));
+    auto &event_ids_builder =
+        *(reinterpret_cast<arrow::UInt64Builder *>(event_ids_list_builder.value_builder()));
 
     for (auto const &transaction : list) {
         (void)id_builder.Append(transaction->id());
@@ -41,14 +43,20 @@ std::shared_ptr<arrow::Buffer> TransactionBatch::serialize(
         ids.reserve(events.size());
         for (auto const &id : events) ids.emplace_back(id);
         // indicate the start of a new list row
-        (void)event_ids_builder.Append();
-        (void)event_ids_builder.AppendValues(reinterpret_cast<const int *>(ids.data()), ids.size());
+        (void)event_ids_list_builder.Append();
+        (void)event_ids_builder.AppendValues(ids.data(), ids.size());
     }
     std::shared_ptr<arrow::Array> id_array;
     auto r = id_builder.Finish(&id_array);
     if (!r.ok()) return nullptr;
+    std::shared_ptr<arrow::Array> start_array;
+    r = start_builder.Finish(&start_array);
+    if (!r.ok()) return nullptr;
+    std::shared_ptr<arrow::Array> end_array;
+    r = end_builder.Finish(&end_array);
+    if (!r.ok()) return nullptr;
     std::shared_ptr<arrow::Array> event_id_array;
-    r = event_ids_builder.Finish(&event_id_array);
+    r = event_ids_list_builder.Finish(&event_id_array);
     if (!r.ok()) return nullptr;
 
     std::vector<std::shared_ptr<arrow::Field>> schema_vector = {
@@ -57,7 +65,8 @@ std::shared_ptr<arrow::Buffer> TransactionBatch::serialize(
         arrow::field("events", arrow::list(arrow::uint64()))};
     auto schema = std::make_shared<arrow::Schema>(schema_vector);
 
-    auto batch = arrow::RecordBatch::Make(schema, size(), {id_array, event_id_array});
+    auto batch = arrow::RecordBatch::Make(schema, size(),
+                                          {id_array, start_array, end_array, event_id_array});
     return ::hermes::serialize(batch, schema, buffer_allocator);
 }
 

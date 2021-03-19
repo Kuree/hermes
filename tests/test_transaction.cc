@@ -1,7 +1,6 @@
-#include "transaction.hh"
-#include "gtest/gtest.h"
-
 #include "arrow/api.h"
+#include "gtest/gtest.h"
+#include "transaction.hh"
 
 TEST(transaction, serialization) {  // NOLINT
     hermes::TransactionBatch batch;
@@ -19,13 +18,13 @@ TEST(transaction, serialization) {  // NOLINT
     }
 
     auto buffer_allocator = [](uint64_t size) -> std::shared_ptr<arrow::Buffer> {
-      auto r = arrow::AllocateBuffer(static_cast<int64_t>(size));
-      if (!r.ok()) {
-          return nullptr;
-      } else {
-          std::shared_ptr<arrow::Buffer> ptr = std::move(*r);
-          return ptr;
-      }
+        auto r = arrow::AllocateBuffer(static_cast<int64_t>(size));
+        if (!r.ok()) {
+            return nullptr;
+        } else {
+            std::shared_ptr<arrow::Buffer> ptr = std::move(*r);
+            return ptr;
+        }
     };
 
     auto buffer = batch.serialize(buffer_allocator);
@@ -33,4 +32,12 @@ TEST(transaction, serialization) {  // NOLINT
     auto new_batch_ptr = hermes::TransactionBatch::deserialize(buffer);
     auto &new_batch = *new_batch_ptr;
     EXPECT_EQ(new_batch.size(), batch.size());
+    auto const &ref_t = batch[42];
+    auto const &test_t = new_batch[42];
+    EXPECT_EQ(test_t->id(), ref_t->id());
+    EXPECT_EQ(test_t->start_time(), ref_t->start_time());
+    EXPECT_EQ(test_t->events().size(), ref_t->events().size());
+    for (auto i = 0; i < test_t->events().size(); i++) {
+        EXPECT_EQ(test_t->events()[i], ref_t->events()[i]);
+    }
 }
