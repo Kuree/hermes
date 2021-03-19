@@ -128,8 +128,22 @@ void Serializer::write_stat(const std::string &json_filename, const std::string 
                             const EventBatch &batch) {
     rapidjson::Document document(rapidjson::kObjectType);
     set_member(document, "parquet", parquet_filename);
+    set_member(document, "type", "event");
 
     // need to compute the max and min ID
+    uint64_t min_time = std::numeric_limits<uint64_t>::max(), max_time = 0,
+             min_id = std::numeric_limits<uint64_t>::max(), max_id = 0;
+    for (auto const &event : batch) {
+        if (event->time() > max_time) max_time = event->time();
+        if (event->time() < min_time) min_time = event->time();
+        max_id = std::max(max_id, event->id());
+        min_id = std::min(min_id, event->id());
+    }
+
+    set_member(document, "min_time", min_time);
+    set_member(document, "max_time", max_time);
+    set_member(document, "min_id", min_id);
+    set_member(document, "max_id", max_id);
 
     write_stat_to_file(document, json_filename);
 }
@@ -138,6 +152,22 @@ void Serializer::write_stat(const std::string &json_filename, const std::string 
                             const TransactionBatch &batch) {
     rapidjson::Document document(rapidjson::kObjectType);
     set_member(document, "parquet", parquet_filename);
+    set_member(document, "type", "transaction");
+
+    uint64_t min_time = std::numeric_limits<uint64_t>::max(), max_time = 0,
+             min_id = std::numeric_limits<uint64_t>::max(), max_id = 0;
+
+    for (auto const &event : batch) {
+        if (event->end_time() > max_time) max_time = event->end_time();
+        if (event->start_time() < min_time) min_time = event->start_time();
+        max_id = std::max(max_id, event->id());
+        min_id = std::min(min_id, event->id());
+    }
+
+    set_member(document, "min_time", min_time);
+    set_member(document, "max_time", max_time);
+    set_member(document, "min_id", min_id);
+    set_member(document, "max_id", max_id);
 
     write_stat_to_file(document, json_filename);
 }
