@@ -1,9 +1,10 @@
 #ifndef HERMES_SERIALIZER_HH
 #define HERMES_SERIALIZER_HH
 
+#include <mutex>
+
 #include "event.hh"
 #include "transaction.hh"
-#include <mutex>
 
 namespace hermes {
 class Serializer {
@@ -19,6 +20,12 @@ private:
     std::mutex batch_mutex_;
 
     std::pair<std::string, std::string> get_next_filename();
+    static bool serialize(const std::string &filename,
+                          const std::shared_ptr<arrow::RecordBatch> &batch);
+    static void write_stat(const std::string &json_filename, const std::string &parquet_filename,
+                           const EventBatch &batch);
+    static void write_stat(const std::string &json_filename, const std::string &parquet_filename,
+                           const TransactionBatch &batch);
 };
 }  // namespace hermes
 
