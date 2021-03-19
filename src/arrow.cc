@@ -1,9 +1,12 @@
 #include "arrow.hh"
 
 #include "arrow/api.h"
+#include "arrow/io/file.h"
 #include "arrow/io/memory.h"
 #include "arrow/ipc/reader.h"
 #include "arrow/ipc/writer.h"
+#include "parquet/arrow/reader.h"
+#include "parquet/file_reader.h"
 #include "parquet/stream_writer.h"
 
 namespace hermes {
@@ -47,6 +50,24 @@ std::shared_ptr<arrow::RecordBatch> get_batch(const std::shared_ptr<arrow::Buffe
     auto r = reader->ReadNext(&batch);
     if (!r.ok()) return nullptr;
     return batch;
+}
+
+std::shared_ptr<arrow::Table> load_table(const std::string &filename) {
+    auto *pool = arrow::default_memory_pool();
+    // the arrow cpp documentation is so bad that it seems impossible to create a RandomAccessFile
+    // since there is no function actually produce a random access file
+    // https://arrow.apache.org/docs/cpp/parquet.html
+
+    auto reader = parquet::ParquetFileReader::OpenFile(filename);
+    std::unique_ptr<parquet::arrow::FileReader> arrow_reader;
+    auto r = parquet::arrow::FileReader::Make(pool, std::move(reader), &arrow_reader);
+    if (!r.ok()) {
+        return nullptr;
+    }
+    std::shared_ptr<arrow::Table> table;
+    r = arrow_reader->ReadTable(&table);
+    if (!r.ok()) return nullptr;
+    return table;
 }
 
 uint8_t get_uint8(const std::shared_ptr<arrow::Scalar> &scalar) {
