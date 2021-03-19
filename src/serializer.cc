@@ -11,4 +11,12 @@ Serializer::Serializer(std::string output_dir): output_dir_(std::move(output_dir
     }
 }
 
+void Serializer::serialize(const EventBatch &batch) {
+
+}
+
+void Serializer::serialize(const TransactionBatch &batch) {
+
+}
+
 }

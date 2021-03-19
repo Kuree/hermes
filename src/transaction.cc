@@ -23,7 +23,8 @@ bool Transaction::add_event(const std::unique_ptr<Event> &event) {
 }
 
 std::shared_ptr<arrow::Buffer> TransactionBatch::serialize(
-    const std::function<std::shared_ptr<arrow::Buffer>(uint64_t)> &buffer_allocator) {
+    const std::function<std::shared_ptr<arrow::Buffer>(uint64_t)> &buffer_allocator)
+    const noexcept {
     // we need to serialize a list of event ids
     auto const &list = *this;
     auto *pool = arrow::default_memory_pool();

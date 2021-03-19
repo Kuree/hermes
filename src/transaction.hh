@@ -14,7 +14,7 @@ public:
     void finish() { is_done_ = true; }
     [[nodiscard]] bool finished() const { return is_done_; }
     [[nodiscard]] uint64_t id() const { return id_; }
-    [[nodiscard]] const std::vector<uint64_t> & events() const { return events_ids_; }
+    [[nodiscard]] const std::vector<uint64_t> &events() const { return events_ids_; }
     [[nodiscard]] uint64_t start_time() const { return start_time_; }
     [[nodiscard]] uint64_t end_time() const { return end_time_; }
 
@@ -31,7 +31,8 @@ private:
 class TransactionBatch : public std::vector<std::unique_ptr<Transaction>> {
 public:
     std::shared_ptr<arrow::Buffer> serialize(
-        const std::function<std::shared_ptr<arrow::Buffer>(uint64_t)> &buffer_allocator);
+        const std::function<std::shared_ptr<arrow::Buffer>(uint64_t)> &buffer_allocator)
+        const noexcept;
     // factory method to construct transaction batch
     static std::unique_ptr<TransactionBatch> deserialize(
         const std::shared_ptr<arrow::Buffer> &buffer);
