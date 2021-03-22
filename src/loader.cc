@@ -5,6 +5,7 @@
 
 #include "arrow/api.h"
 #include "fmt/format.h"
+#include "parquet/arrow/reader.h"
 #include "rapidjson/document.h"
 #include "rapidjson/rapidjson.h"
 
@@ -29,6 +30,31 @@ Loader::Loader(std::string dir) : dir_(fs::absolute(std::move(dir))) {
             load_json(path);
         }
     }
+}
+
+std::vector<std::shared_ptr<arrow::Table>> Loader::get_transactions(uint64_t min_time,
+                                                                    uint64_t max_time) {
+    // need to go through each
+    // maybe index on the time?
+    // I don't expect the number of files to be bigger than 1000 (assume each file is about 10MB)
+    // linear scan should be sufficient
+    std::vector<const FileInfo *> files;
+    files.reserve(16);
+    for (auto const &file : files_) {
+        if (file->max_time < min_time || file->min_time > max_time) continue;
+        files.emplace_back(file.get());
+    }
+    // load the tables
+    // TODO: implement cache replacement algorithm
+    //   for now we hold all of them in memory
+    std::vector<std::shared_ptr<arrow::Table>> result;
+    result.reserve(files.size());
+    for (auto const *file : files) {
+        auto entry = load_table(file->filename);
+        result.emplace_back(entry);
+    }
+
+    return result;
 }
 
 static bool check_member(rapidjson::Document &document, const char *member_name) {
@@ -66,7 +92,7 @@ void Loader::load_json(const std::string &path) {
     // get indexed value
     auto opt_parquet_file = get_member<std::string>(document, "parquet");
     if (!opt_parquet_file) return;
-    auto const &parquet_file = *opt_parquet_file;
+    auto parquet_file = *opt_parquet_file;
 
     auto opt_type = get_member<std::string>(document, "type");
     if (!opt_type) return;
@@ -91,7 +117,9 @@ void Loader::load_json(const std::string &path) {
             times.second = *value;
     }
 
-    auto info = std::make_unique<FileInfo>(path, ids.first, ids.second, times.first, times.second);
+    parquet_file = fs::path(path).parent_path() / parquet_file;
+    auto info =
+        std::make_unique<FileInfo>(parquet_file, ids.first, ids.second, times.first, times.second);
     if (type == "event") {
         events_.emplace_back(info.get());
     } else if (type == "transaction") {
@@ -100,6 +128,10 @@ void Loader::load_json(const std::string &path) {
         return;
     }
     files_.emplace_back(std::move(info));
+}
+
+std::shared_ptr<arrow::Table> Loader::load_table(const std::string &filename) {
+    
 }
 
 }  // namespace hermes
