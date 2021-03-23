@@ -37,6 +37,7 @@ public:
                                                                 uint64_t max_time);
 
     std::vector<std::shared_ptr<arrow::Table>> get_events(uint64_t min_time, uint64_t max_time);
+    std::vector<Event*> get_events(const Transaction &transaction);
 
 private:
     std::string dir_;
@@ -45,13 +46,15 @@ private:
     // indices
     std::vector<const FileInfo *> events_;
     std::vector<const FileInfo *> transactions_;
-    // local caches
     std::unordered_map<const FileInfo *, std::shared_ptr<arrow::Table>> tables_;
+    // local caches
+    std::unordered_map<const arrow::Table *, std::unique_ptr<EventBatch>> event_cache_;
 
     void load_json(const std::string &path);
-    std::shared_ptr<arrow::Table> load_table(const std::string &filename);
+    std::shared_ptr<arrow::Table> load_table(const FileInfo* info);
     std::vector<std::shared_ptr<arrow::Table>> load_tables(
         const std::vector<const FileInfo *> &files);
+    EventBatch *load_events(const std::shared_ptr<arrow::Table> &table);
 };
 
 }  // namespace hermes

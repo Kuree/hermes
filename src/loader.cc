@@ -44,7 +44,8 @@ std::vector<std::shared_ptr<arrow::Table>> Loader::get_transactions(uint64_t min
         files.emplace_back(file);
     }
     // load the tables
-    return load_tables(files);
+    auto result = load_tables(files);
+    return result;
 }
 
 std::vector<std::shared_ptr<arrow::Table>> Loader::get_events(uint64_t min_time,
@@ -56,7 +57,48 @@ std::vector<std::shared_ptr<arrow::Table>> Loader::get_events(uint64_t min_time,
         files.emplace_back(file);
     }
     // load the tables
-    return load_tables(files);
+    auto result = load_tables(files);
+    return result;
+}
+
+std::vector<Event *> Loader::get_events(const Transaction &transaction) {
+    std::unordered_map<const FileInfo *, std::vector<uint64_t>> files;
+    // I'm sure there are some efficient ways to compute this, but for now the performance is fine
+    auto const &ids = transaction.events();
+    for (auto const &file : events_) {
+        for (auto id : ids) {
+            if (file->min_id >= id && file->max_id <= id) {
+                files[file].emplace_back(id);
+            }
+        }
+    }
+    std::unordered_map<uint64_t, Event *> id_mapping;
+    for (auto const &[file, ids] : files) {
+        auto table = load_table(file);
+        auto *events = load_events(table);
+
+        for (auto const id : ids) {
+            if (id_mapping.find(id) != id_mapping.end()) {
+                // we already found it
+                continue;
+            }
+            auto *e = events->get_event(id);
+            if (e) {
+                // we found it
+                id_mapping.emplace(id, e);
+            }
+        }
+    }
+    std::vector<Event *> result;
+    result.resize(transaction.events().size(), nullptr);
+    for (auto i = 0; i < result.size(); i++) {
+        auto const id = transaction.events()[i];
+        if (id_mapping.find(id) != id_mapping.end()) {
+            result[i] = id_mapping.at(id);
+        }
+    }
+
+    return result;
 }
 
 static bool check_member(rapidjson::Document &document, const char *member_name) {
@@ -137,8 +179,11 @@ void Loader::load_json(const std::string &path) {
     files_.emplace_back(std::move(info));
 }
 
-std::shared_ptr<arrow::Table> Loader::load_table(const std::string &filename) {
-    auto res_f = fs_->OpenInputFile(filename);
+std::shared_ptr<arrow::Table> Loader::load_table(const FileInfo *file) {
+    if (tables_.find(file) != tables_.end()) {
+        return tables_.at(file);
+    }
+    auto res_f = fs_->OpenInputFile(file->filename);
     if (!res_f.ok()) return nullptr;
     auto f = *res_f;
     auto *pool = arrow::default_memory_pool();
@@ -148,21 +193,31 @@ std::shared_ptr<arrow::Table> Loader::load_table(const std::string &filename) {
     std::shared_ptr<arrow::Table> table;
     auto res_t = file_reader->ReadTable(&table);
     if (!res_t.ok()) return nullptr;
+    tables_.emplace(file, table);
     return table;
 }
 
 std::vector<std::shared_ptr<arrow::Table>> Loader::load_tables(
     const std::vector<const FileInfo *> &files) {
-    // TODO: implement cache replacement algorithm
-    //   for now we hold all of them in memory
     std::vector<std::shared_ptr<arrow::Table>> result;
     result.reserve(files.size());
     for (auto const *file : files) {
-        auto entry = load_table(file->filename);
+        auto entry = load_table(file);
         result.emplace_back(entry);
     }
 
     return result;
+}
+
+EventBatch *Loader::load_events(const std::shared_ptr<arrow::Table> &table) {
+    // TODO: implement cache replacement algorithm
+    //   for now we hold all of them in memory
+    if (event_cache_.find(table.get()) == event_cache_.end()) {
+        auto events = EventBatch::deserialize(table);
+        // put it into cache
+        event_cache_.emplace(table.get(), std::move(events));
+    }
+    return event_cache_.at(table.get()).get();
 }
 
 }  // namespace hermes

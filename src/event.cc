@@ -134,7 +134,8 @@ EventBatch::serialize() const noexcept {
     return {batch, schema};
 }
 
-std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow::Table> &table) {   // NOLINT
+std::unique_ptr<EventBatch> EventBatch::deserialize(
+    const std::shared_ptr<arrow::Table> &table) {  // NOLINT
     // construct the event batch
     auto event_batch = std::make_unique<EventBatch>();
     event_batch->reserve(table->num_rows());
@@ -205,6 +206,23 @@ bool EventBatch::validate() const noexcept {
         }
     }
     return true;
+}
+
+Event *EventBatch::get_event(uint64_t id) {
+    if (index_.empty()) {
+        build_index();
+    }
+    if (index_.find(id) != index_.end()) {
+        return index_.at(id);
+    } else {
+        return nullptr;
+    }
+}
+
+void EventBatch::build_index() {
+    for (auto const &e : *this) {
+        index_.emplace(e->id(), e.get());
+    }
 }
 
 }  // namespace hermes

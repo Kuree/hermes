@@ -7,6 +7,8 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <unordered_map>
+
 
 namespace arrow {
 class RecordBatch;
@@ -76,6 +78,13 @@ public:
 
     // factory method to construct event batch
     static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Table> &table);
+
+    Event *get_event(uint64_t id);
+
+private:
+    std::unordered_map<uint64_t, Event*> index_;
+
+    void build_index();
 };
 
 }  // namespace hermes
