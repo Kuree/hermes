@@ -61,5 +61,12 @@ TEST(serialization, event) {  // NOLINT
     hermes::Loader loader(dir.path());
     auto tables = loader.get_events(0, num_event);
     EXPECT_EQ(tables.size(), 1);
-
+    auto table = tables[0];
+    auto event_batch = hermes::EventBatch::deserialize(table);
+    EXPECT_EQ(event_batch->size(), num_event);
+    auto const &event = (*event_batch)[42];
+    EXPECT_EQ(event->time(), 42);
+    auto value = event->get_value<uint64_t>("value1");
+    EXPECT_TRUE(value);
+    EXPECT_EQ(*value, 42);
 }

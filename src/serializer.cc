@@ -136,7 +136,8 @@ void write_stat_to_file(rapidjson::Document &document, const std::string &filena
 void Serializer::write_stat(const std::string &json_filename, const std::string &parquet_filename,
                             const EventBatch &batch) {
     rapidjson::Document document(rapidjson::kObjectType);
-    set_member(document, "parquet", parquet_filename);
+    auto parquet_basename = std::string(fs::path(parquet_filename).filename());
+    set_member(document, "parquet", parquet_basename);
     set_member(document, "type", "event");
 
     // need to compute the max and min ID

@@ -83,10 +83,14 @@ static std::optional<T> get_member(rapidjson::Document &document, const char *me
 }
 
 void Loader::load_json(const std::string &path) {
-    std::string content;
     std::ifstream stream(path);
     if (stream.bad()) return;
-    stream >> content;
+    // https://stackoverflow.com/a/2602258
+    stream.seekg(0, std::ios::end);
+    auto size = stream.tellg();
+    std::string content(size, ' ');
+    stream.seekg(0);
+    stream.read(&content[0], size);
 
     rapidjson::Document document;
     document.Parse(content.c_str());
@@ -101,7 +105,7 @@ void Loader::load_json(const std::string &path) {
     auto const &type = *opt_type;
 
     std::pair<uint64_t, uint64_t> ids, times;
-    const static std::vector minmax = {"max", "min"};
+    const static std::vector minmax = {"min", "max"};
     for (auto i = 0; i < 2; i++) {
         auto name = fmt::format("{0}_id", minmax[i]);
         auto value = get_member<uint64_t>(document, name.c_str());
