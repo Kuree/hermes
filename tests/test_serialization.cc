@@ -3,9 +3,9 @@
 
 #include "arrow.hh"
 #include "event.hh"
-#include "serializer.hh"
-#include "loader.hh"
 #include "gtest/gtest.h"
+#include "loader.hh"
+#include "serializer.hh"
 
 namespace fs = std::filesystem;
 
@@ -69,4 +69,34 @@ TEST(serialization, event) {  // NOLINT
     auto value = event->get_value<uint64_t>("value1");
     EXPECT_TRUE(value);
     EXPECT_EQ(*value, 42);
+}
+
+TEST(serialization, transactions) {  // NOLINT
+    TempDirectory dir;
+
+    hermes::TransactionBatch batch;
+    constexpr auto num_transactions = 1000;
+    for (auto i = 0; i < num_transactions; i++) {
+        auto t = std::make_unique<hermes::Transaction>(i);
+        for (uint32_t j = 0; j < i % 10; j++) {
+            auto e = std::make_unique<hermes::Event>(i);
+            e->set_time(i);
+            t->add_event(e);
+        }
+        batch.emplace_back(std::move(t));
+    }
+
+    // serialize it
+    hermes::Serializer s(dir.path());
+    s.serialize(batch);
+
+    hermes::Loader loader(dir.path());
+    auto tables = loader.get_transactions(0, num_transactions);
+    EXPECT_EQ(tables.size(), 1);
+    auto table = tables[0];
+    auto transaction_batch = hermes::TransactionBatch::deserialize(table);
+    EXPECT_EQ(transaction_batch->size(), num_transactions);
+    auto const &transaction = (*transaction_batch)[42];
+    EXPECT_EQ(transaction->start_time(), 42);
+    EXPECT_EQ(transaction->events().size(), 42 % 10);
 }
