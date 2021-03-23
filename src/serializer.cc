@@ -38,7 +38,7 @@ bool Serializer::serialize(const EventBatch &batch) {
     if (!res) return false;
 
     // write out event batch properties
-    write_stat(parquet_name, json_name, batch);
+    write_stat(json_name, parquet_name, batch);
     return true;
 }
 
@@ -51,7 +51,7 @@ bool Serializer::serialize(const TransactionBatch &batch) {
     if (!res) return false;
 
     // write out event batch properties
-    write_stat(parquet_name, json_name, batch);
+    write_stat(json_name, parquet_name, batch);
     return true;
 }
 
@@ -60,15 +60,17 @@ std::pair<std::string, std::string> Serializer::get_next_filename() {
     uint64_t id = batch_counter_++;
     auto parquet_name = fmt::format("{0}.parquet", id);
     auto json_name = fmt::format("{0}.json", id);
+    auto dir = fs::path(output_dir_);
+    parquet_name = dir / parquet_name;
+    json_name = dir / json_name;
     return {parquet_name, json_name};
 }
 
 bool Serializer::serialize(const std::string &filename,
                            const std::shared_ptr<arrow::RecordBatch> &record) {
-    std::shared_ptr<arrow::io::FileOutputStream> outfile;
     auto res_f = arrow::io::FileOutputStream::Open(filename);
     if (!res_f.ok()) return false;
-    auto f = *res_f;
+    auto out_file = *res_f;
 
     // serialize
     auto table_r = arrow::Table::FromRecordBatches({record});
@@ -76,7 +78,7 @@ bool Serializer::serialize(const std::string &filename,
     auto table = *table_r;
 
     auto res =
-        parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), outfile,
+        parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), out_file,
                                    get_chunk_size(static_cast<uint64_t>(record->num_rows())));
 
     // write out table specifics
@@ -111,6 +113,13 @@ template <typename T>
 void set_member(rapidjson::Document &document, const char *name, const T &value) {
     auto &allocator = document.GetAllocator();
     set_member(document, allocator, name, value);
+}
+
+void set_member(rapidjson::Document &document, const char *name, const char *value) {
+    auto &allocator = document.GetAllocator();
+    rapidjson::Value key(name, allocator);  // NOLINT
+    rapidjson::Value v(value, allocator);
+    document.AddMember(key, v, allocator);
 }
 
 void write_stat_to_file(rapidjson::Document &document, const std::string &filename) {

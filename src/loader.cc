@@ -4,6 +4,7 @@
 #include <fstream>
 
 #include "arrow/api.h"
+#include "arrow/filesystem/localfs.h"
 #include "fmt/format.h"
 #include "parquet/arrow/reader.h"
 #include "rapidjson/document.h"
@@ -14,9 +15,6 @@ namespace fs = std::filesystem;
 namespace hermes {
 
 Loader::Loader(std::string dir) : dir_(fs::absolute(std::move(dir))) {
-    // we can't use arrow's filesystem to handle this because the default public API
-    // doesn't have proper interface exposed. in the future we will directly use the
-    // internal API
     // do a LIST operation
     for (auto const &entry : fs::directory_iterator(dir_)) {
         auto path = fs::path(entry);
@@ -30,6 +28,7 @@ Loader::Loader(std::string dir) : dir_(fs::absolute(std::move(dir))) {
             load_json(path);
         }
     }
+    fs_ = std::make_shared<arrow::fs::LocalFileSystem>();
 }
 
 std::vector<std::shared_ptr<arrow::Table>> Loader::get_transactions(uint64_t min_time,
@@ -40,21 +39,24 @@ std::vector<std::shared_ptr<arrow::Table>> Loader::get_transactions(uint64_t min
     // linear scan should be sufficient
     std::vector<const FileInfo *> files;
     files.reserve(16);
-    for (auto const &file : files_) {
+    for (auto const &file : transactions_) {
         if (file->max_time < min_time || file->min_time > max_time) continue;
-        files.emplace_back(file.get());
+        files.emplace_back(file);
     }
     // load the tables
-    // TODO: implement cache replacement algorithm
-    //   for now we hold all of them in memory
-    std::vector<std::shared_ptr<arrow::Table>> result;
-    result.reserve(files.size());
-    for (auto const *file : files) {
-        auto entry = load_table(file->filename);
-        result.emplace_back(entry);
-    }
+    return load_tables(files);
+}
 
-    return result;
+std::vector<std::shared_ptr<arrow::Table>> Loader::get_events(uint64_t min_time,
+                                                              uint64_t max_time) {
+    std::vector<const FileInfo *> files;
+    files.reserve(16);
+    for (auto const &file : events_) {
+        if (file->max_time < min_time || file->min_time > max_time) continue;
+        files.emplace_back(file);
+    }
+    // load the tables
+    return load_tables(files);
 }
 
 static bool check_member(rapidjson::Document &document, const char *member_name) {
@@ -118,8 +120,9 @@ void Loader::load_json(const std::string &path) {
     }
 
     parquet_file = fs::path(path).parent_path() / parquet_file;
-    auto info =
-        std::make_unique<FileInfo>(parquet_file, ids.first, ids.second, times.first, times.second);
+    auto info = std::make_unique<FileInfo>(
+        type == "event" ? FileInfo::FileType::event : FileInfo::FileType::transaction, parquet_file,
+        ids.first, ids.second, times.first, times.second);
     if (type == "event") {
         events_.emplace_back(info.get());
     } else if (type == "transaction") {
@@ -131,7 +134,31 @@ void Loader::load_json(const std::string &path) {
 }
 
 std::shared_ptr<arrow::Table> Loader::load_table(const std::string &filename) {
-    
+    auto res_f = fs_->OpenInputFile(filename);
+    if (!res_f.ok()) return nullptr;
+    auto f = *res_f;
+    auto *pool = arrow::default_memory_pool();
+    std::unique_ptr<parquet::arrow::FileReader> file_reader;
+    auto res = parquet::arrow::OpenFile(f, pool, &file_reader);
+    if (!res.ok()) return nullptr;
+    std::shared_ptr<arrow::Table> table;
+    auto res_t = file_reader->ReadTable(&table);
+    if (!res_t.ok()) return nullptr;
+    return table;
+}
+
+std::vector<std::shared_ptr<arrow::Table>> Loader::load_tables(
+    const std::vector<const FileInfo *> &files) {
+    // TODO: implement cache replacement algorithm
+    //   for now we hold all of them in memory
+    std::vector<std::shared_ptr<arrow::Table>> result;
+    result.reserve(files.size());
+    for (auto const *file : files) {
+        auto entry = load_table(file->filename);
+        result.emplace_back(entry);
+    }
+
+    return result;
 }
 
 }  // namespace hermes

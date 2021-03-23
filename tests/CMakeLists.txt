@@ -7,3 +7,4 @@ endfunction()
 
 setup_test_target(test_event)
 setup_test_target(test_transaction)
+setup_test_target(test_serialization)
