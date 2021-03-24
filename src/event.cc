@@ -28,6 +28,11 @@ void Event::set_time(uint64_t time) {
     values_[TIME_NAME] = time;
 }
 
+void Event::set_id(uint64_t id) {
+    id_ = id;
+    values_[ID_NAME] = id;
+}
+
 template <class... Ts>
 struct overloaded : Ts... {
     using Ts::operator()...;
@@ -175,8 +180,10 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(
                     (*event_batch)[j]->add_value(name, get_uint32(v));
                 } else if (type->Equals(uint64)) {
                     auto int_val = get_uint64(v);
-                    if (name == "time") {
+                    if (name == Event::TIME_NAME) {
                         (*event_batch)[j]->set_time(int_val);
+                    } else if (name == Event::ID_NAME) {
+                        (*event_batch)[j]->set_id(int_val);
                     } else {
                         (*event_batch)[j]->add_value(name, int_val);
                     }

@@ -56,6 +56,7 @@ public:
     [[nodiscard]] uint64_t time() const { return time_; }
     void set_time(uint64_t time);
     [[nodiscard]] uint64_t id() const { return id_; }
+    void set_id(uint64_t id);
 
     [[nodiscard]] auto const &values() const { return values_; }
 

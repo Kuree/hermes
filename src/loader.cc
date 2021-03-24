@@ -67,7 +67,7 @@ std::vector<Event *> Loader::get_events(const Transaction &transaction) {
     auto const &ids = transaction.events();
     for (auto const &file : events_) {
         for (auto id : ids) {
-            if (file->min_id >= id && file->max_id <= id) {
+            if (file->max_id >= id && file->min_id <= id) {
                 files[file].emplace_back(id);
             }
         }

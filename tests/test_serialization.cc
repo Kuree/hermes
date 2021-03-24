@@ -100,3 +100,40 @@ TEST(serialization, transactions) {  // NOLINT
     EXPECT_EQ(transaction->start_time(), 42);
     EXPECT_EQ(transaction->events().size(), 42 % 10);
 }
+
+
+TEST(serialization, get_events) {  // NOLINT
+    TempDirectory dir;
+
+    hermes::TransactionBatch transaction_batch;
+    hermes::EventBatch event_batch;
+    constexpr auto num_transactions = 1000;
+    for (auto i = 0; i < num_transactions; i++) {
+        auto t = std::make_unique<hermes::Transaction>(i);
+        for (uint32_t j = 0; j < i % 10; j++) {
+            auto e = std::make_unique<hermes::Event>(i);
+            e->add_value<uint64_t>("value", i);
+            e->set_time(i);
+            t->add_event(e);
+            event_batch.emplace_back(std::move(e));
+        }
+        transaction_batch.emplace_back(std::move(t));
+    }
+
+    hermes::Serializer s(dir.path());
+    s.serialize(transaction_batch);
+    s.serialize(event_batch);
+
+    hermes::Loader loader(dir.path());
+    auto tables = loader.get_transactions(0, num_transactions);
+    EXPECT_EQ(tables.size(), 1);
+    auto table = tables[0];
+    auto t_batch = hermes::TransactionBatch::deserialize(table);
+    auto const &transaction = (*t_batch)[42];
+    auto events = loader.get_events(*transaction);
+    EXPECT_EQ(events.size(), 42 % 10);
+    EXPECT_NE(events[0], nullptr);
+    auto v = events[0]->get_value<uint64_t>("value");
+    EXPECT_TRUE(v);
+    EXPECT_EQ(*v, 42);
+}
