@@ -7,7 +7,11 @@
 
 namespace hermes {
 
-bool Transaction::add_event(const std::unique_ptr<Event> &event) {
+uint64_t Transaction::id_allocator_ = 0;
+
+Transaction::Transaction() noexcept : id_(id_allocator_++) {}
+
+bool Transaction::add_event(const Event *event) {
     if (is_done_) return false;
     if (start_time_ > event->time()) {
         start_time_ = event->time();

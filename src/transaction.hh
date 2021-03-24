@@ -9,8 +9,10 @@ class TransactionBatch;
 
 class Transaction {
 public:
+    Transaction() noexcept;
     explicit Transaction(uint64_t id) noexcept : id_(id) {}
-    bool add_event(const std::unique_ptr<Event> &event);
+    bool add_event(const std::unique_ptr<Event> &event) { add_event(event.get()); }
+    bool add_event(const Event *event);
     void finish() { is_done_ = true; }
     [[nodiscard]] bool finished() const { return is_done_; }
     [[nodiscard]] uint64_t id() const { return id_; }
@@ -24,6 +26,8 @@ private:
     uint64_t end_time_ = 0;
     bool is_done_ = false;
     std::vector<uint64_t> events_ids_;
+
+    static uint64_t id_allocator_;
 
     friend TransactionBatch;
 };
