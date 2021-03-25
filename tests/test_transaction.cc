@@ -10,9 +10,9 @@ TEST(transaction, serialization) {  // NOLINT
     uint64_t time = 0;
     for (auto i = 0; i < num_transactions; i++) {
         auto num_events = i % 10;
-        auto transaction = std::make_unique<hermes::Transaction>(i);
+        auto transaction = std::make_shared<hermes::Transaction>(i);
         for (auto j = 0; j < num_events; j++) {
-            auto e = std::make_unique<hermes::Event>(time++);
+            auto e = std::make_shared<hermes::Event>(time++);
             transaction->add_event(e);
         }
         batch.emplace_back(std::move(transaction));

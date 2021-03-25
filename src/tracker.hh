@@ -20,8 +20,13 @@ protected:
 
 private:
     std::string name_;
-    std::unordered_set<std::unique_ptr<Transaction>> inflight_transactions;
+    std::unordered_set<std::shared_ptr<Transaction>> inflight_transactions;
+    std::unordered_map<uint64_t, std::shared_ptr<Event>> inflight_events_;
     TransactionBatch finished_transactions_;
+    // notice that in the current model, we assume that the event can only happens in one
+    // transaction. although technically speaking the events can be stored in multiple
+    // places since there is no constraint on id being unique
+    EventBatch finished_events_;
 };
 
 }

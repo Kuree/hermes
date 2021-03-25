@@ -146,7 +146,7 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(
     event_batch->reserve(table->num_rows());
     // create each batch
     for (auto i = 0; i < table->num_rows(); i++) {
-        event_batch->emplace_back(std::make_unique<Event>(0));
+        event_batch->emplace_back(std::make_shared<Event>(0));
     }
 
     auto uint8 = arrow::uint8();
