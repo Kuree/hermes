@@ -24,6 +24,11 @@ void MessageBus::add_subscriber(const std::string &topic, std::shared_ptr<Subscr
     subscribers_[topic].emplace(subscriber);
 }
 
+MessageBus *MessageBus::default_bus() {
+    static MessageBus bus;
+    return &bus;
+}
+
 bool Publisher::publish(const std::string &topic, const std::shared_ptr<Event> &event) {
     if (bus_) {
         bus_->publish(topic, event);
