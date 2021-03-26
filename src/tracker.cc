@@ -1,10 +1,14 @@
 #include "tracker.hh"
 
+#include <utility>
+
 namespace hermes {
 
-Tracker::Tracker(MessageBus *bus, const std::string &name) { subscribe(bus, name); }
+Tracker::Tracker(MessageBus *bus, std::string name) : name_(std::move(name)) { bus_ = bus; }
 
 Tracker::Tracker(const std::string &name) : Tracker(MessageBus::default_bus(), name) {}
+
+void Tracker::connect() { subscribe(bus_, name_); }
 
 Transaction *Tracker::get_new_transaction() {
     // we use the default id allocator

@@ -25,6 +25,7 @@ private:
 class Publisher {
 public:
     explicit Publisher(MessageBus *bus) : bus_(bus) {}
+    Publisher() : bus_(MessageBus::default_bus()) {}
 
     bool publish(const std::string &topic, const std::shared_ptr<Transaction> &transaction);
     bool publish(const std::string &topic, const std::shared_ptr<Event> &event);
@@ -33,8 +34,9 @@ private:
     MessageBus *bus_;
 };
 
-class Subscriber : std::enable_shared_from_this<Subscriber> {
+class Subscriber : public std::enable_shared_from_this<Subscriber> {
 public:
+    Subscriber() = default;
     void subscribe(MessageBus *bus, const std::string &topic);
 
 protected:
@@ -42,8 +44,8 @@ protected:
     virtual void on_message(const std::string &topic,
                             const std::shared_ptr<Transaction> &transaction) {}
 
-private:
     MessageBus *bus_ = nullptr;
+private:
     friend MessageBus;
 };
 

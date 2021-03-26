@@ -10,10 +10,13 @@ namespace hermes {
 class Tracker: public Subscriber {
 public:
     explicit Tracker(const std::string &name);
-    Tracker(MessageBus *bus, const std::string &name);
+    Tracker(MessageBus *bus, std::string name);
+    void connect();
 
     Transaction * get_new_transaction();
     virtual Transaction *track(Event *event) = 0;
+
+    const TransactionBatch &finished_transactions() const { return finished_transactions_; }
 
 protected:
     void on_message(const std::string &, const std::shared_ptr<Event> &event) override;
