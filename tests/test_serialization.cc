@@ -77,13 +77,13 @@ TEST(serialization, transactions) {  // NOLINT
     hermes::TransactionBatch batch;
     constexpr auto num_transactions = 1000;
     for (auto i = 0; i < num_transactions; i++) {
-        auto t = std::make_unique<hermes::Transaction>(i);
+        auto t = std::make_shared<hermes::Transaction>(i);
         for (uint32_t j = 0; j < i % 10; j++) {
-            auto e = std::make_unique<hermes::Event>(i);
+            auto e = std::make_shared<hermes::Event>(i);
             e->set_time(i);
             t->add_event(e);
         }
-        batch.emplace_back(std::move(t));
+        batch.emplace_back(t);
     }
 
     // serialize it
@@ -101,7 +101,6 @@ TEST(serialization, transactions) {  // NOLINT
     EXPECT_EQ(transaction->events().size(), 42 % 10);
 }
 
-
 TEST(serialization, get_events) {  // NOLINT
     TempDirectory dir;
 
@@ -109,15 +108,15 @@ TEST(serialization, get_events) {  // NOLINT
     hermes::EventBatch event_batch;
     constexpr auto num_transactions = 1000;
     for (auto i = 0; i < num_transactions; i++) {
-        auto t = std::make_unique<hermes::Transaction>(i);
+        auto t = std::make_shared<hermes::Transaction>(i);
         for (uint32_t j = 0; j < i % 10; j++) {
-            auto e = std::make_unique<hermes::Event>(i);
+            auto e = std::make_shared<hermes::Event>(i);
             e->add_value<uint64_t>("value", i);
             e->set_time(i);
             t->add_event(e);
-            event_batch.emplace_back(std::move(e));
+            event_batch.emplace_back(e);
         }
-        transaction_batch.emplace_back(std::move(t));
+        transaction_batch.emplace_back(t);
     }
 
     hermes::Serializer s(dir.path());
