@@ -10,6 +10,20 @@ Tracker::Tracker(const std::string &name) : Tracker(MessageBus::default_bus(), n
 
 void Tracker::connect() { subscribe(bus_, name_); }
 
+void Tracker::flush() {
+    if (!serializer_) return;
+    // flush out the events and transactions
+    if (!finished_events_.empty()) {
+        serializer_->serialize(finished_events_);
+        finished_events_.clear();
+    }
+
+    if (!finished_transactions_.empty()) {
+        serializer_->serialize(finished_transactions_);
+        finished_transactions_.clear();
+    }
+}
+
 Transaction *Tracker::get_new_transaction() {
     // we use the default id allocator
     auto t = std::make_shared<Transaction>();
@@ -39,6 +53,12 @@ void Tracker::on_message(const std::string &, const std::shared_ptr<Event> &even
         } else {
             // add the current event to inflight events
             inflight_events_.emplace(event->id(), event);
+        }
+
+        // check if we need to flush events to the disk
+        if (serializer_ && finished_events_.size() >= event_flush_threshold_) {
+            serializer_->serialize(finished_events_);
+            finished_events_.clear();
         }
     }
 }

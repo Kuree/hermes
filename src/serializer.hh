@@ -7,6 +7,7 @@
 #include "transaction.hh"
 
 namespace hermes {
+
 class Serializer {
 public:
     explicit Serializer(std::string output_dir);
