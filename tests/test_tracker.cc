@@ -1,5 +1,7 @@
 #include "gtest/gtest.h"
 #include "tracker.hh"
+#include "test_util.hh"
+#include "loader.hh"
 
 class DummyTracker : public hermes::Tracker {
 public:
@@ -52,4 +54,38 @@ TEST(tracker, dummy_tracker) { // NOLINT
     for (auto const &transaction: finished_transactions) {
         EXPECT_EQ(transaction->events().size(), chunk_size - 1);
     }
+}
+
+
+TEST(tracker, dummy_tracker_flush) { // NOLINT
+    TempDirectory dir;
+    constexpr auto event_name = "dummy";
+    constexpr auto chunk_size = 5;
+    constexpr auto num_events = 100;
+    auto tracker = std::make_shared<DummyTracker>(event_name, chunk_size);
+    hermes::Serializer serializer(dir.path());
+    tracker->connect();
+    tracker->set_serializer(&serializer);
+    hermes::Publisher publisher;
+
+    for (auto i = 0u; i < num_events; i++) {
+        auto e = std::make_shared<hermes::Event>(i);
+        e->add_value<uint32_t>("value", i);
+        publisher.publish(event_name, e);
+    }
+
+    auto finished_transactions = tracker->finished_transactions();
+    EXPECT_EQ(finished_transactions.size(), num_events / chunk_size);
+
+    for (auto const &transaction: finished_transactions) {
+        EXPECT_EQ(transaction->events().size(), chunk_size - 1);
+    }
+
+    tracker->flush();
+
+    // load files
+    hermes::Loader loader(dir.path());
+    auto events = loader.get_events(0, 20);
+    EXPECT_FALSE(events.empty());
+
 }
