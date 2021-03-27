@@ -10,8 +10,9 @@ Process::Process(const std::vector<std::string>& commands) {
 Process::~Process() { process_->kill(); }
 
 void Dispatcher::dispatch(const std::function<void()>& task) {
+    std::lock_guard guard(threads_lock_);
+    clean_up();
     threads_.emplace(std::thread([task, this]() {
-        clean_up();
         task();
     }));
 }
@@ -27,7 +28,8 @@ void Dispatcher::clean_up() {
     }
 }
 
-Dispatcher::~Dispatcher() {
+void Dispatcher::finish() {
+    std::lock_guard guard(threads_lock_);
     while (!threads_.empty()) {
         threads_.front().join();
         threads_.pop();

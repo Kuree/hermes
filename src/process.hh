@@ -2,13 +2,14 @@
 #define HERMES_PROCESS_HH
 
 #include <cstdio>
+#include <functional>
 #include <memory>
+#include <mutex>
+#include <queue>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
-#include <queue>
-#include <thread>
-#include <functional>
 
 // forward declare
 namespace subprocess {
@@ -26,14 +27,21 @@ private:
     std::unique_ptr<subprocess::Popen> process_;
 };
 
-
 class Dispatcher {
 public:
-    void dispatch(const std::function<void()>& task);
+    void dispatch(const std::function<void()> &task);
 
-    ~Dispatcher();
+    static Dispatcher *get_default_dispatcher() {
+        static Dispatcher instance;
+        return &instance;
+    }
+
+    void finish();
+
+    ~Dispatcher() { finish(); }
 
 private:
+    std::mutex threads_lock_;
     std::queue<std::thread> threads_;
 
     void clean_up();

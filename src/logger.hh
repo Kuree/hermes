@@ -12,7 +12,7 @@ public:
 
     void log(const std::shared_ptr<Event> &event) { publish(name_, event); }
 
-private:
+protected:
     std::string name_;
 };
 

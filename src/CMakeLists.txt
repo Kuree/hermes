@@ -5,3 +5,5 @@ target_include_directories(hermes PRIVATE ${ARROW_INCLUDE_DIR}
         ../extern/cpp-subprocess
         ../extern/fmt/include
         ../extern/rapidjson/include)
+
+add_subdirectory(dpi)
