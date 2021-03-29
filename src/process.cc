@@ -7,6 +7,10 @@ Process::Process(const std::vector<std::string>& commands) {
     process_ = std::make_unique<subprocess::Popen>(commands);
 }
 
+void Process::wait() {
+    process_->wait();
+}
+
 Process::~Process() { process_->kill(); }
 
 void Dispatcher::dispatch(const std::function<void()>& task) {

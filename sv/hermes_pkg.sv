@@ -31,6 +31,10 @@ class LogEvent;
     string            string_[string];
     
     function new();
+        reset();
+    endfunction
+
+    function void reset();
         this.time_ = $time();
     endfunction
 
@@ -197,7 +201,7 @@ class Logger;
         string_names.delete();
     endfunction
 
-    static function final_();
+    static function void final_();
         foreach(loggers[i]) begin
             loggers[i].flush();
         end

@@ -34,9 +34,10 @@ T from_str(const std::string &val) {
     return e;
 }
 
+std::string which(const std::string &name);
+
 namespace string {
 std::vector<std::string> split(const std::string &str, const std::string &delimiter);
-
 }  // namespace string
 
 #define ENUM(name, ...)              \

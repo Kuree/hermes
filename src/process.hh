@@ -20,6 +20,7 @@ namespace hermes {
 class Process {
 public:
     explicit Process(const std::vector<std::string> &commands);
+    void wait();
 
     ~Process();
 

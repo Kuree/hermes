@@ -1,7 +1,37 @@
 #include "util.hh"
 
-namespace hermes::string {
+#include <filesystem>
 
+namespace hermes {
+
+std::string which(const std::string &name) {
+    // windows is more picky
+    std::string env_path;
+#ifdef _WIN32
+    char *path_var;
+    size_t len;
+    auto err = _dupenv_s(&path_var, &len, "PATH");
+    if (err) {
+        env_path = "";
+    }
+    env_path = std::string(path_var);
+    free(path_var);
+    path_var = nullptr;
+#else
+    env_path = std::getenv("PATH");
+#endif
+    // tokenize it base on either : or ;
+    auto tokens = string::split(env_path, ";:");
+    for (auto const &dir : tokens) {
+        auto new_path = std::filesystem::path(dir) / name;
+        if (exists(new_path)) {
+            return new_path;
+        }
+    }
+    return "";
+}
+
+namespace string {
 std::vector<std::string> split(const std::string &str, const std::string &delimiter) {
     std::vector<std::string> tokens;
     size_t prev = 0, pos;
@@ -21,5 +51,6 @@ std::vector<std::string> split(const std::string &str, const std::string &delimi
         if (!t.empty()) result.emplace_back(t);
     return result;
 }
+}  // namespace string
 
-}  // namespace hermes::string
+}  // namespace hermes
