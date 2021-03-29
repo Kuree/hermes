@@ -64,7 +64,7 @@ T *get_pointer(svOpenArrayHandle array, int index) {
     return reinterpret_cast<T *>(svGetArrElemPtr1(array, index));
 }
 
-void hermes_create_events(void *logger, svOpenArrayHandle times) {
+[[maybe_unused]] void hermes_create_events(void *logger, svOpenArrayHandle times) {
     auto *l = get_logger(logger);
     auto low = svLeft(times, 1);
     auto high = svRight(times, 1);
@@ -77,55 +77,77 @@ void hermes_create_events(void *logger, svOpenArrayHandle times) {
 }
 
 template <typename T>
-void set_values(DPILogger *logger, const char *name, svOpenArrayHandle array) {
+void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle array) {
     auto low = svLeft(array, 1);
     auto high = svRight(array, 1);
     auto num_entries = static_cast<uint64_t>(high - low + 1l);
-    if (num_entries != logger->num_events()) {
-        // something is wrong, print out error message
-        std::cerr << "[ERROR]: log values (" << name
-                  << ") does not match with the number of events. Expected " << logger->num_events()
-                  << ", got " << num_entries << std::endl;
+    // sanity check on array sizes
+    auto names_low = svLeft(names, 1);
+    auto names_high = svRight(names, 1);
+    auto num_entries_names = static_cast<uint64_t>(names_high - names_low + 1l);
+    if (num_entries_names != num_entries) {
+        // frontend is not implement the logic correctly
+        std::cerr << "[ERROR]: log names does not match with the number of values. Expected "
+                  << num_entries_names << ", got " << num_entries << std::endl;
         return;
     }
+    auto num_events = logger->num_events();
 
-    for (auto i = low; i <= high; i++) {
-        auto *v = get_pointer<T>(array, i);
-        logger->set_value(name, *v, static_cast<uint64_t>(i));
+    if ((num_entries % num_events) != 0) {
+        // something is wrong, print out error message
+        std::cerr << "[ERROR]: log values is not a multiple of the number of events. Expected "
+                  << logger->num_events() << ", got " << num_entries << std::endl;
+        return;
+    }
+    auto entries_per_event = num_entries % logger->num_events();
+
+    uint64_t counter = 0;
+    for (auto i = 0u; i < num_events; i++) {
+        for (auto j = 0; j < entries_per_event; j++) {
+            auto **name = get_pointer<char *>(names, counter);
+            auto *v = get_pointer<T>(array, counter);
+            logger->template set_value(*name, *v, i);
+            counter++;
+        }
     }
 }
 
-void hermes_set_values_uint8(void *logger, const char *name, svOpenArrayHandle array) {
+[[maybe_unused]] void hermes_set_values_uint8(void *logger, svOpenArrayHandle names,
+                                              svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    set_values<uint8_t>(l, name, array);
+    set_values<uint8_t>(l, names, array);
 }
 
-void hermes_set_values_uint16(void *logger, const char *name, svOpenArrayHandle array) {
+[[maybe_unused]] void hermes_set_values_uint16(void *logger, svOpenArrayHandle names,
+                                               svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    set_values<uint16_t>(l, name, array);
+    set_values<uint16_t>(l, names, array);
 }
 
-void hermes_set_values_uin32(void *logger, const char *name, svOpenArrayHandle array) {
+[[maybe_unused]] void hermes_set_values_uin32(void *logger, svOpenArrayHandle names,
+                                              svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    set_values<uint32_t>(l, name, array);
+    set_values<uint32_t>(l, names, array);
 }
 
-void hermes_set_values_uint64(void *logger, const char *name, svOpenArrayHandle array) {
+[[maybe_unused]] void hermes_set_values_uint64(void *logger, svOpenArrayHandle names,
+                                               svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    set_values<uint64_t>(l, name, array);
+    set_values<uint64_t>(l, names, array);
 }
 
-void hermes_set_values_string(void *logger, const char *name, svOpenArrayHandle array) {
+[[maybe_unused]] void hermes_set_values_string(void *logger, svOpenArrayHandle names,
+                                               svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    set_values<char*>(l, name, array);
+    set_values<char *>(l, names, array);
 }
 
-void hermes_send_events(void *logger) {
+[[maybe_unused]] void hermes_send_events(void *logger) {
     auto *l = get_logger(logger);
     l->send_events();
 }
 
-void hermes_final() {
+[[maybe_unused]] void hermes_final() {
     for (auto *ptr : loggers) {
         delete ptr;
     }

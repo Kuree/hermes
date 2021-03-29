@@ -38,15 +38,15 @@ extern "C" {
 [[maybe_unused]] void hermes_set_output_dir(const char *directory);
 [[maybe_unused]] void *hermes_create_logger(const char *name);
 [[maybe_unused]] void hermes_create_events(void *logger, svOpenArrayHandle times);
-[[maybe_unused]] void hermes_set_values_uint8(void *logger, const char *name,
+[[maybe_unused]] void hermes_set_values_uint8(void *logger, svOpenArrayHandle names,
                                               svOpenArrayHandle array);
-[[maybe_unused]] void hermes_set_values_uint16(void *logger, const char *name,
+[[maybe_unused]] void hermes_set_values_uint16(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array);
-[[maybe_unused]] void hermes_set_values_uin32(void *logger, const char *name,
+[[maybe_unused]] void hermes_set_values_uin32(void *logger, svOpenArrayHandle names,
                                               svOpenArrayHandle array);
-[[maybe_unused]] void hermes_set_values_uint64(void *logger, const char *name,
+[[maybe_unused]] void hermes_set_values_uint64(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array);
-[[maybe_unused]] void hermes_set_values_string(void *logger, const char *name,
+[[maybe_unused]] void hermes_set_values_string(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array);
 [[maybe_unused]] void hermes_send_events(void *logger);
 [[maybe_unused]] void hermes_final();

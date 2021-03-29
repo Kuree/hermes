@@ -5,15 +5,15 @@ import "DPI-C" function void hermes_set_output_dir(string directory);
 import "DPI-C" function chandle hermes_create_logger(string directory);
 import "DPI-C" function void hermes_create_events(chandle logger,
                                                   longint unsigned times[]);
-import "DPI-C" function void hermes_set_values_uint8(input chandle logger, string name,
+import "DPI-C" function void hermes_set_values_uint8(input chandle logger, input string names[],
                                                      input byte unsigned values[]);
-import "DPI-C" function void hermes_set_values_uint16(input chandle logger, string name,
+import "DPI-C" function void hermes_set_values_uint16(input chandle logger, input string names[],
                                                       input shortint unsigned values[]);
-import "DPI-C" function void hermes_set_values_uint32(input chandle logger, string name,
+import "DPI-C" function void hermes_set_values_uint32(input chandle logger, input string names[],
                                                       input int unsigned values[]);
-import "DPI-C" function void hermes_set_values_uint64(input chandle logger, string name,
+import "DPI-C" function void hermes_set_values_uint64(input chandle logger, input string names[],
                                                      input longint unsigned values[]);
-import "DPI-C" function void hermes_set_values_string(input chandle logger, string name,
+import "DPI-C" function void hermes_set_values_string(input chandle logger, input string names[],
                                                       input string values[]);
 import "DPI-C" function void hermes_send_events(chandle logger);
 import "DPI-C" function void hermes_final();
@@ -137,7 +137,7 @@ class Logger;
         int uint8_count = 0, uint16_count = 0, uint32_count = 0, uint64_count = 0,
             string_count = 0;
 
-        
+
 
         // we specify each chunk
         for (int i = 0; i < num_events; i++) begin;
