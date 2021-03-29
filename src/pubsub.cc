@@ -29,6 +29,14 @@ MessageBus *MessageBus::default_bus() {
     return &bus;
 }
 
+std::set<std::shared_ptr<Subscriber>> MessageBus::get_subscribers() const {
+    std::set<std::shared_ptr<Subscriber>> result;
+    for (auto const &[topic, subs] : subscribers_) {
+        for (auto const &sub : subs) result.emplace(sub);
+    }
+    return result;
+}
+
 bool Publisher::publish(const std::string &topic, const std::shared_ptr<Event> &event) {
     if (bus_) {
         bus_->publish(topic, event);

@@ -5,10 +5,11 @@
 #include <mutex>
 
 #include "logger.hh"
+#include "svdpi.h"
 
 // all DPI uses default message bus
 
-class DPILogger : hermes::Logger {
+class DPILogger : public hermes::Logger {
 public:
     explicit DPILogger(const std::string &name) : hermes::Logger(name) {}
 
@@ -21,6 +22,7 @@ public:
 
     void create_events(uint64_t num_events);
     void send_events();
+    ~DPILogger();
 
 private:
     // batch
@@ -30,7 +32,21 @@ private:
 
 // DPI part
 extern "C" {
-void *hermes_create_logger(char *name);
+[[maybe_unused]] void hermes_set_output_dir(const char *directory);
+[[maybe_unused]] void *hermes_create_logger(const char *name);
+[[maybe_unused]] void hermes_create_events(void *logger, const char *name, uint64_t num_events);
+[[maybe_unused]] void hermes_set_values_uint8(void *logger, const char *name,
+                                              svOpenArrayHandle array);
+[[maybe_unused]] void hermes_set_values_uint16(void *logger, const char *name,
+                                               svOpenArrayHandle array);
+[[maybe_unused]] void hermes_set_values_uin32(void *logger, const char *name,
+                                              svOpenArrayHandle array);
+[[maybe_unused]] void hermes_set_values_uint64(void *logger, const char *name,
+                                               svOpenArrayHandle array);
+[[maybe_unused]] void hermes_set_values_string(void *logger, const char *name,
+                                               svOpenArrayHandle array);
+[[maybe_unused]] void hermes_send_events(void *logger);
+[[maybe_unused]] void hermes_final();
 }
 
 #endif  // HERMES_DPI_HH

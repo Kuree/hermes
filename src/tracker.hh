@@ -1,14 +1,15 @@
 #ifndef HERMES_TRACKER_HH
 #define HERMES_TRACKER_HH
 
-#include "transaction.hh"
+#include <unordered_set>
+
 #include "pubsub.hh"
 #include "serializer.hh"
-#include <unordered_set>
+#include "transaction.hh"
 
 namespace hermes {
 
-class Tracker: public Subscriber {
+class Tracker : public Subscriber {
 public:
     explicit Tracker(const std::string &name);
     Tracker(MessageBus *bus, std::string name);
@@ -17,12 +18,13 @@ public:
     void flush();
     void set_event_flush_threshold(uint64_t value) { event_flush_threshold_ = value; }
 
-    Transaction * get_new_transaction();
+    Transaction *get_new_transaction();
     virtual Transaction *track(Event *event) = 0;
 
     const TransactionBatch &finished_transactions() const { return finished_transactions_; }
 
     ~Tracker() { flush(); }
+    void stop() override { flush(); }
 
 protected:
     void on_message(const std::string &, const std::shared_ptr<Event> &event) override;
@@ -44,6 +46,6 @@ private:
     Serializer *serializer_ = nullptr;
 };
 
-}
+}  // namespace hermes
 
 #endif  // HERMES_TRACKER_HH

@@ -17,6 +17,7 @@ public:
     void add_subscriber(const std::string &topic, std::shared_ptr<Subscriber> &subscriber);
 
     static MessageBus *default_bus();
+    std::set<std::shared_ptr<Subscriber>> get_subscribers() const;
 
 private:
     std::unordered_map<std::string, std::set<std::shared_ptr<Subscriber>>> subscribers_;
@@ -38,6 +39,7 @@ class Subscriber : public std::enable_shared_from_this<Subscriber> {
 public:
     Subscriber() = default;
     void subscribe(MessageBus *bus, const std::string &topic);
+    virtual void stop() {}
 
 protected:
     virtual void on_message(const std::string &topic, const std::shared_ptr<Event> &event) {}
@@ -45,6 +47,7 @@ protected:
                             const std::shared_ptr<Transaction> &transaction) {}
 
     MessageBus *bus_ = nullptr;
+
 private:
     friend MessageBus;
 };
