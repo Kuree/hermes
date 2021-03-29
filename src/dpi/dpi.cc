@@ -58,14 +58,21 @@ hermes::Serializer *serializer = nullptr;
 
 DPILogger *get_logger(void *logger) { return reinterpret_cast<DPILogger *>(logger); }
 
-void hermes_create_events(void *logger, uint64_t num_events) {
-    auto *l = get_logger(logger);
-    l->create_events(num_events);
-}
-
 template <typename T>
 T *get_pointer(svOpenArrayHandle array, int index) {
     return reinterpret_cast<T *>(svGetArrElemPtr1(array, index));
+}
+
+void hermes_create_events(void *logger, svOpenArrayHandle times) {
+    auto *l = get_logger(logger);
+    auto low = svRight(times, 1);
+    auto high = svLeft(times, 1);
+    l->create_events(high - low);
+    // set event time
+    for (auto i = low; i < high; i++) {
+        auto *v = get_pointer<uint64_t>(times, i);
+        l->set_time(i, *v);
+    }
 }
 
 void hermes_set_values_uint8(void *logger, const char *name, svOpenArrayHandle array) {
@@ -130,7 +137,7 @@ void hermes_final() {
     // need to flush the subscriber as well, if any
     auto *bus = hermes::MessageBus::default_bus();
     auto subs = bus->get_subscribers();
-    for (const auto &sub: subs) {
+    for (const auto &sub : subs) {
         sub->stop();
     }
     delete serializer;

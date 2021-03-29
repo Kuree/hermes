@@ -20,6 +20,8 @@ public:
         }
     }
 
+    inline void set_time(uint64_t index, uint64_t time) { events_[index]->set_time(time); }
+
     void create_events(uint64_t num_events);
     void send_events();
     ~DPILogger();
@@ -34,7 +36,7 @@ private:
 extern "C" {
 [[maybe_unused]] void hermes_set_output_dir(const char *directory);
 [[maybe_unused]] void *hermes_create_logger(const char *name);
-[[maybe_unused]] void hermes_create_events(void *logger, const char *name, uint64_t num_events);
+[[maybe_unused]] void hermes_create_events(void *logger, svOpenArrayHandle times);
 [[maybe_unused]] void hermes_set_values_uint8(void *logger, const char *name,
                                               svOpenArrayHandle array);
 [[maybe_unused]] void hermes_set_values_uint16(void *logger, const char *name,
