@@ -66,11 +66,11 @@ T *get_pointer(svOpenArrayHandle array, int index) {
 
 void hermes_create_events(void *logger, svOpenArrayHandle times) {
     auto *l = get_logger(logger);
-    auto low = svRight(times, 1);
-    auto high = svLeft(times, 1);
-    l->create_events(high - low);
+    auto low = svLeft(times, 1);
+    auto high = svRight(times, 1);
+    l->create_events(high - low + 1);
     // set event time
-    for (auto i = low; i < high; i++) {
+    for (auto i = low; i <= high; i++) {
         auto *v = get_pointer<uint64_t>(times, i);
         l->set_time(i, *v);
     }
@@ -78,9 +78,9 @@ void hermes_create_events(void *logger, svOpenArrayHandle times) {
 
 template <typename T>
 void set_values(DPILogger *logger, const char *name, svOpenArrayHandle array) {
-    auto low = svRight(array, 1);
-    auto high = svLeft(array, 1);
-    auto num_entries = static_cast<uint64_t>(high - low);
+    auto low = svLeft(array, 1);
+    auto high = svRight(array, 1);
+    auto num_entries = static_cast<uint64_t>(high - low + 1l);
     if (num_entries != logger->num_events()) {
         // something is wrong, print out error message
         std::cerr << "[ERROR]: log values (" << name
@@ -89,7 +89,7 @@ void set_values(DPILogger *logger, const char *name, svOpenArrayHandle array) {
         return;
     }
 
-    for (auto i = low; i < high; i++) {
+    for (auto i = low; i <= high; i++) {
         auto *v = get_pointer<T>(array, i);
         logger->set_value(name, *v, static_cast<uint64_t>(i));
     }
