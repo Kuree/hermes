@@ -1,6 +1,7 @@
 #include "dpi.hh"
 
 #include <filesystem>
+#include <iostream>
 
 #include "process.hh"
 #include "serializer.hh"
@@ -75,54 +76,48 @@ void hermes_create_events(void *logger, svOpenArrayHandle times) {
     }
 }
 
-void hermes_set_values_uint8(void *logger, const char *name, svOpenArrayHandle array) {
-    auto *l = get_logger(logger);
+template <typename T>
+void set_values(DPILogger *logger, const char *name, svOpenArrayHandle array) {
     auto low = svRight(array, 1);
     auto high = svLeft(array, 1);
-    for (auto i = low; i < high; i++) {
-        auto *v = get_pointer<uint8_t>(array, i);
-        l->set_value(name, *v, static_cast<uint64_t>(i));
+    auto num_entries = static_cast<uint64_t>(high - low);
+    if (num_entries != logger->num_events()) {
+        // something is wrong, print out error message
+        std::cerr << "[ERROR]: log values (" << name
+                  << ") does not match with the number of events. Expected " << logger->num_events()
+                  << ", got " << num_entries << std::endl;
+        return;
     }
+
+    for (auto i = low; i < high; i++) {
+        auto *v = get_pointer<T>(array, i);
+        logger->set_value(name, *v, static_cast<uint64_t>(i));
+    }
+}
+
+void hermes_set_values_uint8(void *logger, const char *name, svOpenArrayHandle array) {
+    auto *l = get_logger(logger);
+    set_values<uint8_t>(l, name, array);
 }
 
 void hermes_set_values_uint16(void *logger, const char *name, svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    auto low = svRight(array, 1);
-    auto high = svLeft(array, 1);
-    for (auto i = low; i < high; i++) {
-        auto *v = get_pointer<uint16_t>(array, i);
-        l->set_value(name, *v, static_cast<uint64_t>(i));
-    }
+    set_values<uint16_t>(l, name, array);
 }
 
 void hermes_set_values_uin32(void *logger, const char *name, svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    auto low = svRight(array, 1);
-    auto high = svLeft(array, 1);
-    for (auto i = low; i < high; i++) {
-        auto *v = get_pointer<uint32_t>(array, i);
-        l->set_value(name, *v, static_cast<uint64_t>(i));
-    }
+    set_values<uint32_t>(l, name, array);
 }
 
 void hermes_set_values_uint64(void *logger, const char *name, svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    auto low = svRight(array, 1);
-    auto high = svLeft(array, 1);
-    for (auto i = low; i < high; i++) {
-        auto *v = get_pointer<uint64_t>(array, i);
-        l->set_value(name, *v, static_cast<uint64_t>(i));
-    }
+    set_values<uint64_t>(l, name, array);
 }
 
 void hermes_set_values_string(void *logger, const char *name, svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    auto low = svRight(array, 1);
-    auto high = svLeft(array, 1);
-    for (auto i = low; i < high; i++) {
-        auto *v = get_pointer<char *>(array, i);
-        l->set_value(name, *v, static_cast<uint64_t>(i));
-    }
+    set_values<char*>(l, name, array);
 }
 
 void hermes_send_events(void *logger) {

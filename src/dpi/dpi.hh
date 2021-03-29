@@ -19,6 +19,7 @@ public:
             events_[idx]->template add_value(name, value);
         }
     }
+    [[nodiscard]] uint64_t num_events() const { return events_.size(); }
 
     inline void set_time(uint64_t index, uint64_t time) { events_[index]->set_time(time); }
 
