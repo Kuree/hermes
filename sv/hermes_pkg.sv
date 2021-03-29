@@ -3,7 +3,7 @@ package hermes;
 // DPI imports
 import "DPI-C" function void hermes_set_output_dir(string directory);
 import "DPI-C" function chandle hermes_create_logger(string directory);
-import "DPI-C" function void hermes_create_events(chandle logger,
+import "DPI-C" function void hermes_create_events(input chandle logger,
                                                   longint unsigned times[]);
 import "DPI-C" function void hermes_set_values_uint8(input chandle logger, input string names[],
                                                      input byte unsigned values[]);
@@ -15,14 +15,14 @@ import "DPI-C" function void hermes_set_values_uint64(input chandle logger, inpu
                                                      input longint unsigned values[]);
 import "DPI-C" function void hermes_set_values_string(input chandle logger, input string names[],
                                                       input string values[]);
-import "DPI-C" function void hermes_send_events(chandle logger);
+import "DPI-C" function void hermes_send_events(input chandle logger);
 import "DPI-C" function void hermes_final();
 
 
 // class wrapper
 class LogEvent;
     // attributes
-    time time_;
+    longint unsigned time_;
     // value holders
     byte unsigned     uint8[string];
     shortint unsigned uint16[string];
@@ -68,6 +68,7 @@ class Logger;
     local string            uint64_names[$];
     local string            string_[$];
     local string            string_names[$];
+    local longint unsigned  times[$];
     // keep track of number of events
     local int               num_events;
     // the actual logger
@@ -85,6 +86,8 @@ class Logger;
 
     function void log(LogEvent event_);
         // add it to the cached value
+        times.push_back(event_.time_);
+
         if (event_.uint8.size() > 0) begin
             foreach(event_.uint8[name]) begin
                 uint8.push_back(event_.uint8[name]);
@@ -128,30 +131,77 @@ class Logger;
 
     local function automatic void flush();
         // we made assumption that the logger only takes one type of events
-        int uint8_size = uint8.size() / num_events;
-        int uint16_size = uint16.size() / num_events;
-        int uint32_size = uint32.size() / num_events;
-        int uint64_size = uint64.size() / num_events;
-        int string_size = string_.size() / num_events;
+        // batches
+        longint unsigned  times_batch[];
+        byte unsigned     uint8_batch[];
+        shortint unsigned uint16_batch[];
+        int unsigned      uint32_batch[];
+        longint unsigned  uint64_batch[];
+        string            string_batch[];
+        string            uint8_name_batch[];
+        string            uint16_name_batch[];
+        string            uint32_name_batch[];
+        string            uint64_name_batch[];
+        string            string_name_batch[];
 
-        int uint8_count = 0, uint16_count = 0, uint32_count = 0, uint64_count = 0,
-            string_count = 0;
-
-
-
-        // we specify each chunk
-        for (int i = 0; i < num_events; i++) begin;
-            for (int j = 0; i < uint8_size; j++) begin
-                
-            end
+        times_batch = new[num_events];
+        foreach (times[i]) begin
+            times_batch[i] = times[i];
         end
 
+        // maybe the simulator will do zero-copy aliasing?
+        uint8_batch = uint8;
+        uint8_name_batch = uint8_names;
+        uint16_batch = uint16;
+        uint16_name_batch = uint16_names;
+        uint32_batch = uint32;
+        uint32_name_batch = uint32_names;
+        uint64_batch = uint64;
+        uint64_name_batch = uint64_names;
+        string_batch = string_;
+        string_name_batch = string_names;
+
+        // call DPI functions to store data
+        // create events
+        hermes_create_events(logger_, times_batch);
+        if (uint8_batch.size() > 0) begin
+            hermes_set_values_uint8(logger_, uint8_name_batch, uint8_batch);
+        end
+        if (uint16_batch.size() > 0) begin
+            hermes_set_values_uint16(logger_, uint16_name_batch, uint16_batch);
+        end
+        if (uint32_batch.size() > 0) begin
+            hermes_set_values_uint32(logger_, uint32_name_batch, uint32_batch);
+        end
+        if (uint64_batch.size() > 0) begin
+            hermes_set_values_uint64(logger_, uint64_name_batch, uint64_batch);
+        end
+        if (string_batch.size() > 0) begin
+            hermes_set_values_string(logger_, string_name_batch, string_batch);
+        end
+
+        // send events
+        hermes_send_events(logger_);
+
+        // clear up
+        num_events = 0;
+        uint8.delete();
+        uint8_names.delete();
+        uint16.delete();
+        uint16_names.delete();
+        uint32.delete();
+        uint32_names.delete();
+        uint64.delete();
+        uint64_names.delete();
+        string_.delete();
+        string_names.delete();
     endfunction
 
     static function final_();
         foreach(loggers[i]) begin
             loggers[i].flush();
         end
+        hermes_final();
     endfunction
 
 endclass
