@@ -8,9 +8,23 @@
 
 namespace parquet {
 class WriterProperties;
+namespace arrow {
+class FileWriter;
 }
+}  // namespace parquet
 
 namespace hermes {
+
+struct SerializationStat {
+    std::string parquet_filename;
+    std::string json_filename;
+    uint64_t min_time;
+    uint64_t max_time;
+    uint64_t min_id;
+    uint64_t max_id;
+
+    std::string type;
+};
 
 class Serializer {
 public:
@@ -19,18 +33,28 @@ public:
     bool serialize(const EventBatch &batch);
     bool serialize(const TransactionBatch &batch);
 
+    void finalize();
+
+    ~Serializer() { finalize(); }
+
 private:
     std::string output_dir_;
     uint64_t batch_counter_ = 0;
     std::mutex batch_mutex_;
     std::shared_ptr<parquet::WriterProperties> writer_properties_;
+    std::unordered_map<const void *, std::shared_ptr<parquet::arrow::FileWriter>> writers_;
+    std::unordered_map<const void *, SerializationStat> stats_;
 
     std::pair<std::string, std::string> get_next_filename();
-    bool serialize(const std::string &filename, const std::shared_ptr<arrow::RecordBatch> &batch);
-    static void write_stat(const std::string &json_filename, const std::string &parquet_filename,
-                           const EventBatch &batch);
-    static void write_stat(const std::string &json_filename, const std::string &parquet_filename,
-                           const TransactionBatch &batch);
+    parquet::arrow::FileWriter *get_writer(const void *ptr,
+                                           const std::shared_ptr<arrow::Schema> &schema);
+    SerializationStat &get_stat(const void *ptr);
+
+    static bool serialize(parquet::arrow::FileWriter *writer,
+                          const std::shared_ptr<arrow::RecordBatch> &record);
+    static void update_stat(SerializationStat &stat, const EventBatch &batch);
+    static void update_stat(SerializationStat &stat, const TransactionBatch &batch);
+    static void write_stat(const SerializationStat &stat);
 };
 }  // namespace hermes
 

@@ -16,7 +16,6 @@ public:
     void connect();
     void set_serializer(Serializer *serializer) { serializer_ = serializer; }
     void flush();
-    void set_event_flush_threshold(uint64_t value) { event_flush_threshold_ = value; }
 
     Transaction *get_new_transaction();
     virtual Transaction *track(Event *event) = 0;
@@ -28,7 +27,6 @@ public:
 
 protected:
     void on_message(const std::string &, const std::shared_ptr<Event> &event) override;
-    uint64_t event_flush_threshold_ = 1u << 20u;
 
 private:
     std::string name_;

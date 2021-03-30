@@ -21,6 +21,7 @@ TEST(serialization, event) {  // NOLINT
     // serialize it
     hermes::Serializer s(dir.path());
     s.serialize(batch);
+    s.finalize();
 
     hermes::Loader loader(dir.path());
     auto tables = loader.get_events(0, num_event);
@@ -53,6 +54,7 @@ TEST(serialization, transactions) {  // NOLINT
     // serialize it
     hermes::Serializer s(dir.path());
     s.serialize(batch);
+    s.finalize();
 
     hermes::Loader loader(dir.path());
     auto tables = loader.get_transactions(0, num_transactions);
@@ -86,6 +88,7 @@ TEST(serialization, get_events) {  // NOLINT
     hermes::Serializer s(dir.path());
     s.serialize(transaction_batch);
     s.serialize(event_batch);
+    s.finalize();
 
     hermes::Loader loader(dir.path());
     auto tables = loader.get_transactions(0, num_transactions);

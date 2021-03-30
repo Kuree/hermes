@@ -85,6 +85,7 @@ TEST(tracker, dummy_tracker_flush) { // NOLINT
 
     auto *bus = hermes::MessageBus::default_bus();
     bus->stop();
+    serializer.finalize();
 
     // load files
     hermes::Loader loader(dir.path());
