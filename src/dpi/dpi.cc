@@ -36,29 +36,6 @@ DPILogger::~DPILogger() {
     }
 }
 
-DummyEventSerializer::DummyEventSerializer(hermes::Serializer *serializer)
-    : hermes::Subscriber(), serializer_(serializer) {}
-
-void DummyEventSerializer::stop() {
-    for (auto &[topic, events] : event_batches_) {
-        if (!events.empty()) {
-            serializer_->serialize(events);
-            events.clear();
-        }
-    }
-}
-
-void DummyEventSerializer::on_message(const std::string &topic,
-                                      const std::shared_ptr<hermes::Event> &event) {
-    event_batches_[topic].emplace_back(event);
-    auto &events = event_batches_.at(topic);
-    if (events.size() >= event_flush_threshold_) {
-        // serialize events
-        serializer_->serialize(events);
-        events.clear();
-    }
-}
-
 // global variables
 std::vector<DPILogger *> loggers;
 std::string serializer_path;
@@ -187,18 +164,15 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
 
     // need to flush the subscriber as well, if any
     auto *bus = hermes::MessageBus::default_bus();
-    auto subs = bus->get_subscribers();
-    for (const auto &sub : subs) {
-        sub->stop();
-    }
+    bus->stop();
 
     delete serializer_;
 }
 
 [[maybe_unused]] void hermes_add_dummy_serializer(const char *topic) {
     auto *serializer = get_serializer();
-    auto p = std::make_shared<DummyEventSerializer>(serializer);
-    p->subscribe(hermes::MessageBus::default_bus(), topic);
+    auto p = std::make_shared<hermes::DummyEventSerializer>(topic);
+    p->connect(serializer);
 }
 
 // implement the add tracker to simulator

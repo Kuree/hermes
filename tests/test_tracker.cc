@@ -59,14 +59,16 @@ TEST(tracker, dummy_tracker) { // NOLINT
 
 TEST(tracker, dummy_tracker_flush) { // NOLINT
     TempDirectory dir;
-    constexpr auto event_name = "dummy";
+    constexpr auto event_name = "dummy/dummy";
     constexpr auto chunk_size = 5;
     constexpr auto num_events = 100;
-    auto tracker = std::make_shared<DummyTracker>("*", chunk_size);
+    auto tracker = std::make_shared<DummyTracker>("dummy/*", chunk_size);
     hermes::Serializer serializer(dir.path());
     tracker->connect();
     tracker->set_serializer(&serializer);
     hermes::Publisher publisher;
+    auto d = std::make_shared<hermes::DummyEventSerializer>();
+    d->connect(&serializer);
 
     for (auto i = 0u; i < num_events; i++) {
         auto e = std::make_shared<hermes::Event>(i);
@@ -81,11 +83,11 @@ TEST(tracker, dummy_tracker_flush) { // NOLINT
         EXPECT_EQ(transaction->events().size(), chunk_size - 1);
     }
 
-    tracker->flush();
+    auto *bus = hermes::MessageBus::default_bus();
+    bus->stop();
 
     // load files
     hermes::Loader loader(dir.path());
     auto events = loader.get_events(0, 20);
     EXPECT_FALSE(events.empty());
-
 }

@@ -12,6 +12,7 @@ LogEvent e;
 initial begin
     // load the tracker
     test_tracker_lib();
+    hermes_add_dummy_serializer("*");
     logger = new("test");
     e = new();
 

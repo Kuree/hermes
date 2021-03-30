@@ -18,6 +18,7 @@ public:
 
     static MessageBus *default_bus();
     std::set<std::shared_ptr<Subscriber>> get_subscribers() const;
+    void stop() const;
 
 private:
     std::unordered_map<std::string, std::set<std::shared_ptr<Subscriber>>> subscribers_;
@@ -50,6 +51,25 @@ protected:
 
 private:
     friend MessageBus;
+};
+
+// convenient way to store all events
+class Serializer;
+class DummyEventSerializer : public Subscriber {
+public:
+    DummyEventSerializer() : DummyEventSerializer("*") {}
+    explicit DummyEventSerializer(std::string topic) : topic_(std::move(topic)) {}
+    void connect(Serializer *serializer) { connect(MessageBus::default_bus(), serializer); }
+    void connect(MessageBus *bus, Serializer *serializer);
+    void on_message(const std::string &topic, const std::shared_ptr<Event> &event) override;
+    void stop() override;
+
+private:
+    std::string topic_;
+    Serializer *serializer_ = nullptr;
+    static constexpr uint64_t event_dump_threshold = 1 << 15;
+
+    std::map<std::string, EventBatch> events_;
 };
 
 }  // namespace hermes

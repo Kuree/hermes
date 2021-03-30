@@ -34,19 +34,6 @@ private:
     std::vector<std::shared_ptr<hermes::Event>> events_;
 };
 
-class DummyEventSerializer : public hermes::Subscriber {
-public:
-    explicit DummyEventSerializer(hermes::Serializer *serializer);
-    void stop() override;
-    void on_message(const std::string &topic, const std::shared_ptr<hermes::Event> &event) override;
-
-private:
-    hermes::Serializer *serializer_;
-    // we capture all events that match with the topic
-    std::map<std::string, hermes::EventBatch> event_batches_;
-    static constexpr uint64_t event_flush_threshold_ = 1 << 15;
-};
-
 // DPI part
 extern "C" {
 [[maybe_unused]] void hermes_set_output_dir(const char *directory);
