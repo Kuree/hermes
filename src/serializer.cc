@@ -28,6 +28,8 @@ Serializer::Serializer(std::string output_dir) : output_dir_(std::move(output_di
     // we use version 2.0
     auto builder = parquet::WriterProperties::Builder();
     builder.version(parquet::ParquetVersion::PARQUET_2_0);
+    // we use snappy as the compression scheme
+    builder.compression(arrow::Compression::SNAPPY);
     writer_properties_ = builder.build();
 }
 
