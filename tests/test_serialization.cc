@@ -5,7 +5,6 @@
 #include "serializer.hh"
 #include "test_util.hh"
 
-
 TEST(serialization, event) {  // NOLINT
     TempDirectory dir;
 
@@ -34,6 +33,43 @@ TEST(serialization, event) {  // NOLINT
     auto value = event->get_value<uint64_t>("value1");
     EXPECT_TRUE(value);
     EXPECT_EQ(*value, 42);
+}
+
+TEST(serialization, multiple_event_batches) {  // NOLINT
+    TempDirectory dir;
+
+    hermes::EventBatch batch;
+    constexpr auto num_event = 1000;
+    uint64_t i;
+    for (i = 0; i < num_event; i++) {
+        auto e = std::make_unique<hermes::Event>(i);
+        e->add_value<uint64_t>("value1", i);
+        batch.emplace_back(std::move(e));
+    }
+
+    EXPECT_TRUE(batch.validate());
+    // serialize it
+    hermes::Serializer s(dir.path());
+    s.serialize(batch);
+    batch.clear();
+
+    for (; i < num_event * 2; i++) {
+        auto e = std::make_unique<hermes::Event>(i);
+        e->add_value<uint64_t>("value1", i);
+        batch.emplace_back(std::move(e));
+    }
+    s.serialize(batch);
+
+    s.finalize();
+
+    hermes::Loader loader(dir.path());
+    auto tables = loader.get_events(0, num_event * 2);
+    EXPECT_EQ(tables.size(), 1);
+    auto table = tables[0];
+    auto event_batch = hermes::EventBatch::deserialize(table);
+    EXPECT_EQ(event_batch->size(), num_event * 2);
+    auto const &event = (*event_batch)[42 + num_event];
+    EXPECT_EQ(event->time(), 42 + num_event);
 }
 
 TEST(serialization, transactions) {  // NOLINT
