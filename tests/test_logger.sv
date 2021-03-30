@@ -23,8 +23,8 @@ initial begin
         e.add_value_uint32("uint32_2", i + 1);
         e.add_value_uint64("uint64_1", i);
         e.add_value_uint64("uint64_2", i + 1);
-        e.add_value_uint8("string_1", "aaa");
-        e.add_value_uint8("string_2", "bbb");
+        e.add_value_string("string_1", "aaa");
+        e.add_value_string("string_2", "bbb");
         logger.log(e);
         #10;
     end

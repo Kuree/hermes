@@ -132,7 +132,12 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
         for (auto j = 0; j < entries_per_event; j++) {
             auto **name = get_pointer<char *>(names, counter);
             auto *v = get_pointer<T>(array, counter);
-            logger->template set_value(*name, *v, i);
+            if constexpr (std::is_same<T, char *>::value) {
+                std::string value = *v;
+                logger->template set_value(*name, value, i);
+            } else {
+                logger->template set_value(*name, *v, i);
+            }
             counter++;
         }
     }

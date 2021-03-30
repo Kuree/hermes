@@ -53,4 +53,5 @@ TEST(logger, sv) {  // NOLINT
     EXPECT_EQ(batch->size(), 2000);;
     auto event = (*batch)[42];
     EXPECT_EQ(*event->get_value<uint8_t>("uint8_1"), 42);
+    EXPECT_EQ(*event->get_value<std::string>("string_1"), "aaa");
 }

@@ -25,6 +25,10 @@ Serializer::Serializer(std::string output_dir) : output_dir_(std::move(output_di
     if (!fs::exists(output_dir_)) {
         fs::create_directories(output_dir_);
     }
+    // we use version 2.0
+    auto builder = parquet::WriterProperties::Builder();
+    builder.version(parquet::ParquetVersion::PARQUET_2_0);
+    writer_properties_ = builder.build();
 }
 
 bool Serializer::serialize(const EventBatch &batch) {
@@ -77,10 +81,9 @@ bool Serializer::serialize(const std::string &filename,
     if (!table_r.ok()) return false;
     auto table = *table_r;
 
-    auto res =
-        parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), out_file,
-                                   get_chunk_size(static_cast<uint64_t>(record->num_rows())));
-
+    auto res = parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), out_file,
+                                          get_chunk_size(static_cast<uint64_t>(record->num_rows())),
+                                          writer_properties_);
     // write out table specifics
 
     return res.ok();
