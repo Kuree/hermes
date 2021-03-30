@@ -46,6 +46,8 @@ private:
     Serializer *serializer_ = nullptr;
 };
 
+extern void add_tracker_to_simulator(const std::shared_ptr<Tracker> &tracker);
+
 }  // namespace hermes
 
 #endif  // HERMES_TRACKER_HH

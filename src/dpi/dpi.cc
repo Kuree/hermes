@@ -5,6 +5,7 @@
 
 #include "process.hh"
 #include "serializer.hh"
+#include "tracker.hh"
 
 void DPILogger::create_events(uint64_t num_events) {
     std::lock_guard guard(events_lock_);
@@ -199,3 +200,13 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
     auto p = std::make_shared<DummyEventSerializer>(serializer);
     p->subscribe(hermes::MessageBus::default_bus(), topic);
 }
+
+// implement the add tracker to simulator
+namespace hermes {
+void add_tracker_to_simulator(const std::shared_ptr<Tracker> &tracker) {
+    auto *serializer = get_serializer();
+    tracker->set_serializer(serializer);
+    tracker->connect();
+}
+
+}  // namespace hermes

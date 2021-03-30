@@ -164,7 +164,8 @@ void Serializer::write_stat(const std::string &json_filename, const std::string 
 void Serializer::write_stat(const std::string &json_filename, const std::string &parquet_filename,
                             const TransactionBatch &batch) {
     rapidjson::Document document(rapidjson::kObjectType);
-    set_member(document, "parquet", parquet_filename);
+    auto parquet_basename = std::string(fs::path(parquet_filename).filename());
+    set_member(document, "parquet", parquet_basename);
     set_member(document, "type", "transaction");
 
     uint64_t min_time = std::numeric_limits<uint64_t>::max(), max_time = 0,
