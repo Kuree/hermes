@@ -1,21 +1,28 @@
 #include "pubsub.hh"
 
+#include "fnmatch.h"
+
 namespace hermes {
 
 void MessageBus::publish(const std::string &topic, const std::shared_ptr<Event> &event) {
-    if (subscribers_.find(topic) != subscribers_.end()) {
-        auto &subs = subscribers_.at(topic);
-        for (auto const &sub : subs) {
-            sub->on_message(topic, event);
+    for (auto const &[name, subs] : subscribers_) {
+        if (fnmatch(name.c_str(), topic.c_str(), FNM_PATHNAME) == 0) {
+            // this is a match
+            for (auto const &sub : subs) {
+                sub->on_message(topic, event);
+            }
         }
     }
 }
 
-void MessageBus::publish(const std::string &topic, const std::shared_ptr<Transaction> &event) {
-    if (subscribers_.find(topic) != subscribers_.end()) {
-        auto &subs = subscribers_.at(topic);
-        for (auto const &sub : subs) {
-            sub->on_message(topic, event);
+void MessageBus::publish(const std::string &topic,
+                         const std::shared_ptr<Transaction> &transaction) {
+    for (auto const &[name, subs] : subscribers_) {
+        if (fnmatch(name.c_str(), topic.c_str(), FNM_PATHNAME) == 0) {
+            // this is a match
+            for (auto const &sub : subs) {
+                sub->on_message(topic, transaction);
+            }
         }
     }
 }

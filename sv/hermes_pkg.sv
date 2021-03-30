@@ -17,6 +17,8 @@ import "DPI-C" function void hermes_set_values_string(input chandle logger, inpu
                                                       input string values[]);
 import "DPI-C" function void hermes_send_events(input chandle logger);
 import "DPI-C" function void hermes_final();
+// help functions
+import "DPI-C" function void hermes_add_dummy_serializer(input string topic);
 
 
 // class wrapper

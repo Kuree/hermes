@@ -2,11 +2,14 @@ module top;
 
 import hermes::Logger;
 import hermes::LogEvent;
+import hermes::hermes_add_dummy_serializer;
 
 Logger logger;
 LogEvent e;
 
 initial begin
+    // serialize everything
+    hermes_add_dummy_serializer("*");
     logger = new("test");
     e = new();
 

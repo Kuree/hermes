@@ -5,6 +5,7 @@
 #include "arrow.hh"
 #include "arrow/api.h"
 #include "arrow/ipc/reader.h"
+#include "fmt/format.h"
 #include "parquet/stream_writer.h"
 
 namespace hermes {
@@ -188,7 +189,9 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(
                         (*event_batch)[j]->add_value(name, int_val);
                     }
                 } else {
-                    throw std::runtime_error("Unknown type " + type->ToString());
+                    auto error_msg =
+                        fmt::format("Unknown type {0} for column {1}", type->ToString(), name);
+                    throw std::runtime_error(error_msg);
                 }
             }
         }

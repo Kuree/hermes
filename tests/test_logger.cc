@@ -1,9 +1,10 @@
 #include <filesystem>
 
-#include "event.hh"
+
 #include "gtest/gtest.h"
-#include "loader.hh"
+#include "test_util.hh"
 #include "process.hh"
+#include "loader.hh"
 #include "util.hh"
 
 namespace fs = std::filesystem;
@@ -28,6 +29,8 @@ TEST(logger, sv) {  // NOLINT
     auto xrun = hermes::which("xrun");
     if (xrun.empty()) GTEST_SKIP_("xrun not available");
 
+    TempDirectory temp;
+
     auto root = get_root_dir();
     auto sv_pkg = root / "sv" / "hermes_pkg.sv";
     auto test_logger = root / "tests" / "test_logger.sv";
@@ -39,6 +42,15 @@ TEST(logger, sv) {  // NOLINT
     EXPECT_TRUE(fs::exists(so));
 
     const std::vector<std::string> args = {"xrun", sv_pkg, test_logger, "-sv_lib", so};
-    auto p = hermes::Process(args);
+    auto p = hermes::Process(args, temp.path());
     p.wait();
+
+    // load it back up
+    hermes::Loader loader(temp.path());
+    auto events = loader.get_events(0, 3000);
+    EXPECT_EQ(events.size(), 1);
+    auto batch = hermes::EventBatch::deserialize(events[0]);
+    EXPECT_EQ(batch->size(), 2000);;
+    auto event = (*batch)[42];
+    EXPECT_EQ(*event->get_value<uint8_t>("uint8_1"), 42);
 }

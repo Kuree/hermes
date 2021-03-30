@@ -7,18 +7,18 @@ Process::Process(const std::vector<std::string>& commands) {
     process_ = std::make_unique<subprocess::Popen>(commands);
 }
 
-void Process::wait() {
-    process_->wait();
+Process::Process(const std::vector<std::string>& commands, const std::string& cwd) {
+    process_ = std::make_unique<subprocess::Popen>(commands, subprocess::cwd(cwd));
 }
+
+void Process::wait() { process_->wait(); }
 
 Process::~Process() { process_->kill(); }
 
 void Dispatcher::dispatch(const std::function<void()>& task) {
     std::lock_guard guard(threads_lock_);
     clean_up();
-    threads_.emplace(std::thread([task, this]() {
-        task();
-    }));
+    threads_.emplace(std::thread([task]() { task(); }));
 }
 
 void Dispatcher::clean_up() {

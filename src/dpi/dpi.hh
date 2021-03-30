@@ -5,6 +5,7 @@
 #include <mutex>
 
 #include "logger.hh"
+#include "serializer.hh"
 #include "svdpi.h"
 
 // all DPI uses default message bus
@@ -33,6 +34,19 @@ private:
     std::vector<std::shared_ptr<hermes::Event>> events_;
 };
 
+class DummyEventSerializer : public hermes::Subscriber {
+public:
+    explicit DummyEventSerializer(hermes::Serializer *serializer);
+    void stop() override;
+    void on_message(const std::string &topic, const std::shared_ptr<hermes::Event> &event) override;
+
+private:
+    hermes::Serializer *serializer_;
+    // we capture all events that match with the topic
+    std::map<std::string, hermes::EventBatch> event_batches_;
+    static constexpr uint64_t event_flush_threshold_ = 1 << 15;
+};
+
 // DPI part
 extern "C" {
 [[maybe_unused]] void hermes_set_output_dir(const char *directory);
@@ -43,13 +57,16 @@ extern "C" {
 [[maybe_unused]] void hermes_set_values_uint16(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array);
 [[maybe_unused]] void hermes_set_values_uint32(void *logger, svOpenArrayHandle names,
-                                              svOpenArrayHandle array);
+                                               svOpenArrayHandle array);
 [[maybe_unused]] void hermes_set_values_uint64(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array);
 [[maybe_unused]] void hermes_set_values_string(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array);
 [[maybe_unused]] void hermes_send_events(void *logger);
 [[maybe_unused]] void hermes_final();
+
+// helper functions
+[[maybe_unused]] void hermes_add_dummy_serializer(const char *topic);
 }
 
 #endif  // HERMES_DPI_HH

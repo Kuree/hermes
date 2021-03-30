@@ -35,23 +35,49 @@ DPILogger::~DPILogger() {
     }
 }
 
+DummyEventSerializer::DummyEventSerializer(hermes::Serializer *serializer)
+    : hermes::Subscriber(), serializer_(serializer) {}
+
+void DummyEventSerializer::stop() {
+    for (auto &[topic, events] : event_batches_) {
+        if (!events.empty()) {
+            serializer_->serialize(events);
+            events.clear();
+        }
+    }
+}
+
+void DummyEventSerializer::on_message(const std::string &topic,
+                                      const std::shared_ptr<hermes::Event> &event) {
+    event_batches_[topic].emplace_back(event);
+    auto &events = event_batches_.at(topic);
+    if (events.size() >= event_flush_threshold_) {
+        // serialize events
+        serializer_->serialize(events);
+        events.clear();
+    }
+}
+
 // global variables
 std::vector<DPILogger *> loggers;
 std::string serializer_path;
-hermes::Serializer *serializer = nullptr;
+hermes::Serializer *serializer_ = nullptr;
 
-[[maybe_unused]] void hermes_set_output_dir(const char *directory) { serializer_path = directory; }
-
-[[maybe_unused]] void *hermes_create_logger(const char *name) {
-    if (!serializer) {
+hermes::Serializer *get_serializer() {
+    if (!serializer_) {
         // initialize the serializer
         if (serializer_path.empty()) {
             // use the current working directory
             serializer_path = std::filesystem::current_path();
         }
-        serializer = new hermes::Serializer(serializer_path);
+        serializer_ = new hermes::Serializer(serializer_path);
     }
+    return serializer_;
+}
 
+[[maybe_unused]] void hermes_set_output_dir(const char *directory) { serializer_path = directory; }
+
+[[maybe_unused]] void *hermes_create_logger(const char *name) {
     auto *logger = new DPILogger(name);
     loggers.emplace_back(logger);
     return logger;
@@ -99,7 +125,7 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
                   << logger->num_events() << ", got " << num_entries << std::endl;
         return;
     }
-    auto entries_per_event = num_entries % logger->num_events();
+    auto entries_per_event = num_entries / logger->num_events();
 
     uint64_t counter = 0;
     for (auto i = 0u; i < num_events; i++) {
@@ -125,7 +151,7 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
 }
 
 [[maybe_unused]] void hermes_set_values_uint32(void *logger, svOpenArrayHandle names,
-                                              svOpenArrayHandle array) {
+                                               svOpenArrayHandle array) {
     auto *l = get_logger(logger);
     set_values<uint32_t>(l, names, array);
 }
@@ -151,11 +177,20 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
     for (auto *ptr : loggers) {
         delete ptr;
     }
+    loggers.clear();
+
     // need to flush the subscriber as well, if any
     auto *bus = hermes::MessageBus::default_bus();
     auto subs = bus->get_subscribers();
     for (const auto &sub : subs) {
         sub->stop();
     }
-    delete serializer;
+
+    delete serializer_;
+}
+
+[[maybe_unused]] void hermes_add_dummy_serializer(const char *topic) {
+    auto *serializer = get_serializer();
+    auto p = std::make_shared<DummyEventSerializer>(serializer);
+    p->subscribe(hermes::MessageBus::default_bus(), topic);
 }

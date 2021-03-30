@@ -62,7 +62,7 @@ TEST(tracker, dummy_tracker_flush) { // NOLINT
     constexpr auto event_name = "dummy";
     constexpr auto chunk_size = 5;
     constexpr auto num_events = 100;
-    auto tracker = std::make_shared<DummyTracker>(event_name, chunk_size);
+    auto tracker = std::make_shared<DummyTracker>("*", chunk_size);
     hermes::Serializer serializer(dir.path());
     tracker->connect();
     tracker->set_serializer(&serializer);
