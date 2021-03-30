@@ -5,8 +5,6 @@ find_library(LIBARROW_LIBRARY NAMES arrow
         HINTS ${ARROW_LIBS_DIR})
 find_library(LIBPARQUET_LIBRARY NAMES parquet
         HINTS ${ARROW_LIBS_DIR})
-find_library(LIBPLASMA_LIBRARY NAMES plasma
-        HINTS ${ARROW_LIBS_DIR})
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_Args(Arrow DEFAULT_MSG
@@ -19,6 +17,3 @@ set_property(TARGET arrow::arrow PROPERTY INTERFACE_LINK_LIBRARIES ${LIBARROW_LI
 
 add_library(arrow::parquet INTERFACE IMPORTED)
 set_property(TARGET arrow::parquet PROPERTY INTERFACE_LINK_LIBRARIES ${LIBPARQUET_LIBRARY})
-
-add_library(arrow::plasma INTERFACE IMPORTED)
-set_property(TARGET arrow::plasma PROPERTY INTERFACE_LINK_LIBRARIES ${LIBPLASMA_LIBRARY})
