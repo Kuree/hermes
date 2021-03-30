@@ -189,6 +189,7 @@ class Logger;
 
         // clear up
         num_events = 0;
+        times.delete();
         uint8.delete();
         uint8_names.delete();
         uint16.delete();

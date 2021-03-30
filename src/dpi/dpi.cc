@@ -124,7 +124,7 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
     set_values<uint16_t>(l, names, array);
 }
 
-[[maybe_unused]] void hermes_set_values_uin32(void *logger, svOpenArrayHandle names,
+[[maybe_unused]] void hermes_set_values_uint32(void *logger, svOpenArrayHandle names,
                                               svOpenArrayHandle array) {
     auto *l = get_logger(logger);
     set_values<uint32_t>(l, names, array);

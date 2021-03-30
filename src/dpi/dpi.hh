@@ -42,7 +42,7 @@ extern "C" {
                                               svOpenArrayHandle array);
 [[maybe_unused]] void hermes_set_values_uint16(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array);
-[[maybe_unused]] void hermes_set_values_uin32(void *logger, svOpenArrayHandle names,
+[[maybe_unused]] void hermes_set_values_uint32(void *logger, svOpenArrayHandle names,
                                               svOpenArrayHandle array);
 [[maybe_unused]] void hermes_set_values_uint64(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array);
