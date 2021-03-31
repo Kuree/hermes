@@ -14,13 +14,15 @@ fs::path get_root_dir() {
 }
 
 fs::path get_build_dir(const fs::path &root) {
+    fs::path result;
     for (auto const &dir : fs::directory_iterator(root)) {
         std::string filename = dir.path();
         if (filename.find("build") != std::string::npos) {
-            return dir.path();
+            if (result.string().size() < filename.size())
+            result = dir.path();
         }
     }
-    return "";
+    return result;
 }
 
 fs::path get_so(const fs::path &root) {

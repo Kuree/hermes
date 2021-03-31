@@ -91,7 +91,6 @@ void init_tracker(py::module &m) {
 
     auto tracker =
         py::class_<hermes::Tracker, PyTracker, std::shared_ptr<hermes::Tracker>>(m, "Tracker");
-    tracker.def("track", &PyTracker::track, py::arg("event"));
     tracker.def("get_new_transaction", &hermes::Tracker::get_new_transaction,
                 py::return_value_policy::copy);
     tracker.def("set_serializer", &hermes::Tracker::set_serializer, py::arg("serializer"));
