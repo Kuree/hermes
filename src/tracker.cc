@@ -10,11 +10,23 @@ Tracker::Tracker(const std::string &name) : Tracker(MessageBus::default_bus(), n
 
 void Tracker::connect() { subscribe(bus_, name_); }
 
-void Tracker::flush() {
+void Tracker::flush(bool save_inflight_transaction) {
     if (!serializer_) return;
     if (!finished_transactions_.empty()) {
         serializer_->serialize(finished_transactions_);
         finished_transactions_.clear();
+    }
+
+    if (save_inflight_transaction) {
+        if (!inflight_transactions.empty()) {
+            // we reuse the finished transaction so that it will be saved in the
+            // same places
+            for (auto const &transaction : inflight_transactions) {
+                finished_transactions_.emplace_back(transaction);
+            }
+            serializer_->serialize(finished_transactions_);
+            finished_transactions_.clear();
+        }
     }
 }
 

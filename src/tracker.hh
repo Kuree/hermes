@@ -15,15 +15,15 @@ public:
     Tracker(MessageBus *bus, std::string name);
     void connect();
     void set_serializer(Serializer *serializer) { serializer_ = serializer; }
-    void flush();
+    void flush(bool save_inflight_transaction=false);
 
     Transaction *get_new_transaction();
     virtual Transaction *track(Event *event) = 0;
 
     const TransactionBatch &finished_transactions() const { return finished_transactions_; }
 
-    ~Tracker() { flush(); }
-    void stop() override { flush(); }
+    ~Tracker() { flush(true); }
+    void stop() override { flush(true); }
 
 protected:
     void on_message(const std::string &, const std::shared_ptr<Event> &event) override;
