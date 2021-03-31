@@ -2,7 +2,9 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "../logger.hh"
 #include "../serializer.hh"
+#include "../tracker.hh"
 
 namespace py = pybind11;
 
@@ -16,12 +18,13 @@ struct visitor {
 
 void init_event(py::module &m) {
     auto event = py::class_<hermes::Event, std::shared_ptr<hermes::Event>>(m, "Event");
-    event.def("add_value", &hermes::Event::add_value<bool>);
-    event.def("add_value", &hermes::Event::add_value<uint8_t>);
-    event.def("add_value", &hermes::Event::add_value<uint16_t>);
-    event.def("add_value", &hermes::Event::add_value<uint32_t>);
-    event.def("add_value", &hermes::Event::add_value<uint64_t>);
-    event.def("add_value", &hermes::Event::add_value<std::string>);
+    event.def("add_value", &hermes::Event::add_value<bool>, py::arg("name"), py::arg("value"));
+    event.def("add_value", &hermes::Event::add_value<uint8_t>, py::arg("name"), py::arg("value"));
+    event.def("add_value", &hermes::Event::add_value<uint16_t>, py::arg("name"), py::arg("value"));
+    event.def("add_value", &hermes::Event::add_value<uint32_t>, py::arg("name"), py::arg("value"));
+    event.def("add_value", &hermes::Event::add_value<uint64_t>, py::arg("name"), py::arg("value"));
+    event.def("add_value", &hermes::Event::add_value<std::string>, py::arg("name"),
+              py::arg("value"));
     event.def_property_readonly("id", &hermes::Event::id);
 
     event.def("__getattr__", [](const hermes::Event &event, const std::string &name) -> py::object {
@@ -48,14 +51,62 @@ void init_event(py::module &m) {
 void init_transaction(py::module &m) {
     auto transaction =
         py::class_<hermes::Transaction, std::shared_ptr<hermes::Transaction>>(m, "Transaction");
-    transaction.def("add_event", py::overload_cast<const std::shared_ptr<hermes::Event> &>(
-                                     &hermes::Transaction::add_event));
+    transaction.def(
+        "add_event",
+        py::overload_cast<const std::shared_ptr<hermes::Event> &>(&hermes::Transaction::add_event),
+        py::arg("event"));
     transaction.def_property_readonly("id", &hermes::Transaction::id);
     transaction.def("finish", &hermes::Transaction::finish);
     transaction.def_property_readonly("finished", &hermes::Transaction::finished);
 }
 
+void init_serializer(py::module &m) {
+    auto serializer = py::class_<hermes::Serializer>(m, "Serializer");
+    serializer.def(py::init<const std::string &>());
+}
+
+void init_logger(py::module &m) {
+    auto logger = py::class_<hermes::Logger>(m, "Logger");
+    logger.def("log", &hermes::Logger::log, py::arg("event"));
+
+    auto dummy_log_serializer =
+        py::class_<hermes::DummyEventSerializer, std::shared_ptr<hermes::DummyEventSerializer>>(
+            m, "DummyEventSerializer");
+    dummy_log_serializer.def(py::init<>());
+    dummy_log_serializer.def(py::init<std::string>());
+    dummy_log_serializer.def(
+        "connect", py::overload_cast<hermes::Serializer *>(&hermes::DummyEventSerializer::connect),
+        py::arg("serializer"));
+}
+
+void init_tracker(py::module &m) {
+    class PyTracker : public hermes::Tracker {
+    public:
+        using hermes::Tracker::Tracker;
+
+        hermes::Transaction *track(hermes::Event *event) override {
+            PYBIND11_OVERLOAD(hermes::Transaction *, hermes::Tracker, track, event);
+        }
+    };
+
+    auto tracker =
+        py::class_<hermes::Tracker, PyTracker, std::shared_ptr<hermes::Tracker>>(m, "Tracker");
+    tracker.def("track", &PyTracker::track, py::arg("event"));
+    tracker.def("get_new_transaction", &hermes::Tracker::get_new_transaction,
+                py::return_value_policy::copy);
+    tracker.def("set_serializer", &hermes::Tracker::set_serializer, py::arg("serializer"));
+    tracker.def("set_transaction_name", &hermes::Tracker::set_transaction_name);
+    tracker.def("connect", &hermes::Tracker::connect);
+    tracker.def("connect", [](hermes::Tracker &tracker, hermes::Serializer *serializer) {
+        tracker.set_serializer(serializer);
+        tracker.connect();
+    });
+}
+
 PYBIND11_MODULE(_pyhermes, m) {
     init_event(m);
     init_transaction(m);
+    init_serializer(m);
+    init_logger(m);
+    init_tracker(m);
 }

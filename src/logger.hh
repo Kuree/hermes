@@ -7,13 +7,13 @@
 namespace hermes {
 class Logger : Publisher {
 public:
-    explicit Logger(std::string name) : Publisher(), name_(std::move(name)) {}
-    Logger(MessageBus *bus, std::string name) : Publisher(bus), name_(std::move(name)) {}
+    explicit Logger(std::string topic) : Publisher(), topic_(std::move(topic)) {}
+    Logger(MessageBus *bus, std::string name) : Publisher(bus), topic_(std::move(name)) {}
 
-    void log(const std::shared_ptr<Event> &event) { publish(name_, event); }
+    void log(const std::shared_ptr<Event> &event) { publish(topic_, event); }
 
 protected:
-    std::string name_;
+    std::string topic_;
 };
 
 // convenient way to store all events

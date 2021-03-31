@@ -1,4 +1,5 @@
 #include "logger.hh"
+#include "serializer.hh"
 
 namespace hermes {
 

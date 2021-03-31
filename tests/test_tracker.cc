@@ -2,6 +2,7 @@
 #include "tracker.hh"
 #include "test_util.hh"
 #include "loader.hh"
+#include "logger.hh"
 
 class DummyTracker : public hermes::Tracker {
 public:
