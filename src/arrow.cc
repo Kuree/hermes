@@ -104,4 +104,9 @@ std::string get_string(const std::shared_ptr<arrow::Scalar> &scalar) {
     return str_val;
 }
 
+bool get_bool(const std::shared_ptr<arrow::Scalar> &scalar) {
+    auto bool_val_ = std::reinterpret_pointer_cast<arrow::BooleanScalar>(scalar);
+    return bool_val_->value;
+}
+
 }  // namespace hermes

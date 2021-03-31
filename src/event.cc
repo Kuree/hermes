@@ -51,6 +51,7 @@ std::shared_ptr<arrow::Schema> get_schema(Event *event) {
                               [&type](uint16_t) { type = arrow::uint16(); },
                               [&type](uint32_t) { type = arrow::uint32(); },
                               [&type](uint64_t) { type = arrow::uint64(); },
+                              [&type](bool) { type = arrow::boolean(); },
                               [&type](const std::string &) { type = arrow::utf8(); }},
                    v);
         auto field = std::make_shared<arrow::Field>(name, type);
@@ -91,6 +92,9 @@ EventBatch::serialize() const noexcept {
                            [pool, &builders](uint64_t) {
                                builders.emplace_back(std::make_unique<arrow::UInt64Builder>(pool));
                            },
+                           [pool, &builders](bool) {
+                               builders.emplace_back(std::make_unique<arrow::BooleanBuilder>(pool));
+                           },
                            [pool, &builders](const std::string &) {
                                builders.emplace_back(std::make_unique<arrow::StringBuilder>(pool));
                            }},
@@ -120,10 +124,15 @@ EventBatch::serialize() const noexcept {
                                       auto *p = reinterpret_cast<arrow::UInt64Builder *>(ptr);
                                       (void)p->Append(arg);
                                   },
+                                  [ptr](bool arg) {
+                                      auto *p = reinterpret_cast<arrow::BooleanBuilder *>(ptr);
+                                      (void)p->Append(p);
+                                  },
                                   [ptr](const std::string &arg) {
                                       auto *p = reinterpret_cast<arrow::StringBuilder *>(ptr);
                                       (void)p->Append(arg);
                                   }},
+
                        value);
         }
     }
@@ -150,6 +159,7 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(
         event_batch->emplace_back(std::make_shared<Event>(0));
     }
 
+    auto bool_ = arrow::boolean();
     auto uint8 = arrow::uint8();
     auto uint16 = arrow::uint16();
     auto uint32 = arrow::uint32();
@@ -188,6 +198,9 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(
                     } else {
                         (*event_batch)[j]->add_value(name, int_val);
                     }
+                } else if (type->Equals(bool_)) {
+                    auto bool_val_ = std::reinterpret_pointer_cast<arrow::BooleanScalar>(v);
+                    (*event_batch)[j]->add_value(name, get_bool(v));
                 } else {
                     auto error_msg =
                         fmt::format("Unknown type {0} for column {1}", type->ToString(), name);

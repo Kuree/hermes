@@ -28,6 +28,7 @@ uint16_t get_uint16(const std::shared_ptr<arrow::Scalar> &scalar);
 uint32_t get_uint32(const std::shared_ptr<arrow::Scalar> &scalar);
 uint64_t get_uint64(const std::shared_ptr<arrow::Scalar> &scalar);
 std::string get_string(const std::shared_ptr<arrow::Scalar> &scalar);
+bool get_bool(const std::shared_ptr<arrow::Scalar> &scalar);
 
 }  // namespace hermes
 

@@ -60,7 +60,7 @@ public:
 
     [[nodiscard]] auto const &values() const { return values_; }
 
-    using EventValue = std::variant<uint64_t, uint32_t, uint16_t, uint8_t, std::string>;
+    using EventValue = std::variant<uint64_t, uint32_t, uint16_t, uint8_t, bool, std::string>;
 
 private:
     uint64_t time_;

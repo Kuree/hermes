@@ -113,6 +113,10 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
             if constexpr (std::is_same<T, char *>::value) {
                 std::string value = *v;
                 logger->template set_value(*name, value, i);
+            } else if constexpr (std::is_same<T, bool>::value) {
+                auto *v_ptr = reinterpret_cast<unsigned char *>(v);
+                bool value = *v_ptr != 0;
+                logger->template set_value(*name, value, i);
             } else {
                 logger->template set_value(*name, *v, i);
             }
@@ -143,6 +147,12 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
                                                svOpenArrayHandle array) {
     auto *l = get_logger(logger);
     set_values<uint64_t>(l, names, array);
+}
+
+[[maybe_unused]] void hermes_set_values_bool(void *logger, svOpenArrayHandle names,
+                                             svOpenArrayHandle array) {
+    auto *l = get_logger(logger);
+    set_values<bool>(l, names, array);
 }
 
 [[maybe_unused]] void hermes_set_values_string(void *logger, svOpenArrayHandle names,

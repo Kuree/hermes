@@ -5,6 +5,8 @@ import "DPI-C" function void hermes_set_output_dir(string directory);
 import "DPI-C" function chandle hermes_create_logger(string directory);
 import "DPI-C" function void hermes_create_events(input chandle logger,
                                                   longint unsigned times[]);
+import "DPI-C" function void hermes_set_values_bool(input chandle logger, input string names[],
+                                                    input bit values[]);
 import "DPI-C" function void hermes_set_values_uint8(input chandle logger, input string names[],
                                                      input byte unsigned values[]);
 import "DPI-C" function void hermes_set_values_uint16(input chandle logger, input string names[],
@@ -26,6 +28,7 @@ class LogEvent;
     // attributes
     longint unsigned time_;
     // value holders
+    bit               bool[string];
     byte unsigned     uint8[string];
     shortint unsigned uint16[string];
     int unsigned      uint32[string];
@@ -64,6 +67,8 @@ endclass
 
 class Logger;
     // local values
+    local bit               bool[$];
+    local string            bool_names[$];
     local byte unsigned     uint8[$];
     local string            uint8_names[$];
     local shortint unsigned uint16[$];
@@ -93,6 +98,13 @@ class Logger;
     function void log(LogEvent event_);
         // add it to the cached value
         times.push_back(event_.time_);
+
+        if (event_.bit.size() > 0) begin
+             foreach(event_.bool[name]) begin
+                bool.push_back(event_.bool[name]);
+                bool_names.push_back(name);
+            end
+        end
 
         if (event_.uint8.size() > 0) begin
             foreach(event_.uint8[name]) begin
@@ -139,11 +151,13 @@ class Logger;
         // we made assumption that the logger only takes one type of events
         // batches
         longint unsigned  times_batch[];
+        bit               bool_batch[];
         byte unsigned     uint8_batch[];
         shortint unsigned uint16_batch[];
         int unsigned      uint32_batch[];
         longint unsigned  uint64_batch[];
         string            string_batch[];
+        string            bool_name_batch[];
         string            uint8_name_batch[];
         string            uint16_name_batch[];
         string            uint32_name_batch[];
@@ -156,6 +170,8 @@ class Logger;
         end
 
         // maybe the simulator will do zero-copy aliasing?
+        bool_batch = bool;
+        bool_name_batch = bool_names;
         uint8_batch = uint8;
         uint8_name_batch = uint8_names;
         uint16_batch = uint16;
@@ -170,6 +186,9 @@ class Logger;
         // call DPI functions to store data
         // create events
         hermes_create_events(logger_, times_batch);
+        if (bool_batch.size() > 0) begin
+            hermes_set_values_bool(logger_, bool_name_batch, bool_batch);
+        end
         if (uint8_batch.size() > 0) begin
             hermes_set_values_uint8(logger_, uint8_name_batch, uint8_batch);
         end
@@ -192,6 +211,8 @@ class Logger;
         // clear up
         num_events = 0;
         times.delete();
+        bool.delete();
+        bool_names.delete();
         uint8.delete();
         uint8_names.delete();
         uint16.delete();
