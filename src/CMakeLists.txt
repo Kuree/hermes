@@ -10,3 +10,4 @@ target_include_directories(hermes PRIVATE ${ARROW_INCLUDE_DIR}
 set_property(TARGET hermes PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(dpi)
+add_subdirectory(python)
