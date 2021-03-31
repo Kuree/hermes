@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 
 #include "arrow/api.h"
 #include "arrow/filesystem/localfs.h"
@@ -99,6 +100,15 @@ std::vector<Event *> Loader::get_events(const Transaction &transaction) {
     }
 
     return result;
+}
+
+[[maybe_unused]] void Loader::print_files() const {
+    for (auto const &file : files_) {
+        std::cout << "File: " << std::filesystem::absolute(file->filename) << std::endl
+                  << '\t'
+                  << "Type: " << (file->type == FileInfo::FileType::event ? "event" : "transaction")
+                  << std::endl;
+    }
 }
 
 static bool check_member(rapidjson::Document &document, const char *member_name) {

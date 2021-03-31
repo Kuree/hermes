@@ -126,7 +126,7 @@ EventBatch::serialize() const noexcept {
                                   },
                                   [ptr](bool arg) {
                                       auto *p = reinterpret_cast<arrow::BooleanBuilder *>(ptr);
-                                      (void)p->Append(p);
+                                      (void)p->Append(arg);
                                   },
                                   [ptr](const std::string &arg) {
                                       auto *p = reinterpret_cast<arrow::StringBuilder *>(ptr);

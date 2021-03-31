@@ -13,6 +13,7 @@ TEST(serialization, event) {  // NOLINT
     for (auto i = 0; i < num_event; i++) {
         auto e = std::make_unique<hermes::Event>(i);
         e->add_value<uint64_t>("value1", i);
+        e->add_value<bool>("value2", true);
         batch.emplace_back(std::move(e));
     }
 
@@ -33,6 +34,9 @@ TEST(serialization, event) {  // NOLINT
     auto value = event->get_value<uint64_t>("value1");
     EXPECT_TRUE(value);
     EXPECT_EQ(*value, 42);
+    auto bool_value = event->get_value<bool>("value2");
+    EXPECT_TRUE(bool_value);
+    EXPECT_TRUE(*bool_value);
 }
 
 TEST(serialization, multiple_event_batches) {  // NOLINT

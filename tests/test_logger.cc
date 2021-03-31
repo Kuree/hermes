@@ -59,6 +59,13 @@ TEST(logger, sv) {  // NOLINT
     auto event = (*batch)[42];
     EXPECT_EQ(*event->get_value<uint8_t>("uint8_1"), 42);
     EXPECT_EQ(*event->get_value<std::string>("string_1"), "aaa");
+
+    auto b = event->get_value<bool>("bool");
+    EXPECT_TRUE(b);
+    EXPECT_FALSE(*b);
+    event = (*batch)[43];
+    b = event->get_value<bool>("bool");
+    EXPECT_TRUE(*b);
 }
 
 fs::path get_tracker_lib(const fs::path &root) {

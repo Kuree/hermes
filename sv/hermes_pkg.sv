@@ -43,6 +43,10 @@ class LogEvent;
         this.time_ = $time();
     endfunction
 
+    function void add_value_bool(string name, bit value);
+        bool[name] = value;
+    endfunction
+
     function void add_value_uint8(string name, byte unsigned value);
         uint8[name] = value;
     endfunction
@@ -99,7 +103,7 @@ class Logger;
         // add it to the cached value
         times.push_back(event_.time_);
 
-        if (event_.bit.size() > 0) begin
+        if (event_.bool.size() > 0) begin
              foreach(event_.bool[name]) begin
                 bool.push_back(event_.bool[name]);
                 bool_names.push_back(name);

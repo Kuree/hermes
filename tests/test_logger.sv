@@ -15,6 +15,7 @@ initial begin
 
     for (int i = 0; i < 2000; i++) begin
         e.reset();
+        e.add_value_bool("bool", i % 2);
         e.add_value_uint8("uint8_1", i % 256);
         e.add_value_uint8("uint8_2", i % 256 + 1);
         e.add_value_uint16("uint16_1", i);

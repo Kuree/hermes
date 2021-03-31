@@ -39,6 +39,9 @@ public:
     std::vector<std::shared_ptr<arrow::Table>> get_events(uint64_t min_time, uint64_t max_time);
     std::vector<Event*> get_events(const Transaction &transaction);
 
+    // debug information
+    [[maybe_unused]] void print_files() const;
+
 private:
     std::string dir_;
     std::vector<std::unique_ptr<FileInfo>> files_;
