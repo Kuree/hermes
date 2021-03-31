@@ -103,6 +103,8 @@ setup(
     long_description_content_type='text/x-rst',
     url="https://github.com/Kuree/hgdb-rtl",
     python_requires=">=3.6",
-    ext_modules=[CMakeExtension("_hermes")],
-    cmdclass={"build_ext": CMakeBuild}
+    install_requires=["pyspark"],
+    ext_modules=[CMakeExtension("_pyhermes")],
+    cmdclass={"build_ext": CMakeBuild},
+    packages=["pyhermes"],
 )
