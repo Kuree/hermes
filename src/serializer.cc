@@ -205,6 +205,9 @@ void Serializer::update_stat(SerializationStat &stat, const TransactionBatch &ba
         stat.min_id = std::min(stat.min_id, transaction->id());
     }
     if (stat.type.empty()) stat.type = "transaction";
+    if (stat.type.empty() && !batch.transaction_name().empty()) {
+        stat.name = batch.transaction_name();
+    }
 }
 
 void Serializer::write_stat(const SerializationStat &stat) {
@@ -212,6 +215,7 @@ void Serializer::write_stat(const SerializationStat &stat) {
     auto parquet_basename = std::string(fs::path(stat.parquet_filename).filename());
     set_member(document, "parquet", parquet_basename);
     set_member(document, "type", stat.type);
+    set_member(document, "name", stat.name);
 
     set_member(document, "min_time", stat.min_time);
     set_member(document, "max_time", stat.max_time);

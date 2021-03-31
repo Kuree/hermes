@@ -7,7 +7,7 @@ namespace hermes {
 
 class TransactionBatch;
 
-class Transaction: public std::enable_shared_from_this<Transaction> {
+class Transaction : public std::enable_shared_from_this<Transaction> {
 public:
     Transaction() noexcept;
     explicit Transaction(uint64_t id) noexcept : id_(id) {}
@@ -39,6 +39,12 @@ public:
     // factory method to construct transaction batch
     static std::unique_ptr<TransactionBatch> deserialize(
         const std::shared_ptr<arrow::Table> &table);
+
+    void set_transaction_name(std::string name) { transaction_name_ = std::move(name); }
+    [[nodiscard]] const std::string &transaction_name() const { return transaction_name_; }
+
+private:
+    std::string transaction_name_;
 };
 
 }  // namespace hermes

@@ -24,6 +24,9 @@ struct SerializationStat {
     uint64_t max_id;
 
     std::string type;
+
+    // could be empty
+    std::string name;
 };
 
 class Serializer {

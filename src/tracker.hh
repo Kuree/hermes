@@ -11,8 +11,8 @@ namespace hermes {
 
 class Tracker : public Subscriber {
 public:
-    explicit Tracker(const std::string &name);
-    Tracker(MessageBus *bus, std::string name);
+    explicit Tracker(const std::string &topic);
+    Tracker(MessageBus *bus, std::string topic);
     void connect();
     void set_serializer(Serializer *serializer) { serializer_ = serializer; }
     void flush(bool save_inflight_transaction=false);
@@ -21,15 +21,17 @@ public:
     virtual Transaction *track(Event *event) = 0;
 
     const TransactionBatch &finished_transactions() const { return finished_transactions_; }
+    [[maybe_unused]] void set_transaction_name(std::string transaction_name);
 
     ~Tracker() { flush(true); }
     void stop() override { flush(true); }
 
 protected:
     void on_message(const std::string &, const std::shared_ptr<Event> &event) override;
+    std::string transaction_name_;
 
 private:
-    std::string name_;
+    std::string topic_;
     std::unordered_set<std::shared_ptr<Transaction>> inflight_transactions;
     // normally we don't flush finished transactions to disk unless relevant functions
     // are called, since transaction data are not that big.

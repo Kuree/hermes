@@ -4,11 +4,11 @@
 
 namespace hermes {
 
-Tracker::Tracker(MessageBus *bus, std::string name) : name_(std::move(name)) { bus_ = bus; }
+Tracker::Tracker(MessageBus *bus, std::string topic) : topic_(std::move(topic)) { bus_ = bus; }
 
-Tracker::Tracker(const std::string &name) : Tracker(MessageBus::default_bus(), name) {}
+Tracker::Tracker(const std::string &topic) : Tracker(MessageBus::default_bus(), topic) {}
 
-void Tracker::connect() { subscribe(bus_, name_); }
+void Tracker::connect() { subscribe(bus_, topic_); }
 
 void Tracker::flush(bool save_inflight_transaction) {
     if (!serializer_) return;
@@ -36,6 +36,12 @@ Transaction *Tracker::get_new_transaction() {
     auto *ptr = t.get();
     inflight_transactions.emplace(t);
     return ptr;
+}
+
+[[maybe_unused]] void Tracker::set_transaction_name(std::string transaction_name) {
+    transaction_name_ = std::move(transaction_name);
+
+    finished_transactions_.set_transaction_name(transaction_name_);
 }
 
 void Tracker::on_message(const std::string &, const std::shared_ptr<Event> &event) {
