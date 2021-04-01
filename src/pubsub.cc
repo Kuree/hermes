@@ -34,8 +34,11 @@ void MessageBus::add_subscriber(const std::string &topic, std::shared_ptr<Subscr
 }
 
 MessageBus *MessageBus::default_bus() {
-    static MessageBus bus;
-    return &bus;
+    static std::shared_ptr<MessageBus> bus;
+    if (!bus) {
+        bus = std::make_shared<MessageBus>();
+    }
+    return bus.get();
 }
 
 std::set<std::shared_ptr<Subscriber>> MessageBus::get_subscribers() const {

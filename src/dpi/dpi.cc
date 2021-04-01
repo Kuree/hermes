@@ -39,16 +39,16 @@ DPILogger::~DPILogger() {
 // global variables
 std::vector<DPILogger *> loggers;
 std::string serializer_path;
-hermes::Serializer *serializer_ = nullptr;
+std::shared_ptr<hermes::Serializer> serializer_;
 
-hermes::Serializer *get_serializer() {
+std::shared_ptr<hermes::Serializer> get_serializer() {
     if (!serializer_) {
         // initialize the serializer
         if (serializer_path.empty()) {
             // use the current working directory
             serializer_path = std::filesystem::current_path();
         }
-        serializer_ = new hermes::Serializer(serializer_path);
+        serializer_ = std::make_shared<hermes::Serializer>(serializer_path);
     }
     return serializer_;
 }
@@ -176,11 +176,11 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
     auto *bus = hermes::MessageBus::default_bus();
     bus->stop();
 
-    delete serializer_;
+    serializer_.reset();
 }
 
 [[maybe_unused]] void hermes_add_dummy_serializer(const char *topic) {
-    auto *serializer = get_serializer();
+    auto serializer = get_serializer();
     auto p = std::make_shared<hermes::DummyEventSerializer>(topic);
     p->connect(serializer);
 }
@@ -188,7 +188,7 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
 // implement the add tracker to simulator
 namespace hermes {
 void add_tracker_to_simulator(const std::shared_ptr<Tracker> &tracker) {
-    auto *serializer = get_serializer();
+    auto serializer = get_serializer();
     tracker->set_serializer(serializer);
     tracker->connect();
 }

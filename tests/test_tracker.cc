@@ -64,12 +64,12 @@ TEST(tracker, dummy_tracker_flush) { // NOLINT
     constexpr auto chunk_size = 5;
     constexpr auto num_events = 100;
     auto tracker = std::make_shared<DummyTracker>("dummy/*", chunk_size);
-    hermes::Serializer serializer(dir.path());
+    auto serializer = std::make_shared<hermes::Serializer>(dir.path());
     tracker->connect();
-    tracker->set_serializer(&serializer);
+    tracker->set_serializer(serializer);
     hermes::Publisher publisher;
     auto d = std::make_shared<hermes::DummyEventSerializer>();
-    d->connect(&serializer);
+    d->connect(serializer);
 
     for (auto i = 0u; i < num_events; i++) {
         auto e = std::make_shared<hermes::Event>(i);
@@ -86,7 +86,7 @@ TEST(tracker, dummy_tracker_flush) { // NOLINT
 
     auto *bus = hermes::MessageBus::default_bus();
     bus->stop();
-    serializer.finalize();
+    serializer->finalize();
 
     // load files
     hermes::Loader loader(dir.path());

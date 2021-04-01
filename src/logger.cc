@@ -1,9 +1,10 @@
 #include "logger.hh"
+
 #include "serializer.hh"
 
 namespace hermes {
 
-void DummyEventSerializer::connect(MessageBus *bus, Serializer *serializer) {
+void DummyEventSerializer::connect(MessageBus *bus, const std::shared_ptr<Serializer> &serializer) {
     subscribe(bus, topic_);
     serializer_ = serializer;
 }
@@ -33,4 +34,4 @@ void DummyEventSerializer::stop() {
     }
 }
 
-}
+}  // namespace hermes

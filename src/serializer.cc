@@ -129,6 +129,8 @@ SerializationStat &Serializer::get_stat(const void *ptr) {
 
 bool Serializer::serialize(parquet::arrow::FileWriter *writer,
                            const std::shared_ptr<arrow::RecordBatch> &record) {
+    if (!writer)
+        return false;
     // serialize
     auto table_r = arrow::Table::FromRecordBatches({record});
     if (!table_r.ok()) return false;

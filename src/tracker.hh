@@ -14,7 +14,7 @@ public:
     explicit Tracker(const std::string &topic);
     Tracker(MessageBus *bus, std::string topic);
     void connect();
-    void set_serializer(Serializer *serializer) { serializer_ = serializer; }
+    void set_serializer(const std::shared_ptr<Serializer> &serializer) { serializer_ = serializer; }
     void flush(bool save_inflight_transaction = false);
 
     Transaction *get_new_transaction();
@@ -39,7 +39,7 @@ private:
     TransactionBatch finished_transactions_;
 
     // serializer
-    Serializer *serializer_ = nullptr;
+    std::shared_ptr<Serializer> serializer_;
 };
 
 extern void add_tracker_to_simulator(const std::shared_ptr<Tracker> &tracker);

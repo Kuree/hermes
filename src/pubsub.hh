@@ -10,7 +10,7 @@ namespace hermes {
 class Publisher;
 class Subscriber;
 
-class MessageBus {
+class MessageBus: public std::enable_shared_from_this<MessageBus> {
 public:
     void publish(const std::string &topic, const std::shared_ptr<Event> &event);
     void publish(const std::string &topic, const std::shared_ptr<Transaction> &transaction);

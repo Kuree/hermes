@@ -12,7 +12,7 @@ uint64_t Transaction::id_allocator_ = 0;
 Transaction::Transaction() noexcept : id_(id_allocator_++) {}
 
 bool Transaction::add_event(const Event *event) {
-    if (is_done_) return false;
+    if (finished_) return false;
     if (start_time_ > event->time()) {
         start_time_ = event->time();
     }
@@ -33,6 +33,7 @@ TransactionBatch::serialize() const noexcept {
     arrow::UInt64Builder id_builder(pool);
     arrow::UInt64Builder start_builder(pool);
     arrow::UInt64Builder end_builder(pool);
+    arrow::BooleanBuilder finished_builder(pool);
     arrow::ListBuilder event_ids_list_builder(pool, std::make_shared<arrow::UInt64Builder>(pool));
     auto &event_ids_builder =
         *(reinterpret_cast<arrow::UInt64Builder *>(event_ids_list_builder.value_builder()));
@@ -41,6 +42,7 @@ TransactionBatch::serialize() const noexcept {
         (void)id_builder.Append(transaction->id());
         (void)start_builder.Append(transaction->start_time());
         (void)end_builder.Append(transaction->end_time());
+        (void)finished_builder.Append(transaction->finished());
         std::vector<uint64_t> ids;
         auto const &events = transaction->events();
         ids.reserve(events.size());
@@ -58,18 +60,21 @@ TransactionBatch::serialize() const noexcept {
     std::shared_ptr<arrow::Array> end_array;
     r = end_builder.Finish(&end_array);
     if (!r.ok()) return error_return;
+    std::shared_ptr<arrow::Array> finished_array;
+    r = finished_builder.Finish(&finished_array);
+    if (!r.ok()) return error_return;
     std::shared_ptr<arrow::Array> event_id_array;
     r = event_ids_list_builder.Finish(&event_id_array);
     if (!r.ok()) return error_return;
 
     std::vector<std::shared_ptr<arrow::Field>> schema_vector = {
         arrow::field("id", arrow::uint64()), arrow::field("start_time", arrow::uint64()),
-        arrow::field("end_time", arrow::uint64()),
+        arrow::field("end_time", arrow::uint64()), arrow::field("finished", arrow::boolean()),
         arrow::field("events", arrow::list(arrow::uint64()))};
     auto schema = std::make_shared<arrow::Schema>(schema_vector);
 
-    auto batch = arrow::RecordBatch::Make(schema, size(),
-                                          {id_array, start_array, end_array, event_id_array});
+    auto batch = arrow::RecordBatch::Make(
+        schema, size(), {id_array, start_array, end_array, finished_array, event_id_array});
     return {batch, schema};
 }
 
@@ -78,7 +83,8 @@ std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
     auto id = table->column(0);
     auto start = table->column(1);
     auto end = table->column(2);
-    auto e = table->column(3);
+    auto finished = table->column(3);
+    auto e = table->column(4);
 
     auto transactions = std::make_unique<TransactionBatch>();
     transactions->reserve(table->num_rows());
@@ -89,6 +95,7 @@ std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
         auto id_column = id->chunk(idx);
         auto start_time = start->chunk(idx);
         auto end_time = end->chunk(idx);
+        auto finished_ = finished->chunk(idx);
         auto events = e->chunk(idx);
 
         for (auto i = 0; i < id_column->length(); i++) {
@@ -97,6 +104,7 @@ std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
 
             transaction->start_time_ = get_uint64(*start_time->GetScalar(i));
             transaction->end_time_ = get_uint64(*end_time->GetScalar(i));
+            transaction->finished_ = get_bool(*finished_->GetScalar(i));
 
             // TODO, refactor this once it's working
             auto event_scalar_r = events->GetScalar(i);

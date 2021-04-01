@@ -13,8 +13,8 @@ public:
     explicit Transaction(uint64_t id) noexcept : id_(id) {}
     bool add_event(const std::shared_ptr<Event> &event) { return add_event(event.get()); }
     bool add_event(const Event *event);
-    void finish() { is_done_ = true; }
-    [[nodiscard]] bool finished() const { return is_done_; }
+    void finish() { finished_ = true; }
+    [[nodiscard]] bool finished() const { return finished_; }
     [[nodiscard]] uint64_t id() const { return id_; }
     [[nodiscard]] const std::vector<uint64_t> &events() const { return events_ids_; }
     [[nodiscard]] uint64_t start_time() const { return start_time_; }
@@ -24,7 +24,7 @@ private:
     uint64_t id_;
     uint64_t start_time_ = std::numeric_limits<uint64_t>::max();
     uint64_t end_time_ = 0;
-    bool is_done_ = false;
+    bool finished_ = false;
     std::vector<uint64_t> events_ids_;
 
     static uint64_t id_allocator_;

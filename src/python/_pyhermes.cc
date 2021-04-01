@@ -62,7 +62,8 @@ void init_transaction(py::module &m) {
 }
 
 void init_serializer(py::module &m) {
-    auto serializer = py::class_<hermes::Serializer>(m, "Serializer");
+    auto serializer =
+        py::class_<hermes::Serializer, std::shared_ptr<hermes::Serializer>>(m, "Serializer");
     serializer.def(py::init<const std::string &>());
     serializer.def("finalize", &hermes::Serializer::finalize);
 }
@@ -77,9 +78,10 @@ void init_logger(py::module &m) {
             m, "DummyEventSerializer");
     dummy_log_serializer.def(py::init<>());
     dummy_log_serializer.def(py::init<std::string>(), py::arg("topic"));
-    dummy_log_serializer.def(
-        "connect", py::overload_cast<hermes::Serializer *>(&hermes::DummyEventSerializer::connect),
-        py::arg("serializer"));
+    dummy_log_serializer.def("connect",
+                             py::overload_cast<const std::shared_ptr<hermes::Serializer> &>(
+                                 &hermes::DummyEventSerializer::connect),
+                             py::arg("serializer"));
 }
 
 void init_tracker(py::module &m) {
@@ -101,7 +103,7 @@ void init_tracker(py::module &m) {
     tracker.def("connect", &hermes::Tracker::connect);
     tracker.def(
         "connect",
-        [](hermes::Tracker &tracker, hermes::Serializer *serializer) {
+        [](hermes::Tracker &tracker, const std::shared_ptr<hermes::Serializer> &serializer) {
             tracker.set_serializer(serializer);
             tracker.connect();
         },
@@ -109,13 +111,19 @@ void init_tracker(py::module &m) {
     tracker.def(py::init<const std::string &>());
     tracker.def("track", &hermes::Tracker::track);
     tracker.def_property("transaction_name", &hermes::Tracker::transaction_name,
-                          &hermes::Tracker::set_transaction_name);
+                         &hermes::Tracker::set_transaction_name);
 }
 
 void init_message_bus(py::module &m) {
-    auto bus = py::class_<hermes::MessageBus>(m, "MessageBus");
+    auto bus = py::class_<hermes::MessageBus, std::shared_ptr<hermes::MessageBus>>(m, "MessageBus");
     bus.def("flush", &hermes::MessageBus::stop);
-    m.def("default_bus", &hermes::MessageBus::default_bus, py::return_value_policy::reference);
+    m.def(
+        "default_bus",
+        []() {
+            auto *bus = hermes::MessageBus::default_bus();
+            return bus->shared_from_this();
+        },
+        py::return_value_policy::reference_internal);
 }
 
 PYBIND11_MODULE(_pyhermes, m) {
