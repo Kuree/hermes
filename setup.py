@@ -103,7 +103,7 @@ setup(
     long_description_content_type='text/x-rst',
     url="https://github.com/Kuree/hgdb-rtl",
     python_requires=">=3.6",
-    install_requires=["pyspark"],
+    install_requires=["pyarrow", "dask[dataframe]"],
     ext_modules=[CMakeExtension("_pyhermes")],
     cmdclass={"build_ext": CMakeBuild},
     packages=["pyhermes"],

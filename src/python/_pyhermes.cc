@@ -64,17 +64,19 @@ void init_transaction(py::module &m) {
 void init_serializer(py::module &m) {
     auto serializer = py::class_<hermes::Serializer>(m, "Serializer");
     serializer.def(py::init<const std::string &>());
+    serializer.def("finalize", &hermes::Serializer::finalize);
 }
 
 void init_logger(py::module &m) {
     auto logger = py::class_<hermes::Logger>(m, "Logger");
+    logger.def(py::init<std::string>());
     logger.def("log", &hermes::Logger::log, py::arg("event"));
 
     auto dummy_log_serializer =
         py::class_<hermes::DummyEventSerializer, std::shared_ptr<hermes::DummyEventSerializer>>(
             m, "DummyEventSerializer");
     dummy_log_serializer.def(py::init<>());
-    dummy_log_serializer.def(py::init<std::string>());
+    dummy_log_serializer.def(py::init<std::string>(), py::arg("topic"));
     dummy_log_serializer.def(
         "connect", py::overload_cast<hermes::Serializer *>(&hermes::DummyEventSerializer::connect),
         py::arg("serializer"));
