@@ -21,10 +21,12 @@ void Tracker::flush(bool save_inflight_transaction) {
         if (!inflight_transactions.empty()) {
             // we reuse the finished transaction so that it will be saved in the
             // same places
+            finished_transactions_.reserve(inflight_transactions.size());
             for (auto const &transaction : inflight_transactions) {
                 finished_transactions_.emplace_back(transaction);
             }
             serializer_->serialize(finished_transactions_);
+            inflight_transactions.clear();
             finished_transactions_.clear();
         }
     }

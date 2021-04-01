@@ -15,13 +15,14 @@ public:
     Tracker(MessageBus *bus, std::string topic);
     void connect();
     void set_serializer(Serializer *serializer) { serializer_ = serializer; }
-    void flush(bool save_inflight_transaction=false);
+    void flush(bool save_inflight_transaction = false);
 
     Transaction *get_new_transaction();
     virtual Transaction *track(Event *event) = 0;
 
     const TransactionBatch &finished_transactions() const { return finished_transactions_; }
     [[maybe_unused]] void set_transaction_name(std::string transaction_name);
+    const std::string &transaction_name() const { return transaction_name_; }
 
     ~Tracker() { flush(true); }
     void stop() override { flush(true); }

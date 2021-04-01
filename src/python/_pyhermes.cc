@@ -88,21 +88,28 @@ void init_tracker(py::module &m) {
         using hermes::Tracker::Tracker;
 
         hermes::Transaction *track(hermes::Event *event) override {
-            PYBIND11_OVERLOAD(hermes::Transaction *, hermes::Tracker, track, event);
+            PYBIND11_OVERRIDE_PURE(hermes::Transaction *, hermes::Tracker, track, event);
         }
     };
 
     auto tracker =
         py::class_<hermes::Tracker, PyTracker, std::shared_ptr<hermes::Tracker>>(m, "Tracker");
     tracker.def("get_new_transaction", &hermes::Tracker::get_new_transaction,
-                py::return_value_policy::copy);
+                py::return_value_policy::reference_internal);
     tracker.def("set_serializer", &hermes::Tracker::set_serializer, py::arg("serializer"));
     tracker.def("set_event_name", &hermes::Tracker::set_transaction_name);
     tracker.def("connect", &hermes::Tracker::connect);
-    tracker.def("connect", [](hermes::Tracker &tracker, hermes::Serializer *serializer) {
-        tracker.set_serializer(serializer);
-        tracker.connect();
-    });
+    tracker.def(
+        "connect",
+        [](hermes::Tracker &tracker, hermes::Serializer *serializer) {
+            tracker.set_serializer(serializer);
+            tracker.connect();
+        },
+        py::arg("serializer"));
+    tracker.def(py::init<const std::string &>());
+    tracker.def("track", &hermes::Tracker::track);
+    tracker.def_property("transaction_name", &hermes::Tracker::transaction_name,
+                          &hermes::Tracker::set_transaction_name);
 }
 
 void init_message_bus(py::module &m) {

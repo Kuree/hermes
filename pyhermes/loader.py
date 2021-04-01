@@ -24,8 +24,9 @@ class Loader:
                 name = config["name"]
                 df_type = config["type"]
                 # load the parquet file
-                ddf = dd.read_parquet(parquet_filename)
                 if df_type == "event":
+                    ddf = dd.read_parquet(parquet_filename, index=["id", "time"])
                     self.events_df.append(ddf)
                 else:
+                    ddf = dd.read_parquet(parquet_filename, index=["id"])
                     self.transactions_df[name] = ddf
