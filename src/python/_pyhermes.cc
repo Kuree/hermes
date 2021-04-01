@@ -18,6 +18,7 @@ struct visitor {
 
 void init_event(py::module &m) {
     auto event = py::class_<hermes::Event, std::shared_ptr<hermes::Event>>(m, "Event");
+    event.def(py::init<uint64_t>(), py::arg("time"));
     event.def("add_value", &hermes::Event::add_value<bool>, py::arg("name"), py::arg("value"));
     event.def("add_value", &hermes::Event::add_value<uint8_t>, py::arg("name"), py::arg("value"));
     event.def("add_value", &hermes::Event::add_value<uint16_t>, py::arg("name"), py::arg("value"));
@@ -94,12 +95,18 @@ void init_tracker(py::module &m) {
     tracker.def("get_new_transaction", &hermes::Tracker::get_new_transaction,
                 py::return_value_policy::copy);
     tracker.def("set_serializer", &hermes::Tracker::set_serializer, py::arg("serializer"));
-    tracker.def("set_transaction_name", &hermes::Tracker::set_transaction_name);
+    tracker.def("set_event_name", &hermes::Tracker::set_transaction_name);
     tracker.def("connect", &hermes::Tracker::connect);
     tracker.def("connect", [](hermes::Tracker &tracker, hermes::Serializer *serializer) {
         tracker.set_serializer(serializer);
         tracker.connect();
     });
+}
+
+void init_message_bus(py::module &m) {
+    auto bus = py::class_<hermes::MessageBus>(m, "MessageBus");
+    bus.def("flush", &hermes::MessageBus::stop);
+    m.def("default_bus", &hermes::MessageBus::default_bus, py::return_value_policy::reference);
 }
 
 PYBIND11_MODULE(_pyhermes, m) {
@@ -108,4 +115,5 @@ PYBIND11_MODULE(_pyhermes, m) {
     init_serializer(m);
     init_logger(m);
     init_tracker(m);
+    init_message_bus(m);
 }

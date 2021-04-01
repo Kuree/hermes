@@ -195,6 +195,9 @@ void Serializer::update_stat(SerializationStat &stat, const EventBatch &batch) {
         stat.min_id = std::min(stat.min_id, event->id());
     }
     if (stat.type.empty()) stat.type = "event";
+    if (stat.name.empty() && !batch.event_name().empty()) {
+        stat.name = batch.event_name();
+    }
 }
 
 void Serializer::update_stat(SerializationStat &stat, const TransactionBatch &batch) {
@@ -205,7 +208,7 @@ void Serializer::update_stat(SerializationStat &stat, const TransactionBatch &ba
         stat.min_id = std::min(stat.min_id, transaction->id());
     }
     if (stat.type.empty()) stat.type = "transaction";
-    if (stat.type.empty() && !batch.transaction_name().empty()) {
+    if (stat.name.empty() && !batch.transaction_name().empty()) {
         stat.name = batch.transaction_name();
     }
 }
