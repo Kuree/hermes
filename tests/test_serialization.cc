@@ -26,7 +26,7 @@ TEST(serialization, event) {  // NOLINT
     hermes::Loader loader(dir.path());
     auto tables = loader.get_events(0, num_event);
     EXPECT_EQ(tables.size(), 1);
-    auto table = tables[0];
+    auto table = tables[0].table;
     auto event_batch = hermes::EventBatch::deserialize(table);
     EXPECT_EQ(event_batch->size(), num_event);
     auto const &event = (*event_batch)[42];
@@ -69,7 +69,7 @@ TEST(serialization, multiple_event_batches) {  // NOLINT
     hermes::Loader loader(dir.path());
     auto tables = loader.get_events(0, num_event * 2);
     EXPECT_EQ(tables.size(), 1);
-    auto table = tables[0];
+    auto table = tables[0].table;
     auto event_batch = hermes::EventBatch::deserialize(table);
     EXPECT_EQ(event_batch->size(), num_event * 2);
     auto const &event = (*event_batch)[42 + num_event];
@@ -99,7 +99,7 @@ TEST(serialization, transactions) {  // NOLINT
     hermes::Loader loader(dir.path());
     auto tables = loader.get_transactions(0, num_transactions);
     EXPECT_EQ(tables.size(), 1);
-    auto table = tables[0];
+    auto table = tables[0].table;
     auto transaction_batch = hermes::TransactionBatch::deserialize(table);
     EXPECT_EQ(transaction_batch->size(), num_transactions);
     auto const &transaction = (*transaction_batch)[42];
@@ -133,7 +133,7 @@ TEST(serialization, get_events) {  // NOLINT
     hermes::Loader loader(dir.path());
     auto tables = loader.get_transactions(0, num_transactions);
     EXPECT_EQ(tables.size(), 1);
-    auto table = tables[0];
+    auto table = tables[0].table;
     auto t_batch = hermes::TransactionBatch::deserialize(table);
     auto const &transaction = (*t_batch)[42];
     auto events = loader.get_events(*transaction);
