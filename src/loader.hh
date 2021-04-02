@@ -27,17 +27,26 @@ public:
     uint64_t min_time;
     uint64_t max_time;
 
-    uint64_t usage_count = 0;
+    std::string name;
+};
+
+struct LoaderResult {
+    std::shared_ptr<arrow::Table> table;
+    std::string name;
 };
 
 class Loader {
 public:
     explicit Loader(std::string dir);
-    std::vector<std::shared_ptr<arrow::Table>> get_transactions(uint64_t min_time,
-                                                                uint64_t max_time);
+    std::vector<LoaderResult> get_transactions(uint64_t min_time, uint64_t max_time);
 
-    std::vector<std::shared_ptr<arrow::Table>> get_events(uint64_t min_time, uint64_t max_time);
-    std::vector<Event*> get_events(const Transaction &transaction);
+    std::vector<LoaderResult> get_events(uint64_t min_time, uint64_t max_time);
+
+    std::vector<LoaderResult> get_transactions() {
+        return get_transactions(0, std::numeric_limits<uint64_t>::max());
+    }
+
+    std::vector<Event *> get_events(const Transaction &transaction);
 
     // debug information
     [[maybe_unused]] void print_files() const;
@@ -54,8 +63,8 @@ private:
     std::unordered_map<const arrow::Table *, std::unique_ptr<EventBatch>> event_cache_;
 
     void load_json(const std::string &path);
-    std::shared_ptr<arrow::Table> load_table(const FileInfo* info);
-    std::vector<std::shared_ptr<arrow::Table>> load_tables(
+    std::shared_ptr<arrow::Table> load_table(const FileInfo *info);
+    std::vector<LoaderResult> load_tables(
         const std::vector<const FileInfo *> &files);
     EventBatch *load_events(const std::shared_ptr<arrow::Table> &table);
 };

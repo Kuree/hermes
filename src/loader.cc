@@ -32,8 +32,7 @@ Loader::Loader(std::string dir) : dir_(fs::absolute(std::move(dir))) {
     fs_ = std::make_shared<arrow::fs::LocalFileSystem>();
 }
 
-std::vector<std::shared_ptr<arrow::Table>> Loader::get_transactions(uint64_t min_time,
-                                                                    uint64_t max_time) {
+std::vector<LoaderResult> Loader::get_transactions(uint64_t min_time, uint64_t max_time) {
     // need to go through each
     // maybe index on the time?
     // I don't expect the number of files to be bigger than 1000 (assume each file is about 10MB)
@@ -49,8 +48,7 @@ std::vector<std::shared_ptr<arrow::Table>> Loader::get_transactions(uint64_t min
     return result;
 }
 
-std::vector<std::shared_ptr<arrow::Table>> Loader::get_events(uint64_t min_time,
-                                                              uint64_t max_time) {
+std::vector<LoaderResult> Loader::get_events(uint64_t min_time, uint64_t max_time) {
     std::vector<const FileInfo *> files;
     files.reserve(16);
     for (auto const &file : events_) {
@@ -186,6 +184,12 @@ void Loader::load_json(const std::string &path) {
     } else {
         return;
     }
+    // get name
+    auto name_opt = get_member<std::string>(document, "name");
+    if (name_opt) {
+        info->name = *name_opt;
+    }
+
     files_.emplace_back(std::move(info));
 }
 
@@ -207,13 +211,12 @@ std::shared_ptr<arrow::Table> Loader::load_table(const FileInfo *file) {
     return table;
 }
 
-std::vector<std::shared_ptr<arrow::Table>> Loader::load_tables(
-    const std::vector<const FileInfo *> &files) {
-    std::vector<std::shared_ptr<arrow::Table>> result;
+std::vector<LoaderResult> Loader::load_tables(const std::vector<const FileInfo *> &files) {
+    std::vector<LoaderResult> result;
     result.reserve(files.size());
     for (auto const *file : files) {
         auto entry = load_table(file);
-        result.emplace_back(entry);
+        result.emplace_back(LoaderResult{entry, file->name});
     }
 
     return result;
