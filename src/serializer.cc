@@ -230,23 +230,4 @@ void Serializer::write_stat(const SerializationStat &stat) {
     write_stat_to_file(document, stat.json_filename);
 }
 
-CompactSerializer::CompactSerializer(const std::string &input_dir, std::string output_dir)
-    : output_dir_(std::move(output_dir)) {
-    if (!fs::exists(output_dir_)) {
-        fs::create_directories(output_dir_);
-    }
-    // we use version 2.0
-    auto builder = parquet::WriterProperties::Builder();
-    builder.version(parquet::ParquetVersion::PARQUET_2_0);
-    // we use snappy as the compression scheme
-    builder.compression(arrow::Compression::SNAPPY);
-    writer_properties_ = builder.build();
-
-    loader_ = std::make_unique<Loader>(input_dir);
-}
-
-void CompactSerializer::serialize() {
-    // load all transactions in parallel
-}
-
 }  // namespace hermes

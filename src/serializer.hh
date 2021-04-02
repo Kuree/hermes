@@ -60,21 +60,6 @@ private:
     static void write_stat(const SerializationStat &stat);
 };
 
-class Loader;
-class CompactSerializer {
-    // this will not be loaded by C++ based loader
-public:
-    explicit CompactSerializer(const std::string &input_dir, std::string output_dir);
-    void serialize();
-
-private:
-    std::string output_dir_;
-    std::shared_ptr<parquet::WriterProperties> writer_properties_;
-    std::unique_ptr<Loader> loader_;
-
-    static constexpr uint64_t chunk_size = 1 << 16;
-};
-
 }  // namespace hermes
 
 #endif  // HERMES_SERIALIZER_HH
