@@ -4,7 +4,7 @@ import os
 import dask.dataframe as dd
 
 
-class Loader:
+class ParquetLoader:
     def __init__(self, directory):
         directory = os.path.abspath(directory)
         self.events_df = []

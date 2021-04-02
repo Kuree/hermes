@@ -16,7 +16,7 @@ def test_loader_events():
 
         pyhermes.default_bus().flush()
         serializer.finalize()
-        loader = pyhermes.Loader(temp)
+        loader = pyhermes.ParquetLoader(temp)
         assert len(loader.events_df) == 1
         df = loader.events_df[0]
         assert len(df) == 100
@@ -53,7 +53,7 @@ def test_loader_transaction():
 
         pyhermes.default_bus().flush()
         serializer.finalize()
-        loader = pyhermes.Loader(temp)
+        loader = pyhermes.ParquetLoader(temp)
         assert len(loader.transactions_df) > 0
         df = loader.transactions_df["test"]
         assert len(df) == 10
