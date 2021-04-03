@@ -105,28 +105,28 @@ void init_loader(py::module &m) {
     stream.def("__iter__", [](const hermes::TransactionStream &stream) {
         return py::make_iterator(stream.begin(), stream.end());
     });
+    stream.def("__len__", [](const hermes::TransactionStream &stream) { return stream.size(); });
 
     // we adjust the interface a little bit differently from C++ version.
     // here we actually hide the transaction
-    auto iter =
-        py::class_<hermes::TransactionDataIter, std::shared_ptr<hermes::TransactionDataIter>>(
-            m, "TransactionData");
+    auto data = py::class_<hermes::TransactionData, std::shared_ptr<hermes::TransactionData>>(
+        m, "TransactionData");
 
-    iter.def(
+    data.def(
         "__getitem__",
-        [](const hermes::TransactionDataIter &iter, uint64_t index) {
-            if (index >= (*iter).events->size()) {
+        [](const hermes::TransactionData &t, uint64_t index) {
+            if (index >= t.events->size()) {
                 throw py::index_error();
             }
-            return (*(*iter).events)[index];
+            return (*t.events)[index];
         },
         py::arg("index"));
-    iter.def("__iter__", [](const hermes::TransactionDataIter &iter) {
-        return py::make_iterator((*iter).events->begin(), (*iter).events->end());
+    data.def("__iter__", [](const hermes::TransactionData &t) {
+        return py::make_iterator(t.events->begin(), t.events->end());
     });
-    iter.def_property_readonly("finished", [](const hermes::TransactionDataIter &iter) {
-        return iter.operator*().transaction->finished();
-    });
+    data.def("__len__", [](const hermes::TransactionData &t) { return t.events->size(); });
+    data.def_property_readonly(
+        "finished", [](const hermes::TransactionData &t) { return t.transaction->finished(); });
 }
 
 void init_tracker(py::module &m) {
