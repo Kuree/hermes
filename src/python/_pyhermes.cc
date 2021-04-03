@@ -2,6 +2,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "../loader.hh"
 #include "../logger.hh"
 #include "../serializer.hh"
 #include "../tracker.hh"
@@ -47,6 +48,13 @@ void init_event(py::module &m) {
         }
         return py::str(result);
     });
+
+    auto event_batch =
+        py::class_<hermes::EventBatch, std::shared_ptr<hermes::EventBatch>>(m, "EventBatch");
+    event_batch.def(
+        "__getitem__", [](const hermes::EventBatch &batch, uint64_t index) { return batch[index]; },
+        py::arg("index"));
+    event_batch.def("__len__", [](const hermes::EventBatch &batch) { return batch.size(); });
 }
 
 void init_transaction(py::module &m) {
@@ -82,6 +90,43 @@ void init_logger(py::module &m) {
                              py::overload_cast<const std::shared_ptr<hermes::Serializer> &>(
                                  &hermes::DummyEventSerializer::connect),
                              py::arg("serializer"));
+}
+
+void init_loader(py::module &m) {
+    auto loader = py::class_<hermes::Loader, std::shared_ptr<hermes::Loader>>(m, "Loader");
+    loader.def(py::init<std::string>(), "data_dir");
+    loader.def("__getitem__", [](hermes::Loader &loader, std::string &name) {
+        auto stream = loader.get_transaction_stream(name);
+        return stream;
+    });
+
+    auto stream = py::class_<hermes::TransactionStream, std::shared_ptr<hermes::TransactionStream>>(
+        m, "TransactionStream");
+    stream.def("__iter__", [](const hermes::TransactionStream &stream) {
+        return py::make_iterator(stream.begin(), stream.end());
+    });
+
+    // we adjust the interface a little bit differently from C++ version.
+    // here we actually hide the transaction
+    auto iter =
+        py::class_<hermes::TransactionDataIter, std::shared_ptr<hermes::TransactionDataIter>>(
+            m, "TransactionData");
+
+    iter.def(
+        "__getitem__",
+        [](const hermes::TransactionDataIter &iter, uint64_t index) {
+            if (index >= (*iter).events->size()) {
+                throw py::index_error();
+            }
+            return (*(*iter).events)[index];
+        },
+        py::arg("index"));
+    iter.def("__iter__", [](const hermes::TransactionDataIter &iter) {
+        return py::make_iterator((*iter).events->begin(), (*iter).events->end());
+    });
+    iter.def_property_readonly("finished", [](const hermes::TransactionDataIter &iter) {
+        return iter.operator*().transaction->finished();
+    });
 }
 
 void init_tracker(py::module &m) {
@@ -133,4 +178,5 @@ PYBIND11_MODULE(_pyhermes, m) {
     init_logger(m);
     init_tracker(m);
     init_message_bus(m);
+    init_loader(m);
 }
