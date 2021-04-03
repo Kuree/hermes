@@ -15,6 +15,18 @@ namespace fs = std::filesystem;
 
 namespace hermes {
 
+TransactionData TransactionDataIter::operator*() const {
+    TransactionData data;
+    data.transaction = *it_;
+    data.events = std::make_shared<EventBatch>();
+    auto events = loader_->get_events(*data.transaction);
+    data.events->reserve(events.size());
+    for (auto const &e : events) {
+        data.events->emplace_back(e);
+    }
+    return data;
+}
+
 Loader::Loader(std::string dir) : dir_(fs::absolute(std::move(dir))) {
     // do a LIST operation
     for (auto const &entry : fs::directory_iterator(dir_)) {
@@ -60,7 +72,7 @@ std::vector<LoaderResult> Loader::get_events(uint64_t min_time, uint64_t max_tim
     return result;
 }
 
-std::vector<Event *> Loader::get_events(const Transaction &transaction) {
+EventBatch Loader::get_events(const Transaction &transaction) {
     std::unordered_map<const FileInfo *, std::vector<uint64_t>> files;
     // I'm sure there are some efficient ways to compute this, but for now the performance is fine
     auto const &ids = transaction.events();
@@ -88,16 +100,36 @@ std::vector<Event *> Loader::get_events(const Transaction &transaction) {
             }
         }
     }
-    std::vector<Event *> result;
+    EventBatch result;
     result.resize(transaction.events().size(), nullptr);
     for (auto i = 0; i < result.size(); i++) {
         auto const id = transaction.events()[i];
         if (id_mapping.find(id) != id_mapping.end()) {
-            result[i] = id_mapping.at(id);
+            result[i] = id_mapping.at(id)->shared_from_this();
         }
     }
 
     return result;
+}
+
+std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::string &name) {
+    // need to find files
+    const FileInfo *info = nullptr;
+    for (auto const &file : files_) {
+        if (file->name == name && file->type == FileInfo::FileType::transaction) {
+            info = file.get();
+            break;
+        }
+    }
+    if (!info) return nullptr;
+    auto table = load_table(info);
+    auto transactions = TransactionBatch::deserialize(table);
+    if (transactions) {
+        std::shared_ptr<TransactionBatch> ptr = std::move(transactions);
+        return std::make_shared<TransactionStream>(ptr, this);
+    } else {
+        return nullptr;
+    }
 }
 
 [[maybe_unused]] void Loader::print_files() const {

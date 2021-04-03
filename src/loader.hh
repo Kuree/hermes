@@ -35,6 +35,58 @@ struct LoaderResult {
     std::string name;
 };
 
+struct TransactionData {
+    std::shared_ptr<Transaction> transaction;
+    std::shared_ptr<EventBatch> events;
+};
+
+class Loader;
+struct TransactionDataIter {
+public:
+    TransactionDataIter(Loader *loader, TransactionBatch::iterator it) : loader_(loader), it_(it) {}
+    TransactionData operator*() const;
+
+    inline TransactionDataIter &operator++() {
+        it_++;
+        return *this;
+    }
+
+    inline TransactionDataIter operator++(int) {  // NOLINT
+        return TransactionDataIter(loader_, it_ + 1);
+    }
+
+    friend bool operator==(const TransactionDataIter &a, const TransactionDataIter &b) {
+        return a.it_ == b.it_;
+    }
+
+    friend bool operator!=(const TransactionDataIter &a, const TransactionDataIter &b) {
+        return a.it_ != b.it_;
+    }
+
+private:
+    Loader *loader_;
+    TransactionBatch::iterator it_;
+};
+
+class TransactionStream {
+public:
+    TransactionStream(std::shared_ptr<TransactionBatch> transactions, Loader *loader)
+        : transactions_(std::move(transactions)), loader_(loader) {}
+
+    [[nodiscard]] inline TransactionDataIter begin() const {
+        return TransactionDataIter(loader_, transactions_->begin());
+    }
+    [[nodiscard]] inline TransactionDataIter end() const {
+        return TransactionDataIter(loader_, transactions_->end());
+    }
+
+    [[nodiscard]] uint64_t size() const { return transactions_->size(); }
+
+private:
+    std::shared_ptr<TransactionBatch> transactions_;
+    Loader *loader_;
+};
+
 class Loader {
 public:
     explicit Loader(std::string dir);
@@ -46,7 +98,9 @@ public:
         return get_transactions(0, std::numeric_limits<uint64_t>::max());
     }
 
-    std::vector<Event *> get_events(const Transaction &transaction);
+    std::shared_ptr<TransactionStream> get_transaction_stream(const std::string &name);
+
+    EventBatch get_events(const Transaction &transaction);
 
     // debug information
     [[maybe_unused]] void print_files() const;
@@ -64,8 +118,7 @@ private:
 
     void load_json(const std::string &path);
     std::shared_ptr<arrow::Table> load_table(const FileInfo *info);
-    std::vector<LoaderResult> load_tables(
-        const std::vector<const FileInfo *> &files);
+    std::vector<LoaderResult> load_tables(const std::vector<const FileInfo *> &files);
     EventBatch *load_events(const std::shared_ptr<arrow::Table> &table);
 };
 

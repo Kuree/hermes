@@ -18,7 +18,7 @@ class Table;
 
 namespace hermes {
 
-class Event {
+class Event: public std::enable_shared_from_this<Event> {
 public:
     static constexpr auto TIME_NAME = "time";
     static constexpr auto ID_NAME = "id";
