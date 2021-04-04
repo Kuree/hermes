@@ -106,6 +106,17 @@ void init_loader(py::module &m) {
         return py::make_iterator(stream.begin(), stream.end());
     });
     stream.def("__len__", [](const hermes::TransactionStream &stream) { return stream.size(); });
+    // we can also materialize transactions on demand
+    stream.def(
+        "__getitem__",
+        [](const hermes::TransactionStream &stream, uint64_t index) {
+            if (index > stream.size()) {
+                throw py::index_error();
+            }
+            auto pos = stream.begin() + index;
+            return *pos;
+        },
+        py::arg("index"));
 
     // we adjust the interface a little bit differently from C++ version.
     // here we actually hide the transaction
@@ -114,9 +125,13 @@ void init_loader(py::module &m) {
 
     data.def(
         "__getitem__",
-        [](const hermes::TransactionData &t, uint64_t index) {
-            if (index >= t.events->size()) {
+        [](const hermes::TransactionData &t, int64_t index) {
+            if (index >= static_cast<int64_t>(t.events->size()) ||
+                index < -static_cast<int64_t>(t.events->size())) {
                 throw py::index_error();
+            }
+            if (index < 0) {
+                index += static_cast<int64_t>(t.events->size());
             }
             return (*t.events)[index];
         },
@@ -127,6 +142,8 @@ void init_loader(py::module &m) {
     data.def("__len__", [](const hermes::TransactionData &t) { return t.events->size(); });
     data.def_property_readonly(
         "finished", [](const hermes::TransactionData &t) { return t.transaction->finished(); });
+    data.def_property_readonly(
+        "id", [](const hermes::TransactionData &t) { return t.transaction->id(); });
 }
 
 void init_tracker(py::module &m) {

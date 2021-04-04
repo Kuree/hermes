@@ -74,7 +74,9 @@ def test_loader_stream():
             assert len(trans) == 10
             for e in trans:
                 values.add(e.v)
+            assert trans[-1] is not None
         assert len(values) == 100
+        assert transactions[4].id > 0
 
 
 if __name__ == "__main__":

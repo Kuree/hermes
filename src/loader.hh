@@ -63,6 +63,10 @@ public:
         return a.it_ != b.it_;
     }
 
+    inline TransactionDataIter operator+(uint64_t index) {
+        return TransactionDataIter(loader_, it_ + index);
+    }
+
 private:
     Loader *loader_;
     TransactionBatch::iterator it_;
