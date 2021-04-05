@@ -80,18 +80,38 @@ TransactionBatch::serialize() const noexcept {
 
 std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
     const std::shared_ptr<arrow::Table> &table) {
+    std::vector<uint64_t> row_groups;
+    // Note: we use the fact that all columns are stored in the same
+    // chunk sizes
+    auto const &column = table->GetColumnByName("id");
+    row_groups.reserve(column->num_chunks());
+    for (uint64_t i = 0; i < column->num_chunks(); i++) {
+        row_groups.emplace_back(i);
+    }
+    return deserialize(table, row_groups);
+}
+
+std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
+    const std::shared_ptr<arrow::Table> &table, const std::vector<uint64_t> &row_groups) {
+    uint64_t num_rows = 0;
+    {
+        auto const &column = table->GetColumnByName("id");
+        for (auto const row_index : row_groups) {
+            if (row_index >= column->chunk(row_index)->length()) continue;
+            num_rows += column->chunk(row_index)->length();
+        }
+    }
+    auto transactions = std::make_unique<TransactionBatch>();
+    transactions->reserve(num_rows);
+
     auto id = table->column(0);
     auto start = table->column(1);
     auto end = table->column(2);
     auto finished = table->column(3);
     auto e = table->column(4);
 
-    auto transactions = std::make_unique<TransactionBatch>();
-    transactions->reserve(table->num_rows());
-
     // need to iterate over the chunks
-    auto num_chunks = id->num_chunks();
-    for (auto idx = 0; idx < num_chunks; idx++) {
+    for (auto idx : row_groups) {
         auto id_column = id->chunk(idx);
         auto start_time = start->chunk(idx);
         auto end_time = end->chunk(idx);

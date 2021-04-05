@@ -39,6 +39,8 @@ public:
     // factory method to construct transaction batch
     static std::unique_ptr<TransactionBatch> deserialize(
         const std::shared_ptr<arrow::Table> &table);
+    static std::unique_ptr<TransactionBatch> deserialize(const std::shared_ptr<arrow::Table> &table,
+                                                         const std::vector<uint64_t> &row_groups);
 
     void set_transaction_name(std::string name) { transaction_name_ = std::move(name); }
     [[nodiscard]] const std::string &transaction_name() const { return transaction_name_; }

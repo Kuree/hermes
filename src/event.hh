@@ -5,10 +5,9 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
-#include <unordered_map>
-
 
 namespace arrow {
 class RecordBatch;
@@ -18,7 +17,7 @@ class Table;
 
 namespace hermes {
 
-class Event: public std::enable_shared_from_this<Event> {
+class Event : public std::enable_shared_from_this<Event> {
 public:
     static constexpr auto TIME_NAME = "time";
     static constexpr auto ID_NAME = "id";
@@ -79,6 +78,8 @@ public:
 
     // factory method to construct event batch
     static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Table> &table);
+    static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Table> &table,
+                                                   const std::vector<uint64_t> &row_groups);
 
     Event *get_event(uint64_t id);
 
@@ -86,7 +87,7 @@ public:
     [[nodiscard]] const std::string &event_name() const { return event_name_; }
 
 private:
-    std::unordered_map<uint64_t, Event*> index_;
+    std::unordered_map<uint64_t, Event *> index_;
     std::string event_name_;
 
     void build_index();
