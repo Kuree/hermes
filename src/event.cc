@@ -172,6 +172,8 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow:
     {
         auto const &column = table->GetColumnByName("id");
         for (auto const row_index : row_groups) {
+            auto chunk = column->chunk(row_index);
+            if (!chunk) continue;
             if (row_index >= column->chunk(row_index)->length()) continue;
             num_rows += column->chunk(row_index)->length();
         }
@@ -235,6 +237,11 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow:
     }
 
     return std::move(event_batch);
+}
+
+std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow::Table> &table,
+                                                    uint64_t idx) {
+    return deserialize(table, std::vector<uint64_t>{idx});
 }
 
 bool EventBatch::validate() const noexcept {

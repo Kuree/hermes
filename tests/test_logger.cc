@@ -53,9 +53,9 @@ TEST(logger, sv) {  // NOLINT
 
     // load it back up
     hermes::Loader loader(temp.path());
-    auto events = loader.get_events(0, 3000);
-    EXPECT_EQ(events.size(), 1);
-    auto batch = hermes::EventBatch::deserialize(events[0].table);
+    auto event_batches = loader.get_events(0, 3000);
+    EXPECT_EQ(event_batches.size(), 1);
+    auto const &batch = event_batches[0];
     EXPECT_EQ(batch->size(), 2000);
 
     auto event = (*batch)[42];
@@ -97,10 +97,10 @@ TEST(logger, tracker_lib) {  // NOLINT
     auto p = hermes::Process(args, temp.path());
     p.wait();
 
-    // load the transactions
+    // load the transactions_batches
     hermes::Loader loader(temp.path());
-    auto transactions = loader.get_transactions(0, 2000);
-    auto batch = hermes::TransactionBatch::deserialize(transactions[0].table);
+    auto transactions_batches = loader.get_transactions(0, 2000);
+    auto &batch = transactions_batches[0];
     auto t = (*batch)[0];
     auto events = loader.get_events(*t);
     EXPECT_EQ(events.size(), 10);

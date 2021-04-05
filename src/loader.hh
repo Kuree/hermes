@@ -7,25 +7,18 @@ namespace arrow::fs {
 class FileSystem;
 }
 
+namespace parquet {
+class Statistics;
+}
+
 namespace hermes {
 
 struct FileInfo {
 public:
     enum class FileType { event, transaction };
-    FileInfo(FileType type, std::string filename, uint64_t min_id, uint64_t max_id,
-             uint64_t min_time, uint64_t max_time)
-        : type(type),
-          filename(std::move(filename)),
-          min_id(min_id),
-          max_id(max_id),
-          min_time(min_time),
-          max_time(max_time) {}
+    FileInfo(FileType type, std::string filename) : type(type), filename(std::move(filename)) {}
     FileType type;
     std::string filename;
-    uint64_t min_id;
-    uint64_t max_id;
-    uint64_t min_time;
-    uint64_t max_time;
 
     std::string name;
 };
@@ -94,13 +87,10 @@ private:
 class Loader {
 public:
     explicit Loader(std::string dir);
-    std::vector<LoaderResult> get_transactions(uint64_t min_time, uint64_t max_time);
+    std::vector<std::unique_ptr<TransactionBatch>> get_transactions(uint64_t min_time,
+                                                                    uint64_t max_time);
 
-    std::vector<LoaderResult> get_events(uint64_t min_time, uint64_t max_time);
-
-    std::vector<LoaderResult> get_transactions() {
-        return get_transactions(0, std::numeric_limits<uint64_t>::max());
-    }
+    std::vector<std::unique_ptr<EventBatch>> get_events(uint64_t min_time, uint64_t max_time);
 
     std::shared_ptr<TransactionStream> get_transaction_stream(const std::string &name);
 
@@ -117,13 +107,18 @@ private:
     std::vector<const FileInfo *> events_;
     std::vector<const FileInfo *> transactions_;
     std::unordered_map<const FileInfo *, std::shared_ptr<arrow::Table>> tables_;
+    // we store all the statistics here
+    std::unordered_map<const FileInfo *,
+                       std::map<std::string, std::vector<std::shared_ptr<parquet::Statistics>>>>
+        file_metadata_;
     // local caches
-    std::unordered_map<const arrow::Table *, std::unique_ptr<EventBatch>> event_cache_;
+    std::map<std::pair<const arrow::Table *, uint64_t>, std::shared_ptr<EventBatch>> event_cache_;
 
     void load_json(const std::string &path);
     std::shared_ptr<arrow::Table> load_table(const FileInfo *info);
-    std::vector<LoaderResult> load_tables(const std::vector<const FileInfo *> &files);
-    EventBatch *load_events(const std::shared_ptr<arrow::Table> &table);
+    std::vector<LoaderResult> load_tables(
+        const std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> &files);
+    EventBatch *load_events(const std::shared_ptr<arrow::Table> &table, uint64_t idx);
 };
 
 }  // namespace hermes

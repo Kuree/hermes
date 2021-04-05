@@ -10,6 +10,7 @@
 #include "loader.hh"
 #include "parquet/arrow/writer.h"
 #include "parquet/metadata.h"
+#include "parquet/arrow/schema.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
@@ -32,6 +33,8 @@ Serializer::Serializer(std::string output_dir) : output_dir_(std::move(output_di
     builder.version(parquet::ParquetVersion::PARQUET_2_0);
     // we use snappy as the compression scheme
     builder.compression(arrow::Compression::SNAPPY);
+    // make sure to use statistic
+    builder.enable_statistics();
     writer_properties_ = builder.build();
 }
 
@@ -137,8 +140,24 @@ bool Serializer::serialize(parquet::arrow::FileWriter *writer,
     auto table = *table_r;
 
     // write the table
-    uint64_t chunk_size = get_chunk_size(static_cast<uint64_t>(record->num_rows()));
-    auto res = writer->WriteTable(*table, chunk_size);
+    if (written_sets_.find(writer) == written_sets_.end()) {
+        written_sets_.emplace(writer);
+    } else {
+        auto r = writer->NewRowGroup(record->num_rows());
+        if (!r.ok()) return false;
+        auto meta = writer->metadata();
+        if (meta) {
+            const auto *schema = meta->schema();
+            auto file_meta = parquet::FileMetaDataBuilder::Make(schema, writer_properties_);
+            file_meta->AppendRowGroup();
+        }
+
+    }
+
+    auto res = writer->WriteTable(*table, record->num_rows());
+    auto meta = writer->metadata();
+    if (meta)
+        printf("num row groups: %d\n", meta->num_row_groups());
     return res.ok();
 }
 

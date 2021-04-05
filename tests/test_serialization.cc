@@ -24,10 +24,9 @@ TEST(serialization, event) {  // NOLINT
     s.finalize();
 
     hermes::Loader loader(dir.path());
-    auto tables = loader.get_events(0, num_event);
-    EXPECT_EQ(tables.size(), 1);
-    auto table = tables[0].table;
-    auto event_batch = hermes::EventBatch::deserialize(table);
+    auto event_batches = loader.get_events(0, num_event);
+    EXPECT_EQ(event_batches.size(), 1);
+    auto const &event_batch = event_batches[0];
     EXPECT_EQ(event_batch->size(), num_event);
     auto const &event = (*event_batch)[42];
     EXPECT_EQ(event->time(), 42);
@@ -67,10 +66,9 @@ TEST(serialization, multiple_event_batches) {  // NOLINT
     s.finalize();
 
     hermes::Loader loader(dir.path());
-    auto tables = loader.get_events(0, num_event * 2);
-    EXPECT_EQ(tables.size(), 1);
-    auto table = tables[0].table;
-    auto event_batch = hermes::EventBatch::deserialize(table);
+    auto event_batches = loader.get_events(0, num_event * 2);
+    EXPECT_EQ(event_batches.size(), 1);
+    auto const &event_batch = event_batches[0];
     EXPECT_EQ(event_batch->size(), num_event * 2);
     auto const &event = (*event_batch)[42 + num_event];
     EXPECT_EQ(event->time(), 42 + num_event);
@@ -97,10 +95,9 @@ TEST(serialization, transactions) {  // NOLINT
     s.finalize();
 
     hermes::Loader loader(dir.path());
-    auto tables = loader.get_transactions(0, num_transactions);
-    EXPECT_EQ(tables.size(), 1);
-    auto table = tables[0].table;
-    auto transaction_batch = hermes::TransactionBatch::deserialize(table);
+    auto transaction_batches = loader.get_transactions(0, num_transactions);
+    EXPECT_EQ(transaction_batches.size(), 1);
+    auto const &transaction_batch = transaction_batches[0];
     EXPECT_EQ(transaction_batch->size(), num_transactions);
     auto const &transaction = (*transaction_batch)[42];
     EXPECT_EQ(transaction->start_time(), 42);
@@ -130,10 +127,9 @@ TEST(serialization, get_events) {  // NOLINT
     s.finalize();
 
     hermes::Loader loader(dir.path());
-    auto tables = loader.get_transactions(0, num_transactions);
-    EXPECT_EQ(tables.size(), 1);
-    auto table = tables[0].table;
-    auto t_batch = hermes::TransactionBatch::deserialize(table);
+    auto transaction_batches = loader.get_transactions(0, num_transactions);
+    EXPECT_EQ(transaction_batches.size(), 1);
+    auto const &t_batch = transaction_batches[0];
     auto const &transaction = (*t_batch)[42];
     auto events = loader.get_events(*transaction);
     EXPECT_EQ(events.size(), 42 % 10);
