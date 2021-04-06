@@ -6,7 +6,6 @@
 
 #include "arrow/api.h"
 #include "arrow/filesystem/localfs.h"
-#include "fmt/format.h"
 #include "parquet/arrow/reader.h"
 #include "parquet/statistics.h"
 #include "rapidjson/document.h"
@@ -130,7 +129,8 @@ std::vector<std::unique_ptr<EventBatch>> Loader::get_events(uint64_t min_time, u
     return result;
 }
 
-std::unique_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t min_time, uint64_t max_time) {
+std::unique_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t min_time,
+                                               uint64_t max_time) {
     std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
     for (auto const &file : events_) {
         if (file->name != name) {
@@ -149,7 +149,7 @@ std::unique_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t
     }
     auto tables = load_tables(files);
     std::unique_ptr<EventBatch> result;
-    for (auto const &load_result: tables) {
+    for (auto const &load_result : tables) {
         if (!result) {
             result = EventBatch::deserialize(load_result.table);
             result->set_event_name(load_result.name);
@@ -163,9 +163,10 @@ std::unique_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t
     return std::move(result);
 }
 
-EventBatch Loader::get_events(const Transaction &transaction) {
+inline std::unordered_map<const FileInfo *, std::vector<uint64_t>> compute_search_space(
+    const std::vector<const FileInfo *> &events_, const Loader::FileMetadata &file_metadata_,
+    const std::vector<uint64_t> &ids) {
     std::unordered_map<const FileInfo *, std::vector<uint64_t>> files;
-    auto const &ids = transaction.events();
     for (auto const &file : events_) {
         auto stats = file_metadata_.at(file);
         auto id_stats = stats.at("id");
@@ -178,6 +179,12 @@ EventBatch Loader::get_events(const Transaction &transaction) {
             }
         }
     }
+    return files;
+}
+
+EventBatch Loader::get_events(const Transaction &transaction) {
+    auto const &ids = transaction.events();
+    auto files = compute_search_space(events_, file_metadata_, ids);
 
     std::unordered_map<uint64_t, Event *> id_mapping;
     for (auto const &[file, chunk_ids] : files) {
@@ -197,6 +204,7 @@ EventBatch Loader::get_events(const Transaction &transaction) {
             }
         }
     }
+
     EventBatch result;
     result.resize(transaction.events().size(), nullptr);
     for (auto i = 0; i < result.size(); i++) {

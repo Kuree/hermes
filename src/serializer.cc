@@ -10,7 +10,6 @@
 #include "loader.hh"
 #include "parquet/arrow/writer.h"
 #include "parquet/metadata.h"
-#include "parquet/arrow/schema.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
@@ -18,11 +17,7 @@
 
 namespace fs = std::filesystem;
 
-constexpr auto num_chunks = 16;
-
 namespace hermes {
-
-uint64_t get_chunk_size(uint64_t num_rows) { return std::max<uint64_t>(1, num_rows / num_chunks); }
 
 Serializer::Serializer(std::string output_dir) : output_dir_(std::move(output_dir)) {
     if (!fs::exists(output_dir_)) {
@@ -178,13 +173,6 @@ void set_member(rapidjson::Document &document, const char *name, const T &value)
     set_member(document, allocator, name, value);
 }
 
-void set_member(rapidjson::Document &document, const char *name, const char *value) {
-    auto &allocator = document.GetAllocator();
-    rapidjson::Value key(name, allocator);  // NOLINT
-    rapidjson::Value v(value, allocator);
-    document.AddMember(key, v, allocator);
-}
-
 void write_stat_to_file(rapidjson::Document &document, const std::string &filename) {
     rapidjson::StringBuffer buffer;
     rapidjson::PrettyWriter w(buffer);
@@ -197,12 +185,6 @@ void write_stat_to_file(rapidjson::Document &document, const std::string &filena
 }
 
 void Serializer::update_stat(SerializationStat &stat, const EventBatch &batch) {
-    for (auto const &event : batch) {
-        if (event->time() > stat.max_time) stat.max_time = event->time();
-        if (event->time() < stat.min_time) stat.min_time = event->time();
-        stat.max_id = std::max(stat.max_id, event->id());
-        stat.min_id = std::min(stat.min_id, event->id());
-    }
     if (stat.type.empty()) stat.type = "event";
     if (stat.name.empty() && !batch.event_name().empty()) {
         stat.name = batch.event_name();
@@ -210,12 +192,6 @@ void Serializer::update_stat(SerializationStat &stat, const EventBatch &batch) {
 }
 
 void Serializer::update_stat(SerializationStat &stat, const TransactionBatch &batch) {
-    for (auto const &transaction : batch) {
-        if (transaction->end_time() > stat.max_time) stat.max_time = transaction->end_time();
-        if (transaction->start_time() < stat.min_time) stat.min_time = transaction->start_time();
-        stat.max_id = std::max(stat.max_id, transaction->id());
-        stat.min_id = std::min(stat.min_id, transaction->id());
-    }
     if (stat.type.empty()) stat.type = "transaction";
     if (stat.name.empty() && !batch.transaction_name().empty()) {
         stat.name = batch.transaction_name();
@@ -228,11 +204,6 @@ void Serializer::write_stat(const SerializationStat &stat) {
     set_member(document, "parquet", parquet_basename);
     set_member(document, "type", stat.type);
     set_member(document, "name", stat.name);
-
-    set_member(document, "min_time", stat.min_time);
-    set_member(document, "max_time", stat.max_time);
-    set_member(document, "min_id", stat.min_id);
-    set_member(document, "max_id", stat.max_id);
 
     write_stat_to_file(document, stat.json_filename);
 }

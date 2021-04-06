@@ -101,6 +101,9 @@ public:
     // debug information
     [[maybe_unused]] void print_files() const;
 
+    using FileMetadata = std::unordered_map<const FileInfo *,
+        std::map<std::string, std::vector<std::shared_ptr<parquet::Statistics>>>>;
+
 private:
     std::string dir_;
     std::vector<std::unique_ptr<FileInfo>> files_;
@@ -110,9 +113,7 @@ private:
     std::vector<const FileInfo *> transactions_;
     std::map<std::pair<const FileInfo *, uint64_t>, std::shared_ptr<arrow::Table>> tables_;
     // we store all the statistics here
-    std::unordered_map<const FileInfo *,
-                       std::map<std::string, std::vector<std::shared_ptr<parquet::Statistics>>>>
-        file_metadata_;
+    FileMetadata file_metadata_;
     // local caches
     std::unordered_map<const arrow::Table *, std::shared_ptr<EventBatch>> event_cache_;
 
