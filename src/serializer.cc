@@ -35,6 +35,7 @@ Serializer::Serializer(std::string output_dir) : output_dir_(std::move(output_di
     builder.compression(arrow::Compression::SNAPPY);
     // make sure to use statistic
     builder.enable_statistics();
+    builder.max_statistics_size(1 << 20);
     writer_properties_ = builder.build();
 }
 
@@ -135,30 +136,17 @@ bool Serializer::serialize(parquet::arrow::FileWriter *writer,
                            const std::shared_ptr<arrow::RecordBatch> &record) {
     if (!writer) return false;
     // serialize
-    auto table_r = arrow::Table::FromRecordBatches({record});
-    if (!table_r.ok()) return false;
-    auto table = *table_r;
 
-    // write the table
-    if (written_sets_.find(writer) == written_sets_.end()) {
-        written_sets_.emplace(writer);
-    } else {
-        auto r = writer->NewRowGroup(record->num_rows());
+    // we write out table by hand instead of using WriteTable
+    auto r = writer->NewRowGroup(record->num_rows());
+    if (!r.ok()) return false;
+    for (int i = 0; i < record->num_columns(); i++) {
+        auto const &column = record->column(i);
+        r = writer->WriteColumnChunk(*column);
         if (!r.ok()) return false;
-        auto meta = writer->metadata();
-        if (meta) {
-            const auto *schema = meta->schema();
-            auto file_meta = parquet::FileMetaDataBuilder::Make(schema, writer_properties_);
-            file_meta->AppendRowGroup();
-        }
-
     }
 
-    auto res = writer->WriteTable(*table, record->num_rows());
-    auto meta = writer->metadata();
-    if (meta)
-        printf("num row groups: %d\n", meta->num_row_groups());
-    return res.ok();
+    return true;
 }
 
 // the implementation below copies from hgdb

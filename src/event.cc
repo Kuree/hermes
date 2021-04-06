@@ -151,33 +151,9 @@ EventBatch::serialize() const noexcept {
 
 std::unique_ptr<EventBatch> EventBatch::deserialize(
     const std::shared_ptr<arrow::Table> &table) {  // NOLINT
-    std::vector<uint64_t> row_groups;
-    // Note: we use the fact that all columns are stored in the same
-    // chunk sizes
-    auto const &column = table->GetColumnByName("id");
-    row_groups.reserve(column->num_chunks());
-    for (uint64_t i = 0; i < column->num_chunks(); i++) {
-        row_groups.emplace_back(i);
-    }
-
-    return deserialize(table, row_groups);
-}
-
-// NOLINTNEXTLINE
-std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow::Table> &table,
-                                                    const std::vector<uint64_t> &row_groups) {
     // construct the event batch
     auto event_batch = std::make_unique<EventBatch>();
-    uint64_t num_rows = 0;
-    {
-        auto const &column = table->GetColumnByName("id");
-        for (auto const row_index : row_groups) {
-            auto chunk = column->chunk(row_index);
-            if (!chunk) continue;
-            if (row_index >= column->chunk(row_index)->length()) continue;
-            num_rows += column->chunk(row_index)->length();
-        }
-    }
+    uint64_t num_rows = table->num_rows();
 
     event_batch->reserve(num_rows);
     // create each batch
@@ -199,7 +175,7 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow:
         auto const &name = fields[i]->name();
         auto type = fields[i]->type();
         auto const &column_chunks = table->column(i);
-        for (auto chunk_idx : row_groups) {
+        for (auto chunk_idx = 0; chunk_idx < column_chunks->num_chunks(); chunk_idx++) {
             auto const &column = column_chunks->chunk(chunk_idx);
             for (int j = 0; j < column->length(); j++) {
                 auto r_ = column->GetScalar(j);
@@ -237,11 +213,6 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow:
     }
 
     return std::move(event_batch);
-}
-
-std::unique_ptr<EventBatch> EventBatch::deserialize(const std::shared_ptr<arrow::Table> &table,
-                                                    uint64_t idx) {
-    return deserialize(table, std::vector<uint64_t>{idx});
 }
 
 bool EventBatch::validate() const noexcept {

@@ -91,6 +91,8 @@ public:
                                                                     uint64_t max_time);
 
     std::vector<std::unique_ptr<EventBatch>> get_events(uint64_t min_time, uint64_t max_time);
+    std::unique_ptr<EventBatch> get_events(const std::string &name, uint64_t min_time,
+                                           uint64_t max_time);
 
     std::shared_ptr<TransactionStream> get_transaction_stream(const std::string &name);
 
@@ -106,19 +108,19 @@ private:
     // indices
     std::vector<const FileInfo *> events_;
     std::vector<const FileInfo *> transactions_;
-    std::unordered_map<const FileInfo *, std::shared_ptr<arrow::Table>> tables_;
+    std::map<std::pair<const FileInfo *, uint64_t>, std::shared_ptr<arrow::Table>> tables_;
     // we store all the statistics here
     std::unordered_map<const FileInfo *,
                        std::map<std::string, std::vector<std::shared_ptr<parquet::Statistics>>>>
         file_metadata_;
     // local caches
-    std::map<std::pair<const arrow::Table *, uint64_t>, std::shared_ptr<EventBatch>> event_cache_;
+    std::unordered_map<const arrow::Table *, std::shared_ptr<EventBatch>> event_cache_;
 
     void load_json(const std::string &path);
-    std::shared_ptr<arrow::Table> load_table(const FileInfo *info);
+    bool preload_table(const FileInfo *info);
     std::vector<LoaderResult> load_tables(
         const std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> &files);
-    EventBatch *load_events(const std::shared_ptr<arrow::Table> &table, uint64_t idx);
+    EventBatch *load_events(const std::shared_ptr<arrow::Table> &table);
 };
 
 }  // namespace hermes

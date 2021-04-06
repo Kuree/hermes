@@ -78,10 +78,6 @@ public:
 
     // factory method to construct event batch
     static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Table> &table);
-    static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Table> &table,
-                                                   const std::vector<uint64_t> &row_groups);
-    static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Table> &table,
-                                                   uint64_t idx);
 
     Event *get_event(uint64_t id);
 

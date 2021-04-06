@@ -55,7 +55,7 @@ private:
                                            const std::shared_ptr<arrow::Schema> &schema);
     SerializationStat &get_stat(const void *ptr);
 
-    bool serialize(parquet::arrow::FileWriter *writer,
+    static bool serialize(parquet::arrow::FileWriter *writer,
                    const std::shared_ptr<arrow::RecordBatch> &record);
     static void update_stat(SerializationStat &stat, const EventBatch &batch);
     static void update_stat(SerializationStat &stat, const TransactionBatch &batch);

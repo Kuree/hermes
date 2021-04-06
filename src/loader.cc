@@ -79,8 +79,8 @@ std::vector<std::unique_ptr<TransactionBatch>> Loader::get_transactions(uint64_t
     for (auto const &file : transactions_) {
         auto stats = file_metadata_.at(file);
         // we use time column
-        auto max_time_stats = stats.at("max_time");
-        auto min_time_stats = stats.at("min_time");
+        auto max_time_stats = stats.at("end_time");
+        auto min_time_stats = stats.at("start_time");
         auto pair = std::make_pair(file, std::vector<uint64_t>{});
         for (uint64_t idx = 0; idx < max_time_stats.size(); idx++) {
             auto const &min_s = min_time_stats[idx];
@@ -97,8 +97,7 @@ std::vector<std::unique_ptr<TransactionBatch>> Loader::get_transactions(uint64_t
     result.reserve(files.size());
     for (uint64_t i = 0; i < files.size(); i++) {
         auto const &load_result = tables[i];
-        auto rows = files[i].second;
-        auto batch = TransactionBatch::deserialize(load_result.table, rows);
+        auto batch = TransactionBatch::deserialize(load_result.table);
         batch->set_transaction_name(load_result.name);
         result.emplace_back(std::move(batch));
     }
@@ -122,15 +121,46 @@ std::vector<std::unique_ptr<EventBatch>> Loader::get_events(uint64_t min_time, u
     // load the tables
     auto tables = load_tables(files);
     std::vector<std::unique_ptr<EventBatch>> result;
-    result.reserve(files.size());
-    for (uint64_t i = 0; i < files.size(); i++) {
-        auto const &load_result = tables[i];
-        auto rows = files[i].second;
-        auto batch = EventBatch::deserialize(load_result.table, rows);
+    result.reserve(tables.size());
+    for (auto const &load_result : tables) {
+        auto batch = EventBatch::deserialize(load_result.table);
         batch->set_event_name(load_result.name);
         result.emplace_back(std::move(batch));
     }
     return result;
+}
+
+std::unique_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t min_time, uint64_t max_time) {
+    std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
+    for (auto const &file : events_) {
+        if (file->name != name) {
+            continue;
+        }
+        auto stats = file_metadata_.at(file);
+        auto time_stats = stats.at("time");
+        auto pair = std::make_pair(file, std::vector<uint64_t>{});
+        for (uint64_t idx = 0; idx < time_stats.size(); idx++) {
+            auto const &s = time_stats[idx];
+            if (contains_value(s, min_time, max_time)) {
+                pair.second.emplace_back(idx);
+            }
+        }
+        files.emplace_back(pair);
+    }
+    auto tables = load_tables(files);
+    std::unique_ptr<EventBatch> result;
+    for (auto const &load_result: tables) {
+        if (!result) {
+            result = EventBatch::deserialize(load_result.table);
+            result->set_event_name(load_result.name);
+        } else {
+            auto batch = EventBatch::deserialize(load_result.table);
+            result->reserve(result->size() + batch->size());
+            result->insert(result->end(), batch->begin(), batch->end());
+        }
+    }
+
+    return std::move(result);
 }
 
 EventBatch Loader::get_events(const Transaction &transaction) {
@@ -151,9 +181,9 @@ EventBatch Loader::get_events(const Transaction &transaction) {
 
     std::unordered_map<uint64_t, Event *> id_mapping;
     for (auto const &[file, chunk_ids] : files) {
-        auto table = load_table(file);
         for (auto const &chunk_id : chunk_ids) {
-            auto *events = load_events(table, chunk_id);
+            auto table = tables_.at(std::make_pair(file, chunk_id));
+            auto *events = load_events(table);
             for (auto const id : ids) {
                 if (id_mapping.find(id) != id_mapping.end()) {
                     // we already found it
@@ -189,8 +219,24 @@ std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::str
         }
     }
     if (!info) return nullptr;
-    auto table = load_table(info);
-    auto transactions = TransactionBatch::deserialize(table);
+    // need to gather all the tables given the info
+    std::unique_ptr<TransactionBatch> transactions;
+    for (auto const &[entry, table] : tables_) {
+        auto const &[f, c_id] = entry;
+        if (f == info) {
+            // load table
+            if (!transactions) {
+                transactions = TransactionBatch::deserialize(table);
+            } else {
+                auto new_transactions = TransactionBatch::deserialize(table);
+                // need to merge them
+                transactions->reserve(transactions->size() + new_transactions->size());
+                transactions->insert(transactions->end(), new_transactions->begin(),
+                                     new_transactions->end());
+            }
+        }
+    }
+
     if (transactions) {
         std::shared_ptr<TransactionBatch> ptr = std::move(transactions);
         return std::make_shared<TransactionStream>(ptr, this);
@@ -273,30 +319,30 @@ void Loader::load_json(const std::string &path) {
     // load table as well
     // notice that we don't actually load the entire table into memory, just
     // indices and references
-    load_table(info.get());
+    preload_table(info.get());
 
     files_.emplace_back(std::move(info));
 }
 
-std::shared_ptr<arrow::Table> Loader::load_table(const FileInfo *file) {
-    if (tables_.find(file) != tables_.end()) {
-        return tables_.at(file);
-    }
+bool Loader::preload_table(const FileInfo *file) {
     auto res_f = fs_->OpenInputFile(file->filename);
-    if (!res_f.ok()) return nullptr;
+    if (!res_f.ok()) return false;
     auto f = *res_f;
     auto *pool = arrow::default_memory_pool();
     std::unique_ptr<parquet::arrow::FileReader> file_reader;
     auto res = parquet::arrow::OpenFile(f, pool, &file_reader);
-    if (!res.ok()) return nullptr;
-    std::shared_ptr<arrow::Table> table;
-    auto res_t = file_reader->ReadTable(&table);
-    if (!res_t.ok()) return nullptr;
-    tables_.emplace(file, table);
+    if (!res.ok()) return false;
+    // load each chunks
+    auto num_row_groups = file_reader->num_row_groups();
+    for (int row_group_id = 0; row_group_id < num_row_groups; row_group_id++) {
+        std::shared_ptr<arrow::Table> table;
+        auto res_t = file_reader->ReadRowGroup(row_group_id, &table);
+        if (!res_t.ok()) return false;
+        tables_.emplace(std::make_pair(file, row_group_id), table);
+    }
 
     // also load statistic
     auto metadata = file_reader->parquet_reader()->metadata();
-    auto num_row_groups = metadata->num_row_groups();
     // use metadata statistics
     for (auto row_group = 0; row_group < num_row_groups; row_group++) {
         auto group_metadata = metadata->RowGroup(row_group);
@@ -307,12 +353,11 @@ std::shared_ptr<arrow::Table> Loader::load_table(const FileInfo *file) {
             auto column_name = schema->Column(column_idx)->name();
             auto column_meta = group_metadata->ColumnChunk(column_idx);
             auto stats = column_meta->statistics();
-            printf("is stats set: %d\n", column_meta->is_stats_set());
             file_metadata_[file][column_name].emplace_back(stats);
         }
     }
 
-    return table;
+    return true;
 }
 
 std::vector<LoaderResult> Loader::load_tables(
@@ -320,23 +365,24 @@ std::vector<LoaderResult> Loader::load_tables(
     std::vector<LoaderResult> result;
     result.reserve(files.size());
     for (auto const &[file, groups] : files) {
-        auto entry = load_table(file);
-        result.emplace_back(LoaderResult{entry, file->name});
+        for (auto const &group_id : groups) {
+            auto entry = tables_.at(std::make_pair(file, group_id));
+            result.emplace_back(LoaderResult{entry, file->name});
+        }
     }
 
     return result;
 }
 
-EventBatch *Loader::load_events(const std::shared_ptr<arrow::Table> &table, uint64_t idx) {
+EventBatch *Loader::load_events(const std::shared_ptr<arrow::Table> &table) {
     // TODO: implement cache replacement algorithm
     //   for now we hold all of them in memory
-    auto entry = std::make_pair(table.get(), idx);
-    if (event_cache_.find(entry) == event_cache_.end()) {
-        auto events = EventBatch::deserialize(table, idx);
+    if (event_cache_.find(table.get()) == event_cache_.end()) {
+        auto events = EventBatch::deserialize(table);
         // put it into cache
-        event_cache_.emplace(entry, std::move(events));
+        event_cache_.emplace(table.get(), std::move(events));
     }
-    return event_cache_.at(entry).get();
+    return event_cache_.at(table.get()).get();
 }
 
 }  // namespace hermes

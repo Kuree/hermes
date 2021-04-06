@@ -80,27 +80,7 @@ TransactionBatch::serialize() const noexcept {
 
 std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
     const std::shared_ptr<arrow::Table> &table) {
-    std::vector<uint64_t> row_groups;
-    // Note: we use the fact that all columns are stored in the same
-    // chunk sizes
-    auto const &column = table->GetColumnByName("id");
-    row_groups.reserve(column->num_chunks());
-    for (uint64_t i = 0; i < column->num_chunks(); i++) {
-        row_groups.emplace_back(i);
-    }
-    return deserialize(table, row_groups);
-}
-
-std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
-    const std::shared_ptr<arrow::Table> &table, const std::vector<uint64_t> &row_groups) {
-    uint64_t num_rows = 0;
-    {
-        auto const &column = table->GetColumnByName("id");
-        for (auto const row_index : row_groups) {
-            if (row_index >= column->chunk(row_index)->length()) continue;
-            num_rows += column->chunk(row_index)->length();
-        }
-    }
+    uint64_t num_rows = table->num_rows();
     auto transactions = std::make_unique<TransactionBatch>();
     transactions->reserve(num_rows);
 
@@ -111,7 +91,7 @@ std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
     auto e = table->column(4);
 
     // need to iterate over the chunks
-    for (auto idx : row_groups) {
+    for (auto idx = 0; idx < id->num_chunks(); idx++) {
         auto id_column = id->chunk(idx);
         auto start_time = start->chunk(idx);
         auto end_time = end->chunk(idx);

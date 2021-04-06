@@ -53,6 +53,7 @@ TEST(serialization, multiple_event_batches) {  // NOLINT
     EXPECT_TRUE(batch.validate());
     // serialize it
     hermes::Serializer s(dir.path());
+    batch.set_event_name("test");
     s.serialize(batch);
     batch.clear();
 
@@ -66,9 +67,7 @@ TEST(serialization, multiple_event_batches) {  // NOLINT
     s.finalize();
 
     hermes::Loader loader(dir.path());
-    auto event_batches = loader.get_events(0, num_event * 2);
-    EXPECT_EQ(event_batches.size(), 1);
-    auto const &event_batch = event_batches[0];
+    auto event_batch = loader.get_events("test", 0, num_event * 2);
     EXPECT_EQ(event_batch->size(), num_event * 2);
     auto const &event = (*event_batch)[42 + num_event];
     EXPECT_EQ(event->time(), 42 + num_event);
