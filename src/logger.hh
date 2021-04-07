@@ -27,6 +27,8 @@ public:
     }
     void connect(MessageBus *bus, const std::shared_ptr<Serializer> &serializer);
     void on_message(const std::string &topic, const std::shared_ptr<Event> &event) override;
+    void on_message(const std::string &topic,
+                    const std::shared_ptr<Transaction> &transaction) override;
     void stop() override;
     void flush();
 
@@ -36,6 +38,7 @@ private:
     static constexpr uint64_t event_dump_threshold = 1 << 15;
 
     std::map<std::string, EventBatch> events_;
+    std::map<std::string, TransactionBatch> transactions_;
 };
 
 }  // namespace hermes

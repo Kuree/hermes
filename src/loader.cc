@@ -394,6 +394,10 @@ void Loader::compute_stats() {
     }
 }
 
+void Loader::stream(bool stream_transactions) {
+    stream(MessageBus::default_bus(), stream_transactions);
+}
+
 void Loader::stream(MessageBus *bus, bool stream_transactions) {
     // we stream out every items roughly based on the time
     // because each table is a chunk, as long as the cache doesn't
@@ -424,7 +428,7 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
 
         // decide whether to stream transactions or not
         if (stream_transactions) {
-            load_results = load_events_table(start_time, start_time + interval);
+            load_results = load_transaction_table(start_time, start_time + interval);
             for (auto const &res : load_results) {
                 auto const &table = res.table;
                 if (loaded_table_.find(table.get()) != loaded_table_.end()) {
@@ -462,6 +466,8 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
                     }
                 }
             }
+            if (stop) break;
+
             // search for the min index
             if (!events.empty()) {
                 uint64_t min_index = 0;
@@ -474,6 +480,13 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
                 }
                 event_indices[min_index]++;
                 bus->publish(events[min_index]->event_name(), event);
+
+                // need to be careful about the boundary
+                if (event_indices[min_index] >= events[min_index]->size()) {
+                    // need to pop that entry
+                    events.erase(events.begin() + min_index);
+                    event_indices.erase(event_indices.begin() + min_index);
+                }
             }
 
             if (!transactions.empty()) {
@@ -488,25 +501,27 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
                 }
                 transaction_indices[min_index]++;
                 bus->publish(events[min_index]->event_name(), transaction);
-            }
 
-            if (stop) break;
+                // need to be careful about the boundary
+                if (transaction_indices[min_index] >= transactions[min_index]->size()) {
+                    // need to pop that entry
+                    transactions.erase(transactions.begin() + min_index);
+                    transaction_indices.erase(transaction_indices.begin() + min_index);
+                }
+            }
         }
     }
 }
 
 std::vector<LoaderResult> Loader::load_events_table(uint64_t min_time, uint64_t max_time) {
     std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
-    for (auto const &file : transactions_) {
+    for (auto const &file : events_) {
         auto stats = file_metadata_.at(file);
-        // we use time column
-        auto max_time_stats = stats.at("end_time");
-        auto min_time_stats = stats.at("start_time");
+        auto time_stats = stats.at("time");
         auto pair = std::make_pair(file, std::vector<uint64_t>{});
-        for (uint64_t idx = 0; idx < max_time_stats.size(); idx++) {
-            auto const &min_s = min_time_stats[idx];
-            auto const &max_s = max_time_stats[idx];
-            if (contains_value(min_s, max_s, min_time, max_time)) {
+        for (uint64_t idx = 0; idx < time_stats.size(); idx++) {
+            auto const &s = time_stats[idx];
+            if (contains_value(s, min_time, max_time)) {
                 pair.second.emplace_back(idx);
             }
         }

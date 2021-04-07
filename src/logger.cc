@@ -24,6 +24,15 @@ void DummyEventSerializer::on_message(const std::string &topic,
     }
 }
 
+void DummyEventSerializer::on_message(const std::string &topic,
+                                      const std::shared_ptr<Transaction> &transaction) {
+    transactions_[topic].emplace_back(transaction);
+
+    if (transactions_.at(topic).transaction_name().empty()) {
+        transactions_.at(topic).set_transaction_name(topic);
+    }
+}
+
 void DummyEventSerializer::flush() {
     if (!serializer_) return;
 
@@ -33,6 +42,13 @@ void DummyEventSerializer::flush() {
             events.sort();
             serializer_->serialize(events);
             events.clear();
+        }
+    }
+
+    for (auto &[name, transactions] : transactions_) {
+        if (!transactions.empty()) {
+            serializer_->serialize(transactions);
+            transactions.clear();
         }
     }
 }

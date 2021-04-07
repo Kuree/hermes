@@ -108,6 +108,7 @@ public:
 
     EventBatch get_events(const Transaction &transaction);
 
+    void stream(bool stream_transactions = true);
     void stream(MessageBus *bus, bool stream_transactions = true);
 
     // debug information
