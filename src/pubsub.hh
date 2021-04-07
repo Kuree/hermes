@@ -15,6 +15,7 @@ public:
     void publish(const std::string &topic, const std::shared_ptr<Event> &event);
     void publish(const std::string &topic, const std::shared_ptr<Transaction> &transaction);
     void add_subscriber(const std::string &topic, std::shared_ptr<Subscriber> &subscriber);
+    void unsubscribe(const std::shared_ptr<Subscriber> &sub);
 
     static MessageBus *default_bus();
     std::set<std::shared_ptr<Subscriber>> get_subscribers() const;
@@ -40,7 +41,7 @@ class Subscriber : public std::enable_shared_from_this<Subscriber> {
 public:
     Subscriber() = default;
     void subscribe(MessageBus *bus, const std::string &topic);
-    virtual void stop() {}
+    virtual void stop();
 
 protected:
     virtual void on_message(const std::string &topic, const std::shared_ptr<Event> &event) {}

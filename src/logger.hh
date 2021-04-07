@@ -22,10 +22,13 @@ class DummyEventSerializer : public Subscriber {
 public:
     DummyEventSerializer() : DummyEventSerializer("*") {}
     explicit DummyEventSerializer(std::string topic) : topic_(std::move(topic)) {}
-    void connect(const std::shared_ptr<Serializer> &serializer) { connect(MessageBus::default_bus(), serializer); }
+    void connect(const std::shared_ptr<Serializer> &serializer) {
+        connect(MessageBus::default_bus(), serializer);
+    }
     void connect(MessageBus *bus, const std::shared_ptr<Serializer> &serializer);
     void on_message(const std::string &topic, const std::shared_ptr<Event> &event) override;
     void stop() override;
+    void flush();
 
 private:
     std::string topic_;

@@ -24,7 +24,7 @@ void DummyEventSerializer::on_message(const std::string &topic,
     }
 }
 
-void DummyEventSerializer::stop() {
+void DummyEventSerializer::flush() {
     if (!serializer_) return;
 
     // flush everything
@@ -35,6 +35,11 @@ void DummyEventSerializer::stop() {
             events.clear();
         }
     }
+}
+
+void DummyEventSerializer::stop() {
+    flush();
+    Subscriber::stop();
 }
 
 }  // namespace hermes

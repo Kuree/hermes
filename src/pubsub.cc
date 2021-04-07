@@ -33,6 +33,12 @@ void MessageBus::add_subscriber(const std::string &topic, std::shared_ptr<Subscr
     subscribers_[topic].emplace(subscriber);
 }
 
+void MessageBus::unsubscribe(const std::shared_ptr<Subscriber> &sub) {
+    for (auto &iter : subscribers_) {
+        iter.second.erase(sub);
+    }
+}
+
 MessageBus *MessageBus::default_bus() {
     static std::shared_ptr<MessageBus> bus;
     if (!bus) {
@@ -75,6 +81,12 @@ bool Publisher::publish(const std::string &topic, const std::shared_ptr<Transact
 void Subscriber::subscribe(MessageBus *bus, const std::string &topic) {
     auto ptr = shared_from_this();
     bus->add_subscriber(topic, ptr);
+}
+
+void Subscriber::stop() {
+    if (bus_) {
+        bus_->unsubscribe(shared_from_this());
+    }
 }
 
 }  // namespace hermes
