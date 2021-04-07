@@ -1,0 +1,5 @@
+#ifndef HERMES_QUERY_HH
+#define HERMES_QUERY_HH
+
+
+#endif  // HERMES_QUERY_HH
