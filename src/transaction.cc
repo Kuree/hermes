@@ -111,7 +111,7 @@ std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
             auto event_scalar = std::reinterpret_pointer_cast<arrow::ListScalar>(*event_scalar_r);
             auto size = event_scalar->value->length();
             std::vector<uint64_t> ids(size);
-            for (uint64_t j = 0; j < ids.size(); j++) {
+            for (int64_t j = 0; j < ids.size(); j++) {
                 auto v = get_uint64(*event_scalar->value->GetScalar(j));
                 ids[j] = v;
             }
@@ -122,6 +122,40 @@ std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
     }
 
     return std::move(transactions);
+}
+
+TransactionBatch::iterator TransactionBatch::lower_bound(uint64_t time) {
+    if (time_lower_bound_.empty()) {
+        build_time_index();
+    }
+
+    auto it = time_lower_bound_.lower_bound(time);
+    if (it == time_lower_bound_.end()) {
+        return end();
+    } else {
+        return it->second;
+    }
+}
+
+TransactionBatch::iterator TransactionBatch::upper_bound(uint64_t time) {
+    if (time_upper_bound_.empty()) {
+        build_time_index();
+    }
+
+    auto it = time_lower_bound_.lower_bound(time);
+    if (it == time_lower_bound_.end()) {
+        return end();
+    } else {
+        return it->second;
+    }
+}
+
+void TransactionBatch::build_time_index() {
+    for (auto it = begin(); it != end(); it++) {
+        auto const &transaction = *it;
+        time_lower_bound_.try_emplace(transaction->start_time_, it);
+        time_upper_bound_[transaction->end_time_] = it;
+    }
 }
 
 }  // namespace hermes

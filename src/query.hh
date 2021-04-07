@@ -13,12 +13,16 @@ public:
     EventBatch concurrent_events(const std::string &event_name, uint64_t min_time,
                                  uint64_t max_time);
     EventBatch concurrent_events(const std::shared_ptr<Event> &event);
+    EventBatch concurrent_events(const std::string &event_name,
+                                 const std::shared_ptr<Event> &event);
 
     TransactionBatch concurrent_transactions(uint64_t time);
-    TransactionBatch concurrent_transaction(uint64_t min_time, uint64_t max_time);
-    TransactionBatch concurrent_transaction(const std::string &transaction_name, uint64_t min_time,
+    TransactionBatch concurrent_transactions(uint64_t min_time, uint64_t max_time);
+    TransactionBatch concurrent_transactions(const std::string &transaction_name, uint64_t min_time,
                                             uint64_t max_time);
-    TransactionBatch concurrent_transaction(const std::shared_ptr<Transaction> &transaction);
+    TransactionBatch concurrent_transactions(const std::shared_ptr<Transaction> &transaction);
+    TransactionBatch concurrent_transactions(const std::string &transaction_name,
+                                             const std::shared_ptr<Transaction> &transaction);
 
 private:
     std::shared_ptr<Loader> loader_;

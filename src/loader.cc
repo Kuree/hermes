@@ -75,33 +75,49 @@ bool contains_value(const std::shared_ptr<parquet::Statistics> &min_stats,
     return min <= max_value && min_value <= max;
 }
 
-std::vector<std::unique_ptr<TransactionBatch>> Loader::get_transactions(uint64_t min_time,
+std::vector<std::shared_ptr<TransactionBatch>> Loader::get_transactions(uint64_t min_time,
                                                                         uint64_t max_time) {
     // load the tables
-    auto tables = load_transaction_table(min_time, max_time);
-    std::vector<std::unique_ptr<TransactionBatch>> result;
+    auto tables = load_transaction_table(std::nullopt, min_time, max_time);
+    std::vector<std::shared_ptr<TransactionBatch>> result;
     result.reserve(tables.size());
     for (auto const &load_result : tables) {
-        auto batch = TransactionBatch::deserialize(load_result.table);
+        auto batch = load_transactions(load_result.table);
         batch->set_transaction_name(load_result.name);
         result.emplace_back(std::move(batch));
     }
     return result;
 }
 
-std::vector<std::unique_ptr<EventBatch>> Loader::get_events(uint64_t min_time, uint64_t max_time) {
+std::shared_ptr<TransactionBatch> Loader::get_transactions(const std::string &name,
+                                                           uint64_t min_time, uint64_t max_time) {
+    auto tables = load_transaction_table(name, min_time, max_time);
+    std::shared_ptr<TransactionBatch> result;
+    for (auto const &load_result : tables) {
+        auto batch = load_transactions(load_result.table);
+        if (!result) {
+            result = batch;
+        } else {
+            result->reserve(result->size() + batch->size());
+            result->insert(result->end(), batch->begin(), batch->end());
+        }
+    }
+    return result;
+}
+
+std::vector<std::shared_ptr<EventBatch>> Loader::get_events(uint64_t min_time, uint64_t max_time) {
     auto tables = load_events_table(min_time, max_time);
-    std::vector<std::unique_ptr<EventBatch>> result;
+    std::vector<std::shared_ptr<EventBatch>> result;
     result.reserve(tables.size());
     for (auto const &load_result : tables) {
-        auto batch = EventBatch::deserialize(load_result.table);
+        auto batch = load_events(load_result.table);
         batch->set_event_name(load_result.name);
         result.emplace_back(std::move(batch));
     }
     return result;
 }
 
-std::unique_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t min_time,
+std::shared_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t min_time,
                                                uint64_t max_time) {
     std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
     for (auto const &file : events_) {
@@ -120,19 +136,19 @@ std::unique_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t
         files.emplace_back(pair);
     }
     auto tables = load_tables(files);
-    std::unique_ptr<EventBatch> result;
+    std::shared_ptr<EventBatch> result;
     for (auto const &load_result : tables) {
         if (!result) {
-            result = EventBatch::deserialize(load_result.table);
+            result = load_events(load_result.table);
             result->set_event_name(load_result.name);
         } else {
-            auto batch = EventBatch::deserialize(load_result.table);
+            auto batch = load_events(load_result.table);
             result->reserve(result->size() + batch->size());
             result->insert(result->end(), batch->begin(), batch->end());
         }
     }
 
-    return std::move(result);
+    return result;
 }
 
 inline std::unordered_map<const FileInfo *, std::vector<uint64_t>> compute_search_space(
@@ -162,7 +178,7 @@ EventBatch Loader::get_events(const Transaction &transaction) {
     for (auto const &[file, chunk_ids] : files) {
         for (auto const &chunk_id : chunk_ids) {
             auto table = tables_.at(std::make_pair(file, chunk_id));
-            auto *events = load_events(table);
+            auto events = load_events(table);
             for (auto const id : ids) {
                 if (id_mapping.find(id) != id_mapping.end()) {
                     // we already found it
@@ -200,15 +216,15 @@ std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::str
     }
     if (!info) return nullptr;
     // need to gather all the tables given the info
-    std::unique_ptr<TransactionBatch> transactions;
+    std::shared_ptr<TransactionBatch> transactions;
     for (auto const &[entry, table] : tables_) {
         auto const &[f, c_id] = entry;
         if (f == info) {
             // load table
             if (!transactions) {
-                transactions = TransactionBatch::deserialize(table);
+                transactions = load_transactions(table);
             } else {
-                auto new_transactions = TransactionBatch::deserialize(table);
+                auto new_transactions = load_transactions(table);
                 // need to merge them
                 transactions->reserve(transactions->size() + new_transactions->size());
                 transactions->insert(transactions->end(), new_transactions->begin(),
@@ -354,7 +370,7 @@ std::vector<LoaderResult> Loader::load_tables(
     return result;
 }
 
-EventBatch *Loader::load_events(const std::shared_ptr<arrow::Table> &table) {
+std::shared_ptr<EventBatch> Loader::load_events(const std::shared_ptr<arrow::Table> &table) {
     // TODO: implement cache replacement algorithm
     //   for now we hold all of them in memory
     if (event_cache_.find(table.get()) == event_cache_.end()) {
@@ -362,7 +378,16 @@ EventBatch *Loader::load_events(const std::shared_ptr<arrow::Table> &table) {
         // put it into cache
         event_cache_.emplace(table.get(), std::move(events));
     }
-    return event_cache_.at(table.get()).get();
+    return event_cache_.at(table.get());
+}
+
+std::shared_ptr<TransactionBatch> Loader::load_transactions(
+    const std::shared_ptr<arrow::Table> &table) {
+    if (transaction_cache_.find(table.get()) == transaction_cache_.end()) {
+        auto transactions = TransactionBatch::deserialize(table);
+        transaction_cache_.emplace(table.get(), std::move(transactions));
+    }
+    return transaction_cache_.at(table.get());
 }
 
 void Loader::compute_stats() {
@@ -411,8 +436,8 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
     for (uint64_t start_time = stats_.min_event_time; start_time <= stats_.max_event_time;
          start_time += interval) {
         auto load_results = load_events_table(start_time, start_time + interval);
-        std::vector<std::unique_ptr<EventBatch>> events;
-        std::vector<std::unique_ptr<TransactionBatch>> transactions;
+        std::vector<std::shared_ptr<EventBatch>> events;
+        std::vector<std::shared_ptr<TransactionBatch>> transactions;
         for (auto const &res : load_results) {
             auto const &table = res.table;
             if (loaded_table_.find(table.get()) != loaded_table_.end()) {
@@ -421,14 +446,14 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
             }
             loaded_table_.emplace(table.get());
             // stream this event out
-            auto event_batch = EventBatch::deserialize(table);
+            auto event_batch = load_events(table);
             event_batch->set_event_name(res.name);
             events.emplace_back(std::move(event_batch));
         }
 
         // decide whether to stream transactions or not
         if (stream_transactions) {
-            load_results = load_transaction_table(start_time, start_time + interval);
+            load_results = load_transaction_table(std::nullopt, start_time, start_time + interval);
             for (auto const &res : load_results) {
                 auto const &table = res.table;
                 if (loaded_table_.find(table.get()) != loaded_table_.end()) {
@@ -437,7 +462,7 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
                 }
                 loaded_table_.emplace(table.get());
                 // stream this event out
-                auto transaction_batch = TransactionBatch::deserialize(table);
+                auto transaction_batch = load_transactions(table);
                 transaction_batch->set_transaction_name(res.name);
                 transactions.emplace_back(std::move(transaction_batch));
             }
@@ -470,7 +495,7 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
 
             // search for the min index
             if (!events.empty()) {
-                uint64_t min_index = 0;
+                uint32_t min_index = 0;
                 auto event = (*events[min_index])[event_indices[min_index]];
                 for (uint64_t i = 1; i < events.size(); i++) {
                     if ((*events[i])[event_indices[i]]->time() < event->time()) {
@@ -490,7 +515,7 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
             }
 
             if (!transactions.empty()) {
-                uint64_t min_index = 0;
+                uint32_t min_index = 0;
                 auto transaction = (*transactions[min_index])[transaction_indices[min_index]];
                 for (uint64_t i = 1; i < events.size(); i++) {
                     if ((*transactions[i])[transaction_indices[i]]->start_time() <
@@ -532,9 +557,13 @@ std::vector<LoaderResult> Loader::load_events_table(uint64_t min_time, uint64_t 
     return tables;
 }
 
-std::vector<LoaderResult> Loader::load_transaction_table(uint64_t min_time, uint64_t max_time) {
+std::vector<LoaderResult> Loader::load_transaction_table(const std::optional<std::string> &name,
+                                                         uint64_t min_time, uint64_t max_time) {
     std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
     for (auto const &file : transactions_) {
+        if (name) {
+            if (file->name != name) continue;
+        }
         auto stats = file_metadata_.at(file);
         // we use time column
         auto max_time_stats = stats.at("end_time");

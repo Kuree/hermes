@@ -126,10 +126,6 @@ SerializationStat &Serializer::get_stat(const void *ptr) {
     auto &stat = stats_[ptr];
     stat.parquet_filename = parquet_name;
     stat.json_filename = json_name;
-    stat.max_id = 0;
-    stat.max_time = 0;
-    stat.min_id = std::numeric_limits<uint64_t>::max();
-    stat.min_time = std::numeric_limits<uint64_t>::max();
 
     return stat;
 }

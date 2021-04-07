@@ -97,11 +97,13 @@ class MessageBus;
 class Loader {
 public:
     explicit Loader(std::string dir);
-    std::vector<std::unique_ptr<TransactionBatch>> get_transactions(uint64_t min_time,
+    std::vector<std::shared_ptr<TransactionBatch>> get_transactions(uint64_t min_time,
                                                                     uint64_t max_time);
+    std::shared_ptr<TransactionBatch> get_transactions(const std::string &name, uint64_t min_time,
+                                                       uint64_t max_time);
 
-    std::vector<std::unique_ptr<EventBatch>> get_events(uint64_t min_time, uint64_t max_time);
-    std::unique_ptr<EventBatch> get_events(const std::string &name, uint64_t min_time,
+    std::vector<std::shared_ptr<EventBatch>> get_events(uint64_t min_time, uint64_t max_time);
+    std::shared_ptr<EventBatch> get_events(const std::string &name, uint64_t min_time,
                                            uint64_t max_time);
 
     std::shared_ptr<TransactionStream> get_transaction_stream(const std::string &name);
@@ -129,6 +131,7 @@ private:
     FileMetadata file_metadata_;
     // local caches
     std::unordered_map<const arrow::Table *, std::shared_ptr<EventBatch>> event_cache_;
+    std::unordered_map<const arrow::Table *, std::shared_ptr<TransactionBatch>> transaction_cache_;
     // stats about the folder we're reading
     LoaderStats stats_;
 
@@ -136,12 +139,14 @@ private:
     bool preload_table(const FileInfo *info);
     std::vector<LoaderResult> load_tables(
         const std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> &files);
-    EventBatch *load_events(const std::shared_ptr<arrow::Table> &table);
+    std::shared_ptr<EventBatch> load_events(const std::shared_ptr<arrow::Table> &table);
+    std::shared_ptr<TransactionBatch> load_transactions(const std::shared_ptr<arrow::Table> &table);
     void compute_stats();
 
     // only return the table
     std::vector<LoaderResult> load_events_table(uint64_t min_time, uint64_t max_time);
-    std::vector<LoaderResult> load_transaction_table(uint64_t min_time, uint64_t max_time);
+    std::vector<LoaderResult> load_transaction_table(const std::optional<std::string> &name,
+                                                     uint64_t min_time, uint64_t max_time);
 };
 
 }  // namespace hermes

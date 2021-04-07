@@ -241,19 +241,51 @@ void EventBatch::sort() {
 }
 
 Event *EventBatch::get_event(uint64_t id) {
-    if (index_.empty()) {
-        build_index();
+    if (id_index_.empty()) {
+        build_id_index();
     }
-    if (index_.find(id) != index_.end()) {
-        return index_.at(id);
+    if (id_index_.find(id) != id_index_.end()) {
+        return id_index_.at(id);
     } else {
         return nullptr;
     }
 }
 
-void EventBatch::build_index() {
+EventBatch::iterator EventBatch::lower_bound(uint64_t time) {
+    if (lower_bound_index_.empty()) {
+        build_time_index();
+    }
+    auto it = lower_bound_index_.lower_bound(time);
+    if (it == lower_bound_index_.end()) {
+        return end();
+    } else {
+        return it->second;
+    }
+}
+
+EventBatch::iterator EventBatch::upper_bound(uint64_t time) {
+    if (upper_bounder_index_.empty()) {
+        build_time_index();
+    }
+
+    auto it = upper_bounder_index_.upper_bound(time);
+    if (it == upper_bounder_index_.end()) {
+        return end();
+    } else {
+        return it->second;
+    }
+}
+
+void EventBatch::build_id_index() {
     for (auto const &e : *this) {
-        index_.emplace(e->id(), e.get());
+        id_index_.emplace(e->id(), e.get());
+    }
+}
+
+void EventBatch::build_time_index() {
+    for (auto it = this->begin(); it != this->end(); it++) {
+        lower_bound_index_.try_emplace((*it)->time(), it);
+        upper_bounder_index_[(*it)->time()] = it;
     }
 }
 

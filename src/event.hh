@@ -81,15 +81,20 @@ public:
     static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Table> &table);
 
     Event *get_event(uint64_t id);
+    EventBatch::iterator lower_bound(uint64_t time);
+    EventBatch::iterator upper_bound(uint64_t time);
 
     void set_event_name(std::string name) { event_name_ = std::move(name); }
     [[nodiscard]] const std::string &event_name() const { return event_name_; }
 
 private:
-    std::unordered_map<uint64_t, Event *> index_;
+    std::unordered_map<uint64_t, Event *> id_index_;
+    std::map<uint64_t, EventBatch::iterator> lower_bound_index_;
+    std::map<uint64_t, EventBatch::iterator> upper_bounder_index_;
     std::string event_name_;
 
-    void build_index();
+    void build_id_index();
+    void build_time_index();
 };
 
 }  // namespace hermes
