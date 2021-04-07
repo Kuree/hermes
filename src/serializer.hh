@@ -19,10 +19,6 @@ namespace hermes {
 struct SerializationStat {
     std::string parquet_filename;
     std::string json_filename;
-    uint64_t min_time;
-    uint64_t max_time;
-    uint64_t min_id;
-    uint64_t max_id;
 
     std::string type;
 
@@ -33,6 +29,7 @@ struct SerializationStat {
 class Serializer {
 public:
     explicit Serializer(std::string output_dir);
+    Serializer(std::string output_dir, bool override);
 
     bool serialize(const EventBatch &batch);
     bool serialize(const TransactionBatch &batch);
@@ -48,12 +45,12 @@ private:
     std::shared_ptr<parquet::WriterProperties> writer_properties_;
     std::unordered_map<const void *, std::shared_ptr<parquet::arrow::FileWriter>> writers_;
     std::unordered_map<const void *, SerializationStat> stats_;
-    std::unordered_set<const void *> written_sets_;
 
     std::pair<std::string, std::string> get_next_filename();
     parquet::arrow::FileWriter *get_writer(const void *ptr,
                                            const std::shared_ptr<arrow::Schema> &schema);
     SerializationStat &get_stat(const void *ptr);
+    void identify_batch_counter();
 
     static bool serialize(parquet::arrow::FileWriter *writer,
                    const std::shared_ptr<arrow::RecordBatch> &record);

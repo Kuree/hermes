@@ -72,7 +72,9 @@ void init_transaction(py::module &m) {
 void init_serializer(py::module &m) {
     auto serializer =
         py::class_<hermes::Serializer, std::shared_ptr<hermes::Serializer>>(m, "Serializer");
-    serializer.def(py::init<const std::string &>());
+    serializer.def(py::init<const std::string &>(), py::arg("output_dir"));
+    serializer.def(py::init<const std::string &, bool>(), py::arg("output_dir"),
+                   py::arg("override"));
     serializer.def("finalize", &hermes::Serializer::finalize);
 }
 
@@ -99,6 +101,8 @@ void init_loader(py::module &m) {
         auto stream = loader.get_transaction_stream(name);
         return stream;
     });
+    loader.def("stream", [](hermes::Loader &loader) { loader.stream(); });
+    loader.def("stream", py::overload_cast<bool>(&hermes::Loader::stream));
 
     auto stream = py::class_<hermes::TransactionStream, std::shared_ptr<hermes::TransactionStream>>(
         m, "TransactionStream");

@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <utility>
 
 #include "arrow/api.h"
 #include "arrow/io/file.h"
@@ -19,7 +20,9 @@ namespace fs = std::filesystem;
 
 namespace hermes {
 
-Serializer::Serializer(std::string output_dir) : output_dir_(std::move(output_dir)) {
+Serializer::Serializer(std::string output_dir) : Serializer(std::move(output_dir), true) {}
+
+Serializer::Serializer(std::string output_dir, bool override) : output_dir_(std::move(output_dir)) {
     if (!fs::exists(output_dir_)) {
         fs::create_directories(output_dir_);
     }
@@ -32,6 +35,10 @@ Serializer::Serializer(std::string output_dir) : output_dir_(std::move(output_di
     builder.enable_statistics();
     builder.max_statistics_size(1 << 20);
     writer_properties_ = builder.build();
+
+    if (!override) {
+        identify_batch_counter();
+    }
 }
 
 bool Serializer::serialize(const EventBatch &batch) {
@@ -125,6 +132,19 @@ SerializationStat &Serializer::get_stat(const void *ptr) {
     stat.min_time = std::numeric_limits<uint64_t>::max();
 
     return stat;
+}
+
+void Serializer::identify_batch_counter() {
+    while (true) {
+        auto json_name = fmt::format("{0}.json", batch_counter_);
+        auto dir = fs::path(output_dir_);
+        json_name = dir / json_name;
+        if (fs::exists(json_name)) {
+            batch_counter_++;
+        } else {
+            break;
+        }
+    }
 }
 
 bool Serializer::serialize(parquet::arrow::FileWriter *writer,
