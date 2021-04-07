@@ -233,6 +233,13 @@ bool EventBatch::validate() const noexcept {
     return true;
 }
 
+void EventBatch::sort() {
+    // we sort it based on time
+    std::sort(begin(), end(), [](const std::shared_ptr<Event> &a, const std::shared_ptr<Event> &b) {
+        return a->time() < b->time();
+    });
+}
+
 Event *EventBatch::get_event(uint64_t id) {
     if (index_.empty()) {
         build_index();

@@ -17,6 +17,8 @@ void DummyEventSerializer::on_message(const std::string &topic,
     }
 
     if (serializer_ && events_.at(topic).size() >= event_dump_threshold) {
+        // sort them first
+        events_.at(topic).sort();
         serializer_->serialize(events_.at(topic));
         events_[topic].clear();
     }
@@ -28,6 +30,7 @@ void DummyEventSerializer::stop() {
     // flush everything
     for (auto &[name, events] : events_) {
         if (!events.empty()) {
+            events.sort();
             serializer_->serialize(events);
             events.clear();
         }

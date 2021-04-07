@@ -8,6 +8,7 @@
 #include "arrow/filesystem/localfs.h"
 #include "parquet/arrow/reader.h"
 #include "parquet/statistics.h"
+#include "pubsub.hh"
 #include "rapidjson/document.h"
 #include "rapidjson/rapidjson.h"
 
@@ -42,6 +43,8 @@ Loader::Loader(std::string dir) : dir_(fs::absolute(std::move(dir))) {
             load_json(path);
         }
     }
+    // compute stats. this should be very fast
+    compute_stats();
 }
 
 bool contains_value(const std::shared_ptr<parquet::Statistics> &stats, uint64_t value) {
@@ -74,28 +77,11 @@ bool contains_value(const std::shared_ptr<parquet::Statistics> &min_stats,
 
 std::vector<std::unique_ptr<TransactionBatch>> Loader::get_transactions(uint64_t min_time,
                                                                         uint64_t max_time) {
-    std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
-    for (auto const &file : transactions_) {
-        auto stats = file_metadata_.at(file);
-        // we use time column
-        auto max_time_stats = stats.at("end_time");
-        auto min_time_stats = stats.at("start_time");
-        auto pair = std::make_pair(file, std::vector<uint64_t>{});
-        for (uint64_t idx = 0; idx < max_time_stats.size(); idx++) {
-            auto const &min_s = min_time_stats[idx];
-            auto const &max_s = max_time_stats[idx];
-            if (contains_value(min_s, max_s, min_time, max_time)) {
-                pair.second.emplace_back(idx);
-            }
-        }
-        files.emplace_back(pair);
-    }
     // load the tables
-    auto tables = load_tables(files);
+    auto tables = load_transaction_table(min_time, max_time);
     std::vector<std::unique_ptr<TransactionBatch>> result;
-    result.reserve(files.size());
-    for (uint64_t i = 0; i < files.size(); i++) {
-        auto const &load_result = tables[i];
+    result.reserve(tables.size());
+    for (auto const &load_result : tables) {
         auto batch = TransactionBatch::deserialize(load_result.table);
         batch->set_transaction_name(load_result.name);
         result.emplace_back(std::move(batch));
@@ -104,21 +90,7 @@ std::vector<std::unique_ptr<TransactionBatch>> Loader::get_transactions(uint64_t
 }
 
 std::vector<std::unique_ptr<EventBatch>> Loader::get_events(uint64_t min_time, uint64_t max_time) {
-    std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
-    for (auto const &file : events_) {
-        auto stats = file_metadata_.at(file);
-        auto time_stats = stats.at("time");
-        auto pair = std::make_pair(file, std::vector<uint64_t>{});
-        for (uint64_t idx = 0; idx < time_stats.size(); idx++) {
-            auto const &s = time_stats[idx];
-            if (contains_value(s, min_time, max_time)) {
-                pair.second.emplace_back(idx);
-            }
-        }
-        files.emplace_back(pair);
-    }
-    // load the tables
-    auto tables = load_tables(files);
+    auto tables = load_events_table(min_time, max_time);
     std::vector<std::unique_ptr<EventBatch>> result;
     result.reserve(tables.size());
     for (auto const &load_result : tables) {
@@ -391,6 +363,180 @@ EventBatch *Loader::load_events(const std::shared_ptr<arrow::Table> &table) {
         event_cache_.emplace(table.get(), std::move(events));
     }
     return event_cache_.at(table.get()).get();
+}
+
+void Loader::compute_stats() {
+    for (auto const &[info, table] : tables_) {
+        auto const &[file, blk_id] = info;
+        if (file->type == FileInfo::FileType::event) {
+            stats_.num_event_files++;
+            stats_.num_events += table->num_rows();
+            // need to load the column stats
+
+            auto const &stats = file_metadata_.at(file).at("time")[blk_id];
+            auto typed =
+                std::reinterpret_pointer_cast<parquet::TypedStatistics<arrow::UInt64Type>>(stats);
+            auto min = typed->min();
+            auto max = typed->max();
+
+            if (min < stats_.min_event_time) {
+                stats_.min_event_time = min;
+            }
+
+            if (max > stats_.max_event_time) {
+                stats_.max_event_time = max;
+            }
+
+        } else {
+            stats_.num_transaction_files++;
+            stats_.num_transactions += table->num_rows();
+        }
+    }
+}
+
+void Loader::stream(MessageBus *bus, bool stream_transactions) {
+    // we stream out every items roughly based on the time
+    // because each table is a chunk, as long as the cache doesn't
+    // take much memory, we're good
+
+    // we assume the event batch is sorted by time within
+    std::unordered_set<arrow::Table *> loaded_table_;
+    // we load them in approximation of time, it won't be perfect but should be good
+    // enough
+    uint64_t interval = (stats_.max_event_time - stats_.min_event_time) / stats_.num_event_files;
+    for (uint64_t start_time = stats_.min_event_time; start_time <= stats_.max_event_time;
+         start_time += interval) {
+        auto load_results = load_events_table(start_time, start_time + interval);
+        std::vector<std::unique_ptr<EventBatch>> events;
+        std::vector<std::unique_ptr<TransactionBatch>> transactions;
+        for (auto const &res : load_results) {
+            auto const &table = res.table;
+            if (loaded_table_.find(table.get()) != loaded_table_.end()) {
+                // we already streamed this one
+                continue;
+            }
+            loaded_table_.emplace(table.get());
+            // stream this event out
+            auto event_batch = EventBatch::deserialize(table);
+            event_batch->set_event_name(res.name);
+            events.emplace_back(std::move(event_batch));
+        }
+
+        // decide whether to stream transactions or not
+        if (stream_transactions) {
+            load_results = load_events_table(start_time, start_time + interval);
+            for (auto const &res : load_results) {
+                auto const &table = res.table;
+                if (loaded_table_.find(table.get()) != loaded_table_.end()) {
+                    // we already streamed this one
+                    continue;
+                }
+                loaded_table_.emplace(table.get());
+                // stream this event out
+                auto transaction_batch = TransactionBatch::deserialize(table);
+                transaction_batch->set_transaction_name(res.name);
+                transactions.emplace_back(std::move(transaction_batch));
+            }
+        }
+
+        std::vector<uint64_t> event_indices;
+        event_indices.resize(events.size(), 0);
+        std::vector<uint64_t> transaction_indices;
+        transaction_indices.resize(transactions.size(), 0);
+
+        // stream out the events and transactions
+
+        while (true) {
+            bool stop = true;
+            if (!events.empty()) {
+                for (uint64_t i = 0; i < events.size(); i++) {
+                    if (event_indices[i] < events[i]->size()) {
+                        stop = false;
+                    }
+                }
+            }
+            if (!transactions.empty()) {
+                for (uint64_t i = 0; i < transactions.size(); i++) {
+                    if (transaction_indices[i] < transactions[i]->size()) {
+                        stop = false;
+                    }
+                }
+            }
+            // search for the min index
+            if (!events.empty()) {
+                uint64_t min_index = 0;
+                auto event = (*events[min_index])[event_indices[min_index]];
+                for (uint64_t i = 1; i < events.size(); i++) {
+                    if ((*events[i])[event_indices[i]]->time() < event->time()) {
+                        min_index = i;
+                        event = (*events[i])[event_indices[i]];
+                    }
+                }
+                event_indices[min_index]++;
+                bus->publish(events[min_index]->event_name(), event);
+            }
+
+            if (!transactions.empty()) {
+                uint64_t min_index = 0;
+                auto transaction = (*transactions[min_index])[transaction_indices[min_index]];
+                for (uint64_t i = 1; i < events.size(); i++) {
+                    if ((*transactions[i])[transaction_indices[i]]->start_time() <
+                        transaction->start_time()) {
+                        min_index = i;
+                        transaction = (*transactions[i])[transaction_indices[i]];
+                    }
+                }
+                transaction_indices[min_index]++;
+                bus->publish(events[min_index]->event_name(), transaction);
+            }
+
+            if (stop) break;
+        }
+    }
+}
+
+std::vector<LoaderResult> Loader::load_events_table(uint64_t min_time, uint64_t max_time) {
+    std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
+    for (auto const &file : transactions_) {
+        auto stats = file_metadata_.at(file);
+        // we use time column
+        auto max_time_stats = stats.at("end_time");
+        auto min_time_stats = stats.at("start_time");
+        auto pair = std::make_pair(file, std::vector<uint64_t>{});
+        for (uint64_t idx = 0; idx < max_time_stats.size(); idx++) {
+            auto const &min_s = min_time_stats[idx];
+            auto const &max_s = max_time_stats[idx];
+            if (contains_value(min_s, max_s, min_time, max_time)) {
+                pair.second.emplace_back(idx);
+            }
+        }
+        files.emplace_back(pair);
+    }
+    // load the tables
+    auto tables = load_tables(files);
+    return tables;
+}
+
+std::vector<LoaderResult> Loader::load_transaction_table(uint64_t min_time, uint64_t max_time) {
+    std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
+    for (auto const &file : transactions_) {
+        auto stats = file_metadata_.at(file);
+        // we use time column
+        auto max_time_stats = stats.at("end_time");
+        auto min_time_stats = stats.at("start_time");
+        auto pair = std::make_pair(file, std::vector<uint64_t>{});
+        for (uint64_t idx = 0; idx < max_time_stats.size(); idx++) {
+            auto const &min_s = min_time_stats[idx];
+            auto const &max_s = max_time_stats[idx];
+            if (contains_value(min_s, max_s, min_time, max_time)) {
+                pair.second.emplace_back(idx);
+            }
+        }
+        files.emplace_back(pair);
+    }
+    // load the tables
+    auto tables = load_tables(files);
+    return tables;
 }
 
 }  // namespace hermes

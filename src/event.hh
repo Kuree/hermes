@@ -75,6 +75,7 @@ public:
     [[nodiscard]] std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>>
     serialize() const noexcept;
     [[nodiscard]] bool validate() const noexcept;
+    void sort();
 
     // factory method to construct event batch
     static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Table> &table);

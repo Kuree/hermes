@@ -84,6 +84,16 @@ private:
     Loader *loader_;
 };
 
+struct LoaderStats {
+    uint64_t min_event_time = std::numeric_limits<uint64_t>::max();
+    uint64_t max_event_time = 0;
+    uint64_t num_events = 0;
+    uint64_t num_transactions = 0;
+    uint64_t num_event_files = 0;
+    uint64_t num_transaction_files = 0;
+};
+
+class MessageBus;
 class Loader {
 public:
     explicit Loader(std::string dir);
@@ -98,11 +108,13 @@ public:
 
     EventBatch get_events(const Transaction &transaction);
 
+    void stream(MessageBus *bus, bool stream_transactions = true);
+
     // debug information
     [[maybe_unused]] void print_files() const;
 
-    using FileMetadata = std::unordered_map<const FileInfo *,
-        std::map<std::string, std::vector<std::shared_ptr<parquet::Statistics>>>>;
+    using FileMetadata = std::unordered_map<
+        const FileInfo *, std::map<std::string, std::vector<std::shared_ptr<parquet::Statistics>>>>;
 
 private:
     std::string dir_;
@@ -116,12 +128,19 @@ private:
     FileMetadata file_metadata_;
     // local caches
     std::unordered_map<const arrow::Table *, std::shared_ptr<EventBatch>> event_cache_;
+    // stats about the folder we're reading
+    LoaderStats stats_;
 
     void load_json(const std::string &path);
     bool preload_table(const FileInfo *info);
     std::vector<LoaderResult> load_tables(
         const std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> &files);
     EventBatch *load_events(const std::shared_ptr<arrow::Table> &table);
+    void compute_stats();
+
+    // only return the table
+    std::vector<LoaderResult> load_events_table(uint64_t min_time, uint64_t max_time);
+    std::vector<LoaderResult> load_transaction_table(uint64_t min_time, uint64_t max_time);
 };
 
 }  // namespace hermes
