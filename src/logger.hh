@@ -3,6 +3,7 @@
 
 #include "event.hh"
 #include "pubsub.hh"
+#include "transaction.hh"
 
 namespace hermes {
 class Logger : Publisher {
@@ -11,6 +12,7 @@ public:
     Logger(MessageBus *bus, std::string name) : Publisher(bus), topic_(std::move(name)) {}
 
     void log(const std::shared_ptr<Event> &event) { publish(topic_, event); }
+    void log(const std::shared_ptr<Transaction> &transaction) { publish(topic_, transaction); }
 
 protected:
     std::string topic_;

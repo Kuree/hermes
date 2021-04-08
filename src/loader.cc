@@ -98,8 +98,12 @@ std::shared_ptr<TransactionBatch> Loader::get_transactions(const std::string &na
         if (!result) {
             result = batch;
         } else {
-            result->reserve(result->size() + batch->size());
+            auto temp = result;
+            result = std::make_shared<TransactionBatch>();
+            result->reserve(temp->size() + batch->size());
+            result->insert(result->end(), temp->begin(), temp->end());
             result->insert(result->end(), batch->begin(), batch->end());
+            result->set_transaction_name(load_result.name);
         }
     }
     return result;
@@ -138,13 +142,19 @@ std::shared_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t
     auto tables = load_tables(files);
     std::shared_ptr<EventBatch> result;
     for (auto const &load_result : tables) {
+        auto batch = load_events(load_result.table);
         if (!result) {
-            result = load_events(load_result.table);
+            result = batch;
             result->set_event_name(load_result.name);
         } else {
-            auto batch = load_events(load_result.table);
-            result->reserve(result->size() + batch->size());
+            // since the old one is used for caching
+            // we have to create new result instead of reusing the old one
+            auto temp = result;
+            result = std::make_shared<EventBatch>();
+            result->reserve(temp->size() + batch->size());
+            result->insert(result->end(), temp->begin(), temp->end());
             result->insert(result->end(), batch->begin(), batch->end());
+            result->set_event_name(load_result.name);
         }
     }
 

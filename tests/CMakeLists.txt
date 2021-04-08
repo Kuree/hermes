@@ -24,6 +24,7 @@ setup_test_target(test_serialization)
 setup_test_target(test_tracker)
 setup_test_target(test_logger)
 setup_test_target(test_loader)
+setup_test_target(test_query)
 
 # add as a library
 add_library(test_tracker_lib SHARED test_tracker_lib.cc)

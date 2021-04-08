@@ -31,8 +31,8 @@ public:
     explicit Serializer(std::string output_dir);
     Serializer(std::string output_dir, bool override);
 
-    bool serialize(const EventBatch &batch);
-    bool serialize(const TransactionBatch &batch);
+    bool serialize(EventBatch &batch);
+    bool serialize(TransactionBatch &batch);
 
     void finalize();
 

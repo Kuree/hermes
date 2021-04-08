@@ -39,7 +39,6 @@ void DummyEventSerializer::flush() {
     // flush everything
     for (auto &[name, events] : events_) {
         if (!events.empty()) {
-            events.sort();
             serializer_->serialize(events);
             events.clear();
         }

@@ -49,7 +49,7 @@ TransactionBatch::serialize() const noexcept {
         for (auto const &id : events) ids.emplace_back(id);
         // indicate the start of a new list row
         (void)event_ids_list_builder.Append();
-        (void)event_ids_builder.AppendValues(ids.data(), ids.size());
+        (void)event_ids_builder.AppendValues(ids.data(), static_cast<int64_t>(ids.size()));
     }
     std::shared_ptr<arrow::Array> id_array;
     auto r = id_builder.Finish(&id_array);
@@ -137,25 +137,17 @@ TransactionBatch::iterator TransactionBatch::lower_bound(uint64_t time) {
     }
 }
 
-TransactionBatch::iterator TransactionBatch::upper_bound(uint64_t time) {
-    if (time_upper_bound_.empty()) {
-        build_time_index();
-    }
-
-    auto it = time_lower_bound_.lower_bound(time);
-    if (it == time_lower_bound_.end()) {
-        return end();
-    } else {
-        return it->second;
+void TransactionBatch::build_time_index() {
+    // we assume the transaction is sorted by end time already
+    for (auto it = begin(); it != end(); it++) {
+        auto const &transaction = *it;
+        time_lower_bound_.try_emplace(transaction->end_time_, it);
     }
 }
 
-void TransactionBatch::build_time_index() {
-    for (auto it = begin(); it != end(); it++) {
-        auto const &transaction = *it;
-        time_lower_bound_.try_emplace(transaction->start_time_, it);
-        time_upper_bound_[transaction->end_time_] = it;
-    }
+void TransactionBatch::sort() {
+    std::sort(begin(), end(),
+              [](const auto &a, const auto &b) { return a->end_time() < b->end_time(); });
 }
 
 }  // namespace hermes

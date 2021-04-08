@@ -41,9 +41,10 @@ Serializer::Serializer(std::string output_dir, bool override) : output_dir_(std:
     }
 }
 
-bool Serializer::serialize(const EventBatch &batch) {
+bool Serializer::serialize(EventBatch &batch) {
     auto r = batch.validate();
     if (!r) return false;
+    batch.sort();
     // serialize
     auto [record, schema] = batch.serialize();
     auto *writer = get_writer(&batch, schema);
@@ -57,7 +58,8 @@ bool Serializer::serialize(const EventBatch &batch) {
     return true;
 }
 
-bool Serializer::serialize(const TransactionBatch &batch) {
+bool Serializer::serialize(TransactionBatch &batch) {
+    batch.sort();
     // serialize
     auto [record, schema] = batch.serialize();
     auto *writer = get_writer(&batch, schema);

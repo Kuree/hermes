@@ -44,13 +44,14 @@ public:
     [[nodiscard]] const std::string &transaction_name() const { return transaction_name_; }
 
     TransactionBatch::iterator lower_bound(uint64_t time);
-    TransactionBatch::iterator upper_bound(uint64_t time);
+
+    // we sort based on the finishing time (end time)
+    void sort();
 
 private:
     std::string transaction_name_;
 
     std::map<uint64_t, TransactionBatch::iterator> time_lower_bound_;
-    std::map<uint64_t, TransactionBatch::iterator> time_upper_bound_;
 
     void build_time_index();
 };

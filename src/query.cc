@@ -12,9 +12,8 @@ EventBatch QueryHelper::concurrent_events(uint64_t min_time, uint64_t max_time) 
     for (auto const &event_batch : event_batches) {
         auto start = event_batch->lower_bound(min_time);
         auto end = event_batch->upper_bound(max_time);
-        if (end != event_batch->end()) end++;
 
-        for (auto it = start; it != end; it++) {
+        for (auto it = start; it != end && it != event_batch->end(); it++) {
             auto const &event = *it;
             result.emplace_back(event);
         }
@@ -27,13 +26,13 @@ EventBatch QueryHelper::concurrent_events(const std::string &event_name, uint64_
                                           uint64_t max_time) {
     auto event_batch = loader_->get_events(event_name, min_time, max_time);
     EventBatch result;
+    if (!event_batch) return result;
     // some approximation
     result.reserve(max_time - min_time + 1);
     auto start = event_batch->lower_bound(min_time);
     auto end = event_batch->upper_bound(max_time);
-    if (end != event_batch->end()) end++;
 
-    for (auto it = start; it != end; it++) {
+    for (auto it = start; it != end && it != event_batch->end(); it++) {
         auto const &event = *it;
         result.emplace_back(event);
     }
@@ -59,10 +58,10 @@ TransactionBatch QueryHelper::concurrent_transactions(uint64_t min_time, uint64_
     TransactionBatch batch;
     for (auto const &transaction_batch : transaction_batches) {
         auto start = transaction_batch->lower_bound(min_time);
-        auto end = transaction_batch->upper_bound(max_time);
-        if (end != transaction_batch->end()) end++;
 
-        for (auto it = start; it != end; it++) {
+        for (auto it = start; it != transaction_batch->end(); it++) {
+            auto const &event = *it;
+            if (event->start_time() > max_time) break;
             batch.emplace_back(*it);
         }
     }
@@ -73,11 +72,12 @@ TransactionBatch QueryHelper::concurrent_transactions(const std::string &transac
                                                       uint64_t min_time, uint64_t max_time) {
     auto transaction_batch = loader_->get_transactions(transaction_name, min_time, max_time);
     TransactionBatch batch;
+    if (!transaction_batch) return batch;
     auto start = transaction_batch->lower_bound(min_time);
-    auto end = transaction_batch->upper_bound(max_time);
-    if (end != transaction_batch->end()) end++;
 
-    for (auto it = start; it != end; it++) {
+    for (auto it = start; it != transaction_batch->end(); it++) {
+        auto const &event = *it;
+        if (event->start_time() > max_time) break;
         batch.emplace_back(*it);
     }
 
