@@ -56,6 +56,8 @@ void init_event(py::module &m) {
         "__getitem__", [](const hermes::EventBatch &batch, uint64_t index) { return batch[index]; },
         py::arg("index"));
     event_batch.def("__len__", [](const hermes::EventBatch &batch) { return batch.size(); });
+    event_batch.def("sort", &hermes::EventBatch::sort);
+    event_batch.def("where", &hermes::EventBatch::where);
 }
 
 void init_transaction(py::module &m) {
@@ -68,6 +70,18 @@ void init_transaction(py::module &m) {
     transaction.def_property_readonly("id", &hermes::Transaction::id);
     transaction.def("finish", &hermes::Transaction::finish);
     transaction.def_property_readonly("finished", &hermes::Transaction::finished);
+
+    auto transaction_batch =
+        py::class_<hermes::TransactionBatch, std::shared_ptr<hermes::TransactionBatch>>(
+            m, "TransactionBatch");
+
+    transaction_batch.def(
+        "__getitem__", [](const hermes::EventBatch &batch, uint64_t index) { return batch[index]; },
+        py::arg("index"));
+    transaction_batch.def("__len__",
+                          [](const hermes::TransactionBatch &batch) { return batch.size(); });
+    transaction_batch.def("sort", [](hermes::TransactionBatch &batch) {});
+    transaction_batch.def("where", &hermes::TransactionBatch::where);
 }
 
 void init_serializer(py::module &m) {
@@ -82,7 +96,13 @@ void init_serializer(py::module &m) {
 void init_logger(py::module &m) {
     auto logger = py::class_<hermes::Logger>(m, "Logger");
     logger.def(py::init<std::string>());
-    logger.def("log", &hermes::Logger::log, py::arg("event"));
+    logger.def("log",
+               py::overload_cast<const std::shared_ptr<hermes::Event> &>(&hermes::Logger::log),
+               py::arg("event"));
+    logger.def(
+        "log",
+        py::overload_cast<const std::shared_ptr<hermes::Transaction> &>(&hermes::Logger::log),
+        py::arg("transaction"));
 
     auto dummy_log_serializer =
         py::class_<hermes::DummyEventSerializer, std::shared_ptr<hermes::DummyEventSerializer>>(

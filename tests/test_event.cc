@@ -54,3 +54,20 @@ TEST(event_batch, serilizattion) {  // NOLINT
     EXPECT_EQ(*event->get_value<uint16_t>("uint16_t"), 42 + 42);
     EXPECT_EQ(*event->get_value<uint32_t>("uint32_t"), 43 + 42);
 }
+
+TEST(event_batch, where) {  // NOLINT
+    hermes::EventBatch batch;
+
+    auto constexpr num_events = 100;
+    for (auto i = 0; i < num_events; i++) {
+        auto event = std::make_unique<hermes::Event>(i);
+        event->add_value<uint64_t>("value", i);
+        batch.emplace_back(std::move(event));
+    }
+
+    auto res = batch.where([](const auto &e) -> bool {
+        return e->time() < 42;
+    });
+
+    EXPECT_EQ(res->size(), 42);
+}

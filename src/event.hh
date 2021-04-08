@@ -69,13 +69,32 @@ private:
     static uint64_t event_id_count_;
 };
 
+template <typename T, typename K>
+class Batch : public std::vector<std::shared_ptr<T>> {
+public:
+    virtual void sort() = 0;
+    [[nodiscard]] virtual std::pair<std::shared_ptr<arrow::RecordBatch>,
+                                    std::shared_ptr<arrow::Schema>>
+    serialize() const noexcept = 0;
+
+    virtual std::shared_ptr<K> where(const std::function<bool(const std::shared_ptr<T> &)> &func) {
+        auto ptr = std::make_shared<K>();
+        for (auto const &elem : *this) {
+            if (func(elem)) {
+                ptr->emplace_back(elem);
+            }
+        }
+        return ptr;
+    }
+};
+
 // a batch of events
-class EventBatch : public std::vector<std::shared_ptr<Event>> {
+class EventBatch : public Batch<Event, EventBatch> {
 public:
     [[nodiscard]] std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>>
-    serialize() const noexcept;
+    serialize() const noexcept override;
     [[nodiscard]] bool validate() const noexcept;
-    void sort();
+    void sort() override;
 
     // factory method to construct event batch
     static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Table> &table);

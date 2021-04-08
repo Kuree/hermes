@@ -32,10 +32,10 @@ private:
     friend TransactionBatch;
 };
 
-class TransactionBatch : public std::vector<std::shared_ptr<Transaction>> {
+class TransactionBatch : public Batch<Transaction, TransactionBatch> {
 public:
     [[nodiscard]] std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>>
-    serialize() const noexcept;
+    serialize() const noexcept override;
     // factory method to construct transaction batch
     static std::unique_ptr<TransactionBatch> deserialize(
         const std::shared_ptr<arrow::Table> &table);
@@ -46,7 +46,7 @@ public:
     TransactionBatch::iterator lower_bound(uint64_t time);
 
     // we sort based on the finishing time (end time)
-    void sort();
+    void sort() override;
 
 private:
     std::string transaction_name_;
