@@ -29,51 +29,70 @@ public:
     std::optional<uint64_t> event_time_;
 };
 
-TEST(loader, stream) {  // NOLINT
+class LoaderTest : public ::testing::Test {
+public:
     TempDirectory dir;
+    hermes::Publisher publisher;
 
     // need to create s set of events and transactions
-    constexpr auto event_name = "dummy1";
-    constexpr auto chunk_size = 5;
-    constexpr auto num_events = 100;
-    auto serializer = std::make_shared<hermes::Serializer>(dir.path());
-    hermes::Publisher publisher;
-    auto d = std::make_shared<hermes::DummyEventSerializer>();
-    d->connect(serializer);
+    static constexpr auto event_name = "dummy1";
+    static constexpr auto chunk_size = 5;
+    static constexpr auto num_events = 100;
+    std::shared_ptr<hermes::Serializer> serializer;
 
-    for (auto i = 0u; i < num_events; i++) {
-        auto e = std::make_shared<hermes::Event>(i);
-        e->add_value<uint32_t>("value", i);
-        publisher.publish(event_name, e);
-    }
+    void SetUp() override {
+        serializer = std::make_shared<hermes::Serializer>(dir.path());
 
-    // flush it here since we're creating a new batch
-    d->flush();
+        auto d = std::make_shared<hermes::DummyEventSerializer>();
+        d->connect(serializer);
 
-    for (auto i = num_events; i < num_events * 2; i++) {
-        auto e = std::make_shared<hermes::Event>(i);
-        e->add_value<uint32_t>("value", i);
-        publisher.publish(event_name, e);
-    }
-
-    // we don't even track it, just directly use transactions
-    for (auto i = 0; i < num_events * 2 / chunk_size; i++) {
-        auto t = std::make_shared<hermes::Transaction>();
-        for (auto j = 0; j < chunk_size; j++) {
-            hermes::Event e(i * j);
-            t->add_event(&e);
+        for (auto i = 0u; i < num_events; i++) {
+            auto e = std::make_shared<hermes::Event>(i);
+            e->add_value<uint32_t>("value", i);
+            publisher.publish(event_name, e);
         }
-        publisher.publish(event_name, t);
+
+        // flush it here since we're creating a new batch
+        d->flush();
+
+        for (auto i = num_events; i < num_events * 2; i++) {
+            auto e = std::make_shared<hermes::Event>(i);
+            e->add_value<uint32_t>("value", i);
+            publisher.publish(event_name, e);
+        }
+
+        // we don't even track it, just directly use transactions
+        for (auto i = 0; i < num_events * 2 / chunk_size; i++) {
+            auto t = std::make_shared<hermes::Transaction>();
+            for (auto j = 0; j < chunk_size; j++) {
+                hermes::Event e(i * j);
+                t->add_event(&e);
+            }
+            publisher.publish(event_name, t);
+        }
+
+        hermes::MessageBus::default_bus()->stop();
+        serializer->finalize();
     }
+};
 
-    hermes::MessageBus::default_bus()->stop();
-    serializer->finalize();
-
-    // now load it up
+TEST_F(LoaderTest, stream) {  // NOLINT
     hermes::Loader loader(dir.path());
     auto sub = std::make_shared<StreamSubSubscriber>();
     sub->subscribe(hermes::MessageBus::default_bus(), event_name);
     loader.stream();
-    EXPECT_EQ(sub->events.size(),2 * num_events);
+    EXPECT_EQ(sub->events.size(), 2 * num_events);
     EXPECT_EQ(sub->transactions.size(), num_events * 2 / chunk_size);
+}
+
+TEST_F(LoaderTest, stream_iter) {  // NOLINT
+    hermes::Loader loader(dir.path());
+    auto stream = loader.get_transaction_stream(event_name);
+    uint64_t num_trans = 0;
+    for (auto const &[transaction, events]: *stream) {
+        EXPECT_EQ(transaction->id(), num_trans);
+        EXPECT_EQ(events->size(), chunk_size);
+        num_trans++;
+    }
+    EXPECT_EQ(num_trans, num_events * 2 / chunk_size);
 }

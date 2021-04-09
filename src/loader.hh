@@ -29,59 +29,70 @@ struct LoaderResult {
 };
 
 struct TransactionData {
+public:
     std::shared_ptr<Transaction> transaction;
     std::shared_ptr<EventBatch> events;
+
+    template <std::size_t N>
+    decltype(auto) get() const {
+        if constexpr (N == 0)
+            return transaction;
+        else if constexpr (N == 1)
+            return events;
+    }
 };
 
-class Loader;
+class TransactionStream;
 struct TransactionDataIter {
 public:
-    TransactionDataIter(Loader *loader, TransactionBatch::iterator it) : loader_(loader), it_(it) {}
+    TransactionDataIter(TransactionStream *stream, uint64_t current_row)
+        : stream_(stream), current_row_(current_row) {}
     TransactionData operator*() const;
 
     inline TransactionDataIter &operator++() {
-        it_++;
+        current_row_++;
         return *this;
     }
 
     inline TransactionDataIter operator++(int) {  // NOLINT
-        return TransactionDataIter(loader_, it_ + 1);
+        return TransactionDataIter(stream_, current_row_ + 1);
     }
 
     friend bool operator==(const TransactionDataIter &a, const TransactionDataIter &b) {
-        return a.it_ == b.it_;
+        return a.current_row_ == b.current_row_;
     }
 
     friend bool operator!=(const TransactionDataIter &a, const TransactionDataIter &b) {
-        return a.it_ != b.it_;
+        return a.current_row_ != b.current_row_;
     }
 
     inline TransactionDataIter operator+(uint32_t index) {
-        return TransactionDataIter(loader_, it_ + index);
+        return TransactionDataIter(stream_, current_row_ + index);
     }
 
 private:
-    Loader *loader_;
-    TransactionBatch::iterator it_;
+    TransactionStream *stream_;
+    uint64_t current_row_ = 0;
 };
 
+class Loader;
 class TransactionStream {
 public:
-    TransactionStream(std::shared_ptr<TransactionBatch> transactions, Loader *loader)
-        : transactions_(std::move(transactions)), loader_(loader) {}
+    TransactionStream(const std::vector<std::shared_ptr<arrow::Table>> &tables, Loader *loader);
 
-    [[nodiscard]] inline TransactionDataIter begin() const {
-        return TransactionDataIter(loader_, transactions_->begin());
-    }
-    [[nodiscard]] inline TransactionDataIter end() const {
-        return TransactionDataIter(loader_, transactions_->end());
+    [[nodiscard]] inline TransactionDataIter begin() { return TransactionDataIter(this, 0); }
+    [[nodiscard]] inline TransactionDataIter end() {
+        return TransactionDataIter(this, num_entries_);
     }
 
-    [[nodiscard]] uint64_t size() const { return transactions_->size(); }
+    [[nodiscard]] uint64_t size() const { return num_entries_; }
 
 private:
-    std::shared_ptr<TransactionBatch> transactions_;
+    std::map<uint64_t, std::shared_ptr<arrow::Table>> tables_;
+    uint64_t num_entries_ = 0;
     Loader *loader_;
+
+    friend class TransactionDataIter;
 };
 
 struct LoaderStats {
@@ -150,8 +161,16 @@ private:
                                                      uint64_t min_time, uint64_t max_time);
 
     friend class Checker;
+    friend class TransactionDataIter;
 };
 
 }  // namespace hermes
+
+namespace std {
+template <std::size_t N>
+struct tuple_element<N, hermes::TransactionData> {
+    using type = decltype(std::declval<hermes::TransactionData>().get<N>());
+};
+}  // namespace std
 
 #endif  // HERMES_LOADER_HH

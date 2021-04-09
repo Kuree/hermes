@@ -18,14 +18,35 @@ namespace hermes {
 
 TransactionData TransactionDataIter::operator*() const {
     TransactionData data;
-    data.transaction = *it_;
+    if (current_row_ >= stream_->size()) {
+        return data;
+    }
+    // need to load transactions
+    // figure out which table to load
+    auto table_iter = stream_->tables_.lower_bound(current_row_);
+    auto const &table = table_iter->second;
+    auto transactions = stream_->loader_->load_transactions(table);
+    // compute the index
+    auto offset = table_iter->first - current_row_;
+    auto idx = table->num_rows() - offset;
+    data.transaction = (*transactions)[idx];
     data.events = std::make_shared<EventBatch>();
-    auto events = loader_->get_events(*data.transaction);
+    auto events = stream_->loader_->get_events(*data.transaction);
     data.events->reserve(events.size());
     for (auto const &e : events) {
         data.events->emplace_back(e);
     }
     return data;
+}
+
+TransactionStream::TransactionStream(const std::vector<std::shared_ptr<arrow::Table>> &tables,
+                                     Loader *loader)
+    : loader_(loader) {
+    num_entries_ = 0;
+    for (auto const &table : tables) {
+        num_entries_ += table->num_rows();
+        tables_.emplace(num_entries_, table);
+    }
 }
 
 Loader::Loader(std::string dir) : dir_(fs::absolute(std::move(dir))) {
@@ -226,26 +247,16 @@ std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::str
     }
     if (!info) return nullptr;
     // need to gather all the tables given the info
-    std::shared_ptr<TransactionBatch> transactions;
+    std::vector<std::shared_ptr<arrow::Table>> tables;
     for (auto const &[entry, table] : tables_) {
         auto const &[f, c_id] = entry;
         if (f == info) {
-            // load table
-            if (!transactions) {
-                transactions = load_transactions(table);
-            } else {
-                auto new_transactions = load_transactions(table);
-                // need to merge them
-                transactions->reserve(transactions->size() + new_transactions->size());
-                transactions->insert(transactions->end(), new_transactions->begin(),
-                                     new_transactions->end());
-            }
+            tables.emplace_back(table);
         }
     }
 
-    if (transactions) {
-        std::shared_ptr<TransactionBatch> ptr = std::move(transactions);
-        return std::make_shared<TransactionStream>(ptr, this);
+    if (!tables.empty()) {
+        return std::make_shared<TransactionStream>(tables, this);
     } else {
         return nullptr;
     }
