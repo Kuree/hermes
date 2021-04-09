@@ -56,7 +56,7 @@ public:
         return a.it_ != b.it_;
     }
 
-    inline TransactionDataIter operator+(uint64_t index) {
+    inline TransactionDataIter operator+(uint32_t index) {
         return TransactionDataIter(loader_, it_ + index);
     }
 
@@ -94,6 +94,7 @@ struct LoaderStats {
 };
 
 class MessageBus;
+class Checker;
 class Loader {
 public:
     explicit Loader(std::string dir);
@@ -147,6 +148,8 @@ private:
     std::vector<LoaderResult> load_events_table(uint64_t min_time, uint64_t max_time);
     std::vector<LoaderResult> load_transaction_table(const std::optional<std::string> &name,
                                                      uint64_t min_time, uint64_t max_time);
+
+    friend class Checker;
 };
 
 }  // namespace hermes
