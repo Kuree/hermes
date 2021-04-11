@@ -70,7 +70,7 @@ private:
 };
 
 template <typename T, typename K>
-class Batch : public std::vector<std::shared_ptr<T>> {
+class Batch {
 public:
     virtual void sort() = 0;
     [[nodiscard]] virtual std::pair<std::shared_ptr<arrow::RecordBatch>,
@@ -86,6 +86,34 @@ public:
         }
         return ptr;
     }
+
+    // vector interface
+    using iterator = typename std::vector<std::shared_ptr<T>>::iterator;
+    [[nodiscard]] auto begin() const { return array_.begin(); }
+    auto begin() { return array_.begin(); }
+    [[nodiscard]] auto end() const { return array_.end(); }
+    auto end() { return array_.end(); }
+    auto emplace_back(std::shared_ptr<T> ptr) { array_.emplace_back(std::move(ptr)); }
+    [[nodiscard]] auto size() const { return array_.size(); }
+    [[nodiscard]] auto front() const { return array_.front(); }
+    [[nodiscard]] auto empty() const { return array_.empty(); }
+    void reserve(size_t size) { array_.reserve(size); }
+    void resize(size_t size) { array_.resize(size); }
+    template <typename Type>
+    inline void resize(size_t size, const Type &value) {
+        array_.resize(size, value);
+    }
+    void clear() { array_.clear(); }
+    const std::shared_ptr<T> &operator[](uint64_t index) const { return array_[index]; }
+    std::shared_ptr<T> &operator[](uint64_t index) { return array_[index]; }
+
+    template <typename InputT>
+    void insert(const iterator &pos, InputT first, InputT last) {
+        array_.insert(pos, first, last);
+    }
+
+private:
+    std::vector<std::shared_ptr<T>> array_;
 };
 
 // a batch of events

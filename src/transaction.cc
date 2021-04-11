@@ -74,7 +74,8 @@ TransactionBatch::serialize() const noexcept {
     auto schema = std::make_shared<arrow::Schema>(schema_vector);
 
     auto batch = arrow::RecordBatch::Make(
-        schema, size(), {id_array, start_array, end_array, finished_array, event_id_array});
+        schema, static_cast<int64_t>(size()),
+        {id_array, start_array, end_array, finished_array, event_id_array});
     return {batch, schema};
 }
 
@@ -146,8 +147,8 @@ void TransactionBatch::build_time_index() {
 }
 
 void TransactionBatch::sort() {
-    std::sort(begin(), end(),
-              [](const auto &a, const auto &b) { return a->end_time() < b->end_time(); });
+    std::stable_sort(begin(), end(),
+                     [](const auto &a, const auto &b) { return a->end_time() < b->end_time(); });
 }
 
 }  // namespace hermes

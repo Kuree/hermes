@@ -80,7 +80,7 @@ TEST(serialization, transactions) {  // NOLINT
     constexpr auto num_transactions = 1000;
     for (auto i = 0; i < num_transactions; i++) {
         auto t = std::make_shared<hermes::Transaction>(i);
-        for (uint32_t j = 0; j < i % 10; j++) {
+        for (uint32_t j = 0; j < (i % 10 + (i % 10 == 0 ? 1 : 0)); j++) {
             auto e = std::make_shared<hermes::Event>(i);
             e->set_time(i);
             t->add_event(e);
@@ -111,7 +111,7 @@ TEST(serialization, get_events) {  // NOLINT
     constexpr auto num_transactions = 1000;
     for (auto i = 0; i < num_transactions; i++) {
         auto t = std::make_shared<hermes::Transaction>(i);
-        for (uint32_t j = 0; j < i % 10; j++) {
+        for (uint32_t j = 0; j < (i % 10 + (i % 10 == 0 ? 1 : 0)); j++) {
             auto e = std::make_shared<hermes::Event>(i);
             e->add_value<uint64_t>("value", i);
             t->add_event(e);
@@ -137,7 +137,6 @@ TEST(serialization, get_events) {  // NOLINT
     EXPECT_TRUE(v);
     EXPECT_EQ(*v, 42);
 }
-
 
 TEST(serilizaiton, transaction_stream) {  // NOLINT
     TempDirectory dir;
@@ -166,7 +165,7 @@ TEST(serilizaiton, transaction_stream) {  // NOLINT
     auto stream = loader.get_transaction_stream("test");
     EXPECT_TRUE(stream);
     EXPECT_EQ(stream->size(), num_transactions);
-    for (auto const &iter: *stream) {
+    for (auto const &iter : *stream) {
         auto events = iter.events;
         EXPECT_GE(events->size(), 1);
     }
