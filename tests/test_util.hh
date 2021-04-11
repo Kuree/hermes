@@ -4,6 +4,10 @@
 #include <filesystem>
 #include <random>
 
+#include "../src/loader.hh"
+#include "../src/logger.hh"
+#include "../src/serializer.hh"
+
 namespace fs = std::filesystem;
 
 class TempDirectory {
@@ -37,6 +41,47 @@ public:
 
 private:
     std::string path_;
+};
+
+class EventTransactionInitializer {
+public:
+    std::shared_ptr<hermes::Loader> loader;
+    std::shared_ptr<TempDirectory> temp;
+    static constexpr auto name = "test";
+
+    void setup() {
+        temp = std::make_shared<TempDirectory>();
+        // write out events and transactions
+        auto serializer = std::make_shared<hermes::Serializer>(temp->path());
+        auto dummy = std::make_shared<hermes::DummyEventSerializer>();
+        dummy->connect(serializer);
+
+        auto logger = std::make_shared<hermes::Logger>(name);
+
+        uint64_t time = 0;
+        // couple batches
+        for (auto b = 0; b < 4; b++) {
+            std::shared_ptr<hermes::Transaction> transaction;
+            for (auto i = 0; i < 1000; i++) {
+                auto event = std::make_shared<hermes::Event>(time++);
+                event->add_value<uint64_t>("value", i);
+                logger->log(event);
+                if (i % 10 == 0) transaction = std::make_shared<hermes::Transaction>();
+                transaction->add_event(event);
+                if (i % 10 == 9) {
+                    transaction->finish();
+                    logger->log(transaction);
+                }
+            }
+            // flush it
+            dummy->flush();
+        }
+
+        hermes::MessageBus::default_bus()->stop();
+        serializer->finalize();
+
+        loader = std::make_shared<hermes::Loader>(temp->path());
+    }
 };
 
 #endif  // HERMES_TEST_UTIL_HH
