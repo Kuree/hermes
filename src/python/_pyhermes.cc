@@ -127,14 +127,14 @@ void init_loader(py::module &m) {
 
     auto stream = py::class_<hermes::TransactionStream, std::shared_ptr<hermes::TransactionStream>>(
         m, "TransactionStream");
-    stream.def("__iter__", [](const hermes::TransactionStream &stream) {
+    stream.def("__iter__", [](hermes::TransactionStream &stream) {
         return py::make_iterator(stream.begin(), stream.end());
     });
     stream.def("__len__", [](const hermes::TransactionStream &stream) { return stream.size(); });
     // we can also materialize transactions on demand
     stream.def(
         "__getitem__",
-        [](const hermes::TransactionStream &stream, uint64_t index) {
+        [](hermes::TransactionStream &stream, uint64_t index) {
             if (index > stream.size()) {
                 throw py::index_error();
             }
