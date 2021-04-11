@@ -54,6 +54,11 @@ void Tracker::on_message(const std::string &, const std::shared_ptr<Event> &even
             auto transaction = t->shared_from_this();
             inflight_transactions.erase(transaction);
             finished_transactions_.emplace_back(transaction);
+
+            // decide whether to flush
+            if (finished_transactions_.size() >= transaction_flush_threshold_) {
+                flush(false);
+            }
         }
     }
 }

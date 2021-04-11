@@ -40,6 +40,9 @@ private:
 
     // serializer
     std::shared_ptr<Serializer> serializer_;
+
+    // how often to flush the transactions to files
+    constexpr static uint64_t transaction_flush_threshold_ = 1 << 16;
 };
 
 extern void add_tracker_to_simulator(const std::shared_ptr<Tracker> &tracker);
