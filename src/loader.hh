@@ -2,6 +2,7 @@
 #define HERMES_LOADER_HH
 
 #include "transaction.hh"
+#include <mutex>
 
 namespace arrow::fs {
 class FileSystem;
@@ -142,7 +143,9 @@ private:
     // we store all the statistics here
     FileMetadata file_metadata_;
     // local caches
+    std::mutex event_cache_mutex_;
     std::unordered_map<const arrow::Table *, std::shared_ptr<EventBatch>> event_cache_;
+    std::mutex transaction_cache_mutex_;
     std::unordered_map<const arrow::Table *, std::shared_ptr<TransactionBatch>> transaction_cache_;
     // stats about the folder we're reading
     LoaderStats stats_;

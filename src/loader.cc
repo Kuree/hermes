@@ -394,6 +394,7 @@ std::vector<LoaderResult> Loader::load_tables(
 std::shared_ptr<EventBatch> Loader::load_events(const std::shared_ptr<arrow::Table> &table) {
     // TODO: implement cache replacement algorithm
     //   for now we hold all of them in memory
+    std::lock_guard guard(event_cache_mutex_);
     if (event_cache_.find(table.get()) == event_cache_.end()) {
         auto events = EventBatch::deserialize(table);
         // put it into cache
@@ -404,6 +405,7 @@ std::shared_ptr<EventBatch> Loader::load_events(const std::shared_ptr<arrow::Tab
 
 std::shared_ptr<TransactionBatch> Loader::load_transactions(
     const std::shared_ptr<arrow::Table> &table) {
+    std::lock_guard guard(transaction_cache_mutex_);
     if (transaction_cache_.find(table.get()) == transaction_cache_.end()) {
         auto transactions = TransactionBatch::deserialize(table);
         transaction_cache_.emplace(table.get(), std::move(transactions));
