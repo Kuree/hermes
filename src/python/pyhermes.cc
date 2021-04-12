@@ -62,6 +62,7 @@ void init_event(py::module &m) {
 void init_transaction(py::module &m) {
     auto transaction =
         py::class_<hermes::Transaction, std::shared_ptr<hermes::Transaction>>(m, "Transaction");
+    transaction.def(py::init<>());
     transaction.def(
         "add_event",
         py::overload_cast<const std::shared_ptr<hermes::Event> &>(&hermes::Transaction::add_event),
@@ -73,6 +74,7 @@ void init_transaction(py::module &m) {
     auto transaction_batch =
         py::class_<hermes::TransactionBatch, std::shared_ptr<hermes::TransactionBatch>>(
             m, "TransactionBatch");
+    transaction_batch.def(py::init<>());
 
     transaction_batch.def(
         "__getitem__", [](const hermes::EventBatch &batch, uint64_t index) { return batch[index]; },
@@ -263,10 +265,10 @@ void init_checker(py::module &m) {
                 py::arg("transaction"), py::arg("query_helper"));
     checker.def("run", &Checker_::run);
     checker.def(
-        "assert", [](const Checker_ &checker, bool condition) { checker.assert_(condition); },
+        "assert_", [](const Checker_ &checker, bool condition) { checker.assert_(condition); },
         py::arg("condition"));
     checker.def(
-        "assert",
+        "assert_",
         [](const Checker_ &checker, bool condition, const std::string &message) {
             checker.assert_(condition, message);
         },
