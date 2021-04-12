@@ -1,9 +1,11 @@
 #ifndef HERMES_CHECKER_HH
 #define HERMES_CHECKER_HH
 
+#include <exception>
+
 #include "loader.hh"
-#include "transaction.hh"
 #include "query.hh"
+#include "transaction.hh"
 
 namespace hermes {
 
@@ -17,9 +19,20 @@ public:
 
     [[nodiscard]] bool stateless() const { return stateless_; }
     void set_stateless(bool value) { stateless_ = value; }
+    [[nodiscard]] bool assert_exception() const { return assert_exception_; }
+    void set_assert_exception(bool value) { assert_exception_ = value; }
 
-private:
+    void assert_(bool value) { assert_(value, ""); }
+    void assert_(bool value, const std::string &message) const;
+
+protected:
     bool stateless_ = true;
+    bool assert_exception_ = false;
+};
+
+class CheckerAssertion : public std::runtime_error {
+public:
+    CheckerAssertion(std::string msg) : std::runtime_error(std::move(msg)) {}
 };
 
 }  // namespace hermes
