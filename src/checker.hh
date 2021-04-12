@@ -2,6 +2,7 @@
 #define HERMES_CHECKER_HH
 
 #include <exception>
+#include <mutex>
 
 #include "loader.hh"
 #include "query.hh"
@@ -28,11 +29,13 @@ public:
 protected:
     bool stateless_ = true;
     bool assert_exception_ = false;
+    std::mutex assert_mutex_;
+    std::optional<std::exception_ptr> current_ptr_;
 };
 
 class CheckerAssertion : public std::runtime_error {
 public:
-    CheckerAssertion(std::string msg) : std::runtime_error(std::move(msg)) {}
+    explicit CheckerAssertion(std::string msg) : std::runtime_error(std::move(msg)) {}
 };
 
 }  // namespace hermes

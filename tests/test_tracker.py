@@ -5,6 +5,8 @@ import tempfile
 class Checker1(pyhermes.Checker):
     def __init__(self):
         super(Checker1, self).__init__()
+        # we throw exception when assertion fails
+        self.assert_exception = True
 
     def check(self, transaction, _):
         for e in transaction:
@@ -13,7 +15,6 @@ class Checker1(pyhermes.Checker):
 
 def test_checker():
     with tempfile.TemporaryDirectory() as temp:
-        temp = "temp"
         serializer = pyhermes.Serializer(temp)
         logger = pyhermes.Logger("test")
         dummy_serializer = pyhermes.DummyEventSerializer()
@@ -22,10 +23,11 @@ def test_checker():
         t = None
         for i in range(100):
             e = pyhermes.Event(i)
-            e.add_value("v", i if i != 99 else 101)
+            e.add_value("v", i if i < 80 else 42)
             if i % 10 == 0:
                 t = pyhermes.Transaction()
             t.add_event(e)
+            logger.log(e)
             if i % 10 == 9:
                 logger.log(t)
 
@@ -34,7 +36,11 @@ def test_checker():
 
         loader = pyhermes.Loader(temp)
         checker = Checker1()
-        checker.run("test", loader)
+        try:
+            checker.run("test", loader)
+            assert False
+        except pyhermes.CheckerAssertion:
+            pass
 
 
 if __name__ == "__main__":

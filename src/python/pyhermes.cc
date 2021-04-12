@@ -203,7 +203,8 @@ void init_tracker(py::module &m) {
 }
 
 void init_query(py::module &m) {
-    auto helper = py::class_<hermes::QueryHelper>(m, "QueryHelper");
+    auto helper =
+        py::class_<hermes::QueryHelper, std::shared_ptr<hermes::QueryHelper>>(m, "QueryHelper");
     helper.def(py::init<std::shared_ptr<hermes::Loader>>());
     helper.def("concurrent_events",
                py::overload_cast<uint64_t>(&hermes::QueryHelper::concurrent_events));
@@ -241,7 +242,14 @@ void init_checker(py::module &m) {
             auto loader = query->get_loader();
             auto events = loader->get_events(*transaction);
             hermes::TransactionData data{.transaction = transaction, .events = events};
-            check(data, query);
+            try {
+                check(data, query);
+            } catch (pybind11::error_already_set &e) {
+                // a little hack to bypass pybind exception conversion
+                std::lock_guard guard(assert_mutex_);
+                auto ex = hermes::CheckerAssertion(std::string(e.what()));
+                throw ex;
+            }
         }
 
         virtual void check(const hermes::TransactionData &data,
@@ -253,6 +261,8 @@ void init_checker(py::module &m) {
 
         void check(const hermes::TransactionData &data,
                    const std::shared_ptr<hermes::QueryHelper> &query) override {
+            /* Acquire GIL before calling Python code */
+            py::gil_scoped_acquire acquire;
             PYBIND11_OVERRIDE_PURE(void, Checker_, check, data, query);
         }
     };
@@ -263,7 +273,15 @@ void init_checker(py::module &m) {
                 py::overload_cast<const hermes::TransactionData &,
                                   const std::shared_ptr<hermes::QueryHelper> &>(&Checker_::check),
                 py::arg("transaction"), py::arg("query_helper"));
-    checker.def("run", &Checker_::run);
+    checker.def(
+        "run",
+        [](Checker_ &checker, const std::string &transaction_name,
+           const std::shared_ptr<hermes::Loader> &loader) {
+            /* Release GIL before calling into (potentially long-running) C++ code */
+            py::gil_scoped_release release;
+            checker.run(transaction_name, loader);
+        },
+        py::arg("transaction_name"), py::arg("loader"));
     checker.def(
         "assert_", [](const Checker_ &checker, bool condition) { checker.assert_(condition); },
         py::arg("condition"));
@@ -273,11 +291,11 @@ void init_checker(py::module &m) {
             checker.assert_(condition, message);
         },
         py::arg("condition"), py::arg("message"));
-    checker.def_property("stateless", &Checker_::stateless, &Checker_::set_stateless);
     checker.def_property("assert_exception", &Checker_::assert_exception,
                          &Checker_::set_assert_exception);
+    checker.def_property("stateless", &Checker_::stateless, &Checker_::set_stateless);
 
-    py::register_exception<hermes::CheckerAssertion>(m, "CheckerAssertion", PyExc_ArithmeticError);
+    py::register_exception<hermes::CheckerAssertion>(m, "CheckerAssertion");
 }
 
 void init_message_bus(py::module &m) {

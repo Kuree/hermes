@@ -1,7 +1,6 @@
 #include "checker.hh"
 
 #include <iostream>
-#include <mutex>
 #include <thread>
 
 #include "fmt/format.h"
@@ -17,26 +16,24 @@ void Checker::run(const std::string &transaction_name, const std::shared_ptr<Loa
         // run it in parallel. each thread gets a table
         std::vector<std::thread> threads;
         threads.reserve(tables.size());
-        std::optional<std::exception_ptr> assert;
-        std::mutex assert_mutex;
         for (auto const &table : tables) {
             std::vector<std::shared_ptr<arrow::Table>> ts = {table.table};
-            auto thread = std::thread([ts, loader, query, &assert_mutex, &assert, this]() {
+            auto thread = std::thread([ts, loader, query, this]() {
                 auto stream = TransactionStream(ts, loader.get());
                 if (assert_exception_) {
                     try {
                         for (auto &&it : stream) {
                             {
-                                std::lock_guard guard(assert_mutex);
-                                if (assert) {
+                                std::lock_guard guard(assert_mutex_);
+                                if (current_ptr_) {
                                     break;
                                 }
                             }
                             check(it.transaction, query);
                         }
                     } catch (const CheckerAssertion &ex) {
-                        std::lock_guard guard(assert_mutex);
-                        assert = std::current_exception();
+                        std::lock_guard guard(assert_mutex_);
+                        current_ptr_ = std::current_exception();
                     }
                 } else {
                     for (auto &&it : stream) {
@@ -49,8 +46,8 @@ void Checker::run(const std::string &transaction_name, const std::shared_ptr<Loa
         for (auto &thread : threads) {
             thread.join();
         }
-        if (assert_exception_ && assert) {
-            std::rethrow_exception(*assert);
+        if (assert_exception_ && current_ptr_) {
+            std::rethrow_exception(*current_ptr_);
         }
     } else {
         // linear
