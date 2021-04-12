@@ -276,6 +276,13 @@ EventBatch::iterator EventBatch::upper_bound(uint64_t time) {
     }
 }
 
+bool EventBatch::contains(uint64_t id) {
+    if (id_index_.empty()) {
+        build_id_index();
+    }
+    return id_index_.find(id) != id_index_.end();
+}
+
 void EventBatch::build_id_index() {
     for (auto const &e : *this) {
         id_index_.emplace(e->id(), e.get());

@@ -87,6 +87,8 @@ public:
         return ptr;
     }
 
+    virtual bool contains(uint64_t id) = 0;
+
     // vector interface
     using iterator = typename std::vector<std::shared_ptr<T>>::iterator;
     [[nodiscard]] auto begin() const { return array_.begin(); }
@@ -133,6 +135,8 @@ public:
 
     void set_event_name(std::string name) { event_name_ = std::move(name); }
     [[nodiscard]] const std::string &event_name() const { return event_name_; }
+
+    bool contains(uint64_t id) override;
 
 private:
     std::unordered_map<uint64_t, Event *> id_index_;

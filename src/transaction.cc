@@ -146,6 +146,21 @@ void TransactionBatch::build_time_index() {
     }
 }
 
+void TransactionBatch::build_id_index() {
+    if (!id_index_.empty()) return;
+
+    for (auto const &t : *this) {
+        id_index_.emplace(t->id(), t.get());
+    }
+}
+
+bool TransactionBatch::contains(uint64_t id) {
+    if (id_index_.empty()) {
+        build_id_index();
+    }
+    return id_index_.find(id) != id_index_.end();
+}
+
 void TransactionBatch::sort() {
     std::stable_sort(begin(), end(),
                      [](const auto &a, const auto &b) { return a->end_time() < b->end_time(); });

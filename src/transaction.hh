@@ -48,12 +48,16 @@ public:
     // we sort based on the finishing time (end time)
     void sort() override;
 
+    bool contains(uint64_t id) override;
+
 private:
     std::string transaction_name_;
 
+    std::unordered_map<uint64_t, Transaction*> id_index_;
     std::map<uint64_t, TransactionBatch::iterator> time_lower_bound_;
 
     void build_time_index();
+    void build_id_index();
 };
 
 }  // namespace hermes

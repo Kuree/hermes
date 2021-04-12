@@ -130,6 +130,37 @@ std::shared_ptr<TransactionBatch> Loader::get_transactions(const std::string &na
     return result;
 }
 
+std::shared_ptr<TransactionBatch> Loader::get_transactions(
+    const std::shared_ptr<Transaction> &transaction) {
+    auto const id = transaction->id();
+    std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
+    for (auto const *file : transactions_) {
+        if (file->type == FileInfo::FileType::transaction) {
+            auto stats = file_metadata_.at(file);
+            auto id_stats = stats.at("id");
+            std::vector<uint64_t> chunks;
+            for (uint64_t i = 0; i < id_stats.size(); i++) {
+                if (contains_value(id_stats[i], id)) {
+                    // we assume that most of the ids are stored together, so this method
+                    // should be very fast actually
+                    chunks.emplace_back(i);
+                }
+            }
+            files.emplace_back(std::make_pair(file, chunks));
+        }
+    }
+    if (files.empty()) return nullptr;
+    auto tables = load_tables(files);
+    // we expect there is only one entry
+    for (auto const &table : tables) {
+        auto t = load_transactions(table.table);
+        if (t->contains(id)) {
+            return t;
+        }
+    }
+    return nullptr;
+}
+
 std::vector<std::shared_ptr<EventBatch>> Loader::get_events(uint64_t min_time, uint64_t max_time) {
     auto tables = load_events_table(min_time, max_time);
     std::vector<std::shared_ptr<EventBatch>> result;

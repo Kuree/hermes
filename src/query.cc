@@ -95,4 +95,13 @@ TransactionBatch QueryHelper::concurrent_transactions(
                                    transaction->end_time());
 }
 
+std::shared_ptr<Transaction> QueryHelper::next_transaction(
+    const std::shared_ptr<Transaction> &transaction) {
+    // this is actually more complicated than it looks, due to the fact that streaming
+    // logic is handled differently from the query helper.
+    // because transaction has no name attached to it (it's meta-data)
+    // as a result, we need to figure out which batch it comes from
+
+}
+
 }  // namespace hermes

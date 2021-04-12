@@ -1,8 +1,9 @@
 #ifndef HERMES_LOADER_HH
 #define HERMES_LOADER_HH
 
-#include "transaction.hh"
 #include <mutex>
+
+#include "transaction.hh"
 
 namespace arrow::fs {
 class FileSystem;
@@ -114,6 +115,8 @@ public:
                                                                     uint64_t max_time);
     std::shared_ptr<TransactionBatch> get_transactions(const std::string &name, uint64_t min_time,
                                                        uint64_t max_time);
+    std::shared_ptr<TransactionBatch> get_transactions(
+        const std::shared_ptr<Transaction> &transaction);
 
     std::vector<std::shared_ptr<EventBatch>> get_events(uint64_t min_time, uint64_t max_time);
     std::shared_ptr<EventBatch> get_events(const std::string &name, uint64_t min_time,
