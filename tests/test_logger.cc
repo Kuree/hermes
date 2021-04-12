@@ -103,8 +103,8 @@ TEST(logger, tracker_lib) {  // NOLINT
     auto &batch = transactions_batches[0];
     auto t = (*batch)[0];
     auto events = loader.get_events(*t);
-    EXPECT_EQ(events.size(), 10);
-    auto v = events[9]->get_value<uint8_t>("uint8_1");
+    EXPECT_EQ(events->size(), 10);
+    auto v = (*events)[9]->get_value<uint8_t>("uint8_1");
     EXPECT_TRUE(v);
     EXPECT_EQ(*v, 9);
 }

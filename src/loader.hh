@@ -121,7 +121,7 @@ public:
 
     std::shared_ptr<TransactionStream> get_transaction_stream(const std::string &name);
 
-    EventBatch get_events(const Transaction &transaction);
+    std::shared_ptr<EventBatch> get_events(const Transaction &transaction);
 
     void stream(bool stream_transactions = true);
     void stream(MessageBus *bus, bool stream_transactions = true);

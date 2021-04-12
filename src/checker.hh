@@ -22,7 +22,7 @@ public:
     [[nodiscard]] bool assert_exception() const { return assert_exception_; }
     void set_assert_exception(bool value) { assert_exception_ = value; }
 
-    void assert_(bool value) { assert_(value, ""); }
+    void assert_(bool value) const { assert_(value, ""); }
     void assert_(bool value, const std::string &message) const;
 
 protected:

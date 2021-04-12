@@ -2,9 +2,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "../loader.hh"
+#include "../checker.hh"
 #include "../logger.hh"
-#include "../query.hh"
 #include "../serializer.hh"
 #include "../tracker.hh"
 
@@ -231,6 +230,54 @@ void init_query(py::module &m) {
                    &hermes::QueryHelper::concurrent_transactions));
 }
 
+void init_checker(py::module &m) {
+    // we need to redirect some of the functions here
+    class Checker_ : public hermes::Checker {
+    public:
+        void check(const std::shared_ptr<hermes::Transaction> &transaction,
+                   const std::shared_ptr<hermes::QueryHelper> &query) override {
+            auto loader = query->get_loader();
+            auto events = loader->get_events(*transaction);
+            hermes::TransactionData data{.transaction = transaction, .events = events};
+            check(data, query);
+        }
+
+        virtual void check(const hermes::TransactionData &data,
+                           const std::shared_ptr<hermes::QueryHelper> &query) = 0;
+    };
+
+    class PyChecker : public Checker_ {
+        using Checker_::Checker_;
+
+        void check(const hermes::TransactionData &data,
+                   const std::shared_ptr<hermes::QueryHelper> &query) override {
+            PYBIND11_OVERRIDE_PURE(void, Checker_, check, data, query);
+        }
+    };
+
+    auto checker = py::class_<Checker_, PyChecker>(m, "Checker");
+    checker.def(py::init<>());
+    checker.def("check",
+                py::overload_cast<const hermes::TransactionData &,
+                                  const std::shared_ptr<hermes::QueryHelper> &>(&Checker_::check),
+                py::arg("transaction"), py::arg("query_helper"));
+    checker.def("run", &Checker_::run);
+    checker.def(
+        "assert", [](const Checker_ &checker, bool condition) { checker.assert_(condition); },
+        py::arg("condition"));
+    checker.def(
+        "assert",
+        [](const Checker_ &checker, bool condition, const std::string &message) {
+            checker.assert_(condition, message);
+        },
+        py::arg("condition"), py::arg("message"));
+    checker.def_property("stateless", &Checker_::stateless, &Checker_::set_stateless);
+    checker.def_property("assert_exception", &Checker_::assert_exception,
+                         &Checker_::set_assert_exception);
+
+    py::register_exception<hermes::CheckerAssertion>(m, "CheckerAssertion", PyExc_ArithmeticError);
+}
+
 void init_message_bus(py::module &m) {
     auto bus = py::class_<hermes::MessageBus, std::shared_ptr<hermes::MessageBus>>(m, "MessageBus");
     bus.def("flush", &hermes::MessageBus::stop);
@@ -243,7 +290,7 @@ void init_message_bus(py::module &m) {
         py::return_value_policy::reference_internal);
 }
 
-PYBIND11_MODULE(_pyhermes, m) {
+PYBIND11_MODULE(pyhermes, m) {
     init_event(m);
     init_transaction(m);
     init_serializer(m);
@@ -252,4 +299,5 @@ PYBIND11_MODULE(_pyhermes, m) {
     init_message_bus(m);
     init_loader(m);
     init_query(m);
+    init_checker(m);
 }

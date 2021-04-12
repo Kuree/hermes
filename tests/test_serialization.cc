@@ -131,9 +131,9 @@ TEST(serialization, get_events) {  // NOLINT
     auto const &t_batch = transaction_batches[0];
     auto const &transaction = (*t_batch)[42];
     auto events = loader.get_events(*transaction);
-    EXPECT_EQ(events.size(), 42 % 10);
-    EXPECT_NE(events[0], nullptr);
-    auto v = events[0]->get_value<uint64_t>("value");
+    EXPECT_EQ(events->size(), 42 % 10);
+    EXPECT_NE((*events)[0], nullptr);
+    auto v = (*events)[0]->get_value<uint64_t>("value");
     EXPECT_TRUE(v);
     EXPECT_EQ(*v, 42);
 }

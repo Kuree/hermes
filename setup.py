@@ -84,7 +84,7 @@ class CMakeBuild(build_ext):
             ["cmake", ext.sourcedir] + cmake_args, cwd=self.build_temp
         )
         subprocess.check_call(
-            ["cmake", "--build", ".", "--target", "_pyhermes"] + build_args, cwd=self.build_temp
+            ["cmake", "--build", ".", "--target", "pyhermes"] + build_args, cwd=self.build_temp
         )
 
 
@@ -103,8 +103,6 @@ setup(
     long_description_content_type='text/x-rst',
     url="https://github.com/Kuree/hgdb-rtl",
     python_requires=">=3.6",
-    install_requires=["pyarrow", "dask[dataframe]"],
-    ext_modules=[CMakeExtension("_pyhermes")],
-    cmdclass={"build_ext": CMakeBuild},
-    packages=["pyhermes"],
+    ext_modules=[CMakeExtension("pyhermes")],
+    cmdclass={"build_ext": CMakeBuild}
 )

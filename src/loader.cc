@@ -32,8 +32,8 @@ TransactionData TransactionDataIter::operator*() const {
     data.transaction = (*transactions)[idx];
     data.events = std::make_shared<EventBatch>();
     auto events = stream_->loader_->get_events(*data.transaction);
-    data.events->reserve(events.size());
-    for (auto const &e : events) {
+    data.events->reserve(events->size());
+    for (auto const &e : *events) {
         data.events->emplace_back(e);
     }
     return data;
@@ -201,7 +201,7 @@ inline std::unordered_map<const FileInfo *, std::vector<uint64_t>> compute_searc
     return files;
 }
 
-EventBatch Loader::get_events(const Transaction &transaction) {
+std::shared_ptr<EventBatch> Loader::get_events(const Transaction &transaction) {
     auto const &ids = transaction.events();
     auto files = compute_search_space(events_, file_metadata_, ids);
 
@@ -224,12 +224,12 @@ EventBatch Loader::get_events(const Transaction &transaction) {
         }
     }
 
-    EventBatch result;
-    result.resize(transaction.events().size(), nullptr);
-    for (auto i = 0; i < result.size(); i++) {
+    auto result = std::make_shared<EventBatch>();
+    result->resize(transaction.events().size(), nullptr);
+    for (auto i = 0; i < result->size(); i++) {
         auto const id = transaction.events()[i];
         if (id_mapping.find(id) != id_mapping.end()) {
-            result[i] = id_mapping.at(id)->shared_from_this();
+            (*result)[i] = id_mapping.at(id)->shared_from_this();
         }
     }
 
