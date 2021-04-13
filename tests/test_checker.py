@@ -30,6 +30,8 @@ def test_checker():
             logger.log(e)
             if i % 10 == 9:
                 logger.log(t)
+            if i == 50:
+                pyhermes.default_bus().flush()
 
         pyhermes.default_bus().flush()
         serializer.finalize()
