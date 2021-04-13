@@ -6,9 +6,15 @@
 #include "cache.hh"
 #include "transaction.hh"
 
-namespace arrow::fs {
+namespace arrow {
+namespace fs {
 class FileSystem;
+class FileInfo;
+}  // namespace fs
+namespace io {
+class RandomAccessFile;
 }
+}  // namespace arrow
 
 namespace parquet {
 class Statistics;
@@ -113,7 +119,8 @@ class MessageBus;
 class Checker;
 class Loader {
 public:
-    explicit Loader(std::string dir);
+    explicit Loader(const std::string &dir);
+    explicit Loader(const std::vector<std::string> &dirs);
     std::vector<std::shared_ptr<TransactionBatch>> get_transactions(uint64_t min_time,
                                                                     uint64_t max_time);
     std::shared_ptr<TransactionBatch> get_transactions(const std::string &name, uint64_t min_time,
@@ -139,9 +146,7 @@ public:
         const FileInfo *, std::map<std::string, std::vector<std::shared_ptr<parquet::Statistics>>>>;
 
 private:
-    std::string dir_;
     std::vector<std::unique_ptr<FileInfo>> files_;
-    std::shared_ptr<arrow::fs::FileSystem> fs_;
     // indices
     std::vector<const FileInfo *> events_;
     std::vector<const FileInfo *> transactions_;
@@ -157,8 +162,11 @@ private:
     // stats about the folder we're reading
     LoaderStats stats_;
 
-    void load_json(const std::string &path);
-    bool preload_table(const FileInfo *info);
+    void open_dir(const std::string &dir);
+    void load_json(const arrow::fs::FileInfo &json_info,
+                   const std::shared_ptr<arrow::fs::FileSystem> &fs);
+    bool preload_table(const FileInfo *info,
+                       const std::shared_ptr<arrow::io::RandomAccessFile> &file);
     std::vector<LoaderResult> load_tables(
         const std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> &files);
     std::shared_ptr<EventBatch> load_events(const std::shared_ptr<arrow::Table> &table);

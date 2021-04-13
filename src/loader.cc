@@ -50,21 +50,13 @@ TransactionStream::TransactionStream(const std::vector<std::shared_ptr<arrow::Ta
     }
 }
 
-Loader::Loader(std::string dir) : dir_(fs::absolute(std::move(dir))) {
-    fs_ = std::make_shared<arrow::fs::LocalFileSystem>();
-    // do a LIST operation
-    for (auto const &entry : fs::directory_iterator(dir_)) {
-        auto path = fs::path(entry);
-        if (!fs::is_regular_file(path)) {
-            // we ara only interested in regular file
-            continue;
-        }
-        auto ext = path.extension();
-        if (ext == ".json") {
-            // json file, parse it and load it up
-            load_json(path);
-        }
+Loader::Loader(const std::string &dir) : Loader(std::vector<std::string>{dir}) {}
+
+Loader::Loader(const std::vector<std::string> &dirs) {
+    for (auto const &dir : dirs) {
+        open_dir(dir);
     }
+
     // compute stats. this should be very fast
     compute_stats();
     // initialize the cache based on the stats
@@ -344,15 +336,47 @@ static std::optional<T> get_member(rapidjson::Document &document, const char *me
     return std::nullopt;
 }
 
-void Loader::load_json(const std::string &path) {
-    std::ifstream stream(path);
-    if (stream.bad()) return;
-    // https://stackoverflow.com/a/2602258
-    stream.seekg(0, std::ios::end);
-    auto size = stream.tellg();
-    std::string content(size, ' ');
-    stream.seekg(0);
-    stream.read(&content[0], size);
+void Loader::open_dir(const std::string &dir) {
+    // need to detect if it's a local file system or not
+    // if it doesn't contain the uri ://, then it's local filesystem
+    std::string path;
+    if (dir.find("://") == std::string::npos) {
+        path = fs::absolute(dir);
+    } else {
+        path = dir;
+    }
+    auto fs_res = arrow::fs::FileSystemFromUriOrPath(path);
+    if (!fs_res.ok()) return;
+    auto fs = *fs_res;
+
+    // do a LIST option
+    auto selector = arrow::fs::FileSelector();
+    selector.base_dir = path;
+    auto res = fs->GetFileInfo(selector);
+    if (!res.ok())
+        return;
+    auto files = *res;
+    for (auto const &file_info : files) {
+        // notice that arrow's fs doesn't include .
+        if (file_info.extension() == "json") {
+            load_json(file_info, fs);
+        }
+    }
+}
+
+void Loader::load_json(const arrow::fs::FileInfo &json_info,
+                       const std::shared_ptr<arrow::fs::FileSystem> &fs) {
+    auto file_res = fs->OpenInputFile(json_info);
+    if (!file_res.ok()) return;
+    auto file = *file_res;
+    // read out the entire content
+    auto size_res = file->GetSize();
+    if (!size_res.ok()) return;
+    auto file_size = *size_res;
+    auto buffer_res = file->Read(file_size);
+    if (!buffer_res.ok()) return;
+    auto buffer = *buffer_res;
+    auto content = buffer->ToString();
 
     rapidjson::Document document;
     document.Parse(content.c_str());
@@ -366,14 +390,25 @@ void Loader::load_json(const std::string &path) {
     if (!opt_type) return;
     auto const &type = *opt_type;
 
-    parquet_file = fs::path(path).parent_path() / parquet_file;
+    parquet_file = fs::path(json_info.path()).parent_path() / parquet_file;
+    // make sure we can actually open this file
+    auto table_file_res = fs->OpenInputFile(parquet_file);
+    if (!table_file_res.ok()) return;
+    auto table_file = *table_file_res;
+    size_res = table_file->GetSize();
+    if (!size_res.ok()) return;
+    file_size = *size_res;
+
     auto info = std::make_unique<FileInfo>(
         type == "event" ? FileInfo::FileType::event : FileInfo::FileType::transaction,
         parquet_file);
     if (type == "event") {
         events_.emplace_back(info.get());
+        // also add to the stats
+        stats_.average_event_chunk_size += file_size;
     } else if (type == "transaction") {
         transactions_.emplace_back(info.get());
+        stats_.average_transaction_chunk_size += file_size;
     } else {
         return;
     }
@@ -382,19 +417,16 @@ void Loader::load_json(const std::string &path) {
     if (name_opt) {
         info->name = *name_opt;
     }
-
     // load table as well
     // notice that we don't actually load the entire table into memory, just
     // indices and references
-    preload_table(info.get());
+    preload_table(info.get(), table_file);
 
     files_.emplace_back(std::move(info));
 }
 
-bool Loader::preload_table(const FileInfo *file) {
-    auto res_f = fs_->OpenInputFile(file->filename);
-    if (!res_f.ok()) return false;
-    auto f = *res_f;
+bool Loader::preload_table(const FileInfo *file,
+                           const std::shared_ptr<arrow::io::RandomAccessFile> &f) {
     auto *pool = arrow::default_memory_pool();
     std::unique_ptr<parquet::arrow::FileReader> file_reader;
     auto res = parquet::arrow::OpenFile(f, pool, &file_reader);
@@ -487,21 +519,6 @@ void Loader::compute_stats() {
         } else {
             stats_.num_transaction_files++;
             stats_.num_transactions += table->num_rows();
-        }
-
-        // compute the size of the table
-        if (seen_files.find(file) == seen_files.end()) {
-            seen_files.emplace(file);
-            auto info_res = fs_->GetFileInfo(file->filename);
-            if (info_res.ok()) {
-                auto const &info = *info_res;
-                auto size = info.size();
-                if (file->type == FileInfo::FileType::event) {
-                    stats_.average_event_chunk_size += size;
-                } else {
-                    stats_.average_transaction_chunk_size += size;
-                }
-            }
         }
     }
     if (stats_.num_event_files > 0) {
