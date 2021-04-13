@@ -1,5 +1,13 @@
 #include "util.hh"
 
+#ifdef __unix__
+#include <unistd.h>
+#endif
+
+#ifdef WIN32
+#include <windows.h>
+#endif
+
 #include <filesystem>
 
 namespace hermes {
@@ -30,6 +38,23 @@ std::string which(const std::string &name) {
     }
     return "";
 }
+
+namespace os {
+uint64_t get_total_system_memory() {
+    // based on https://stackoverflow.com/a/2513561
+#ifdef __unix__
+    long pages = sysconf(_SC_PHYS_PAGES);
+    long page_size = sysconf(_SC_PAGE_SIZE);
+    return pages * page_size;
+#endif
+#ifdef WIN32
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    GlobalMemoryStatusEx(&status);
+    return status.ullTotalPhys;
+#endif
+}
+}  // namespace os
 
 namespace string {
 std::vector<std::string> split(const std::string &str, const std::string &delimiter) {

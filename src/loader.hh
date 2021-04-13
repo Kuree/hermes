@@ -3,6 +3,7 @@
 
 #include <mutex>
 
+#include "cache.hh"
 #include "transaction.hh"
 
 namespace arrow::fs {
@@ -104,6 +105,8 @@ struct LoaderStats {
     uint64_t num_transactions = 0;
     uint64_t num_event_files = 0;
     uint64_t num_transaction_files = 0;
+    uint64_t average_event_chunk_size = 0;
+    uint64_t average_transaction_chunk_size = 0;
 };
 
 class MessageBus;
@@ -147,9 +150,10 @@ private:
     FileMetadata file_metadata_;
     // local caches
     std::mutex event_cache_mutex_;
-    std::unordered_map<const arrow::Table *, std::shared_ptr<EventBatch>> event_cache_;
+    std::unique_ptr<lru_cache<const arrow::Table *, std::shared_ptr<EventBatch>>> event_cache_;
     std::mutex transaction_cache_mutex_;
-    std::unordered_map<const arrow::Table *, std::shared_ptr<TransactionBatch>> transaction_cache_;
+    std::unique_ptr<lru_cache<const arrow::Table *, std::shared_ptr<TransactionBatch>>>
+        transaction_cache_;
     // stats about the folder we're reading
     LoaderStats stats_;
 

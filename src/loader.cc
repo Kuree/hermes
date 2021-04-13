@@ -11,6 +11,7 @@
 #include "pubsub.hh"
 #include "rapidjson/document.h"
 #include "rapidjson/rapidjson.h"
+#include "util.hh"
 
 namespace fs = std::filesystem;
 
@@ -66,6 +67,24 @@ Loader::Loader(std::string dir) : dir_(fs::absolute(std::move(dir))) {
     }
     // compute stats. this should be very fast
     compute_stats();
+    // initialize the cache based on the stats
+    // get total memory
+    auto total_mem = os::get_total_system_memory();
+    // we divide the mem in 5 parts
+    // we expect the majority of the memory will be consumed by events
+    total_mem = total_mem / 5;
+    auto mem_events = total_mem * 3;
+    auto mem_transaction = total_mem;
+    auto num_events =
+        stats_.average_event_chunk_size > 0 ? mem_events / stats_.average_event_chunk_size : 16;
+    auto num_transactions = stats_.average_transaction_chunk_size > 0
+                                ? mem_transaction / stats_.average_transaction_chunk_size
+                                : 16;
+    event_cache_ =
+        std::make_unique<lru_cache<const arrow::Table *, std::shared_ptr<EventBatch>>>(num_events);
+    transaction_cache_ =
+        std::make_unique<lru_cache<const arrow::Table *, std::shared_ptr<TransactionBatch>>>(
+            num_transactions);
 }
 
 bool contains_value(const std::shared_ptr<parquet::Statistics> &stats, uint64_t value) {
@@ -423,28 +442,27 @@ std::vector<LoaderResult> Loader::load_tables(
 }
 
 std::shared_ptr<EventBatch> Loader::load_events(const std::shared_ptr<arrow::Table> &table) {
-    // TODO: implement cache replacement algorithm
-    //   for now we hold all of them in memory
     std::lock_guard guard(event_cache_mutex_);
-    if (event_cache_.find(table.get()) == event_cache_.end()) {
+    if (!event_cache_->exists(table.get())) {
         auto events = EventBatch::deserialize(table);
         // put it into cache
-        event_cache_.emplace(table.get(), std::move(events));
+        event_cache_->put(table.get(), std::move(events));
     }
-    return event_cache_.at(table.get());
+    return event_cache_->get(table.get());
 }
 
 std::shared_ptr<TransactionBatch> Loader::load_transactions(
     const std::shared_ptr<arrow::Table> &table) {
     std::lock_guard guard(transaction_cache_mutex_);
-    if (transaction_cache_.find(table.get()) == transaction_cache_.end()) {
+    if (!transaction_cache_->exists(table.get())) {
         auto transactions = TransactionBatch::deserialize(table);
-        transaction_cache_.emplace(table.get(), std::move(transactions));
+        transaction_cache_->put(table.get(), std::move(transactions));
     }
-    return transaction_cache_.at(table.get());
+    return transaction_cache_->get(table.get());
 }
 
 void Loader::compute_stats() {
+    std::unordered_set<const FileInfo *> seen_files;
     for (auto const &[info, table] : tables_) {
         auto const &[file, blk_id] = info;
         if (file->type == FileInfo::FileType::event) {
@@ -470,6 +488,28 @@ void Loader::compute_stats() {
             stats_.num_transaction_files++;
             stats_.num_transactions += table->num_rows();
         }
+
+        // compute the size of the table
+        if (seen_files.find(file) == seen_files.end()) {
+            seen_files.emplace(file);
+            auto info_res = fs_->GetFileInfo(file->filename);
+            if (info_res.ok()) {
+                auto const &info = *info_res;
+                auto size = info.size();
+                if (file->type == FileInfo::FileType::event) {
+                    stats_.average_event_chunk_size += size;
+                } else {
+                    stats_.average_transaction_chunk_size += size;
+                }
+            }
+        }
+    }
+    if (stats_.num_event_files > 0) {
+        stats_.average_event_chunk_size = stats_.average_event_chunk_size / stats_.num_event_files;
+    }
+    if (stats_.num_transaction_files > 0) {
+        stats_.average_transaction_chunk_size =
+            stats_.average_transaction_chunk_size / stats_.num_transaction_files;
     }
 }
 

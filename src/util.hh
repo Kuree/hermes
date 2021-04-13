@@ -36,6 +36,10 @@ T from_str(const std::string &val) {
 
 std::string which(const std::string &name);
 
+namespace os {
+uint64_t get_total_system_memory();
+}
+
 namespace string {
 std::vector<std::string> split(const std::string &str, const std::string &delimiter);
 }  // namespace string
