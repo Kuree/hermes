@@ -24,8 +24,6 @@ public:
     TransactionBatch concurrent_transactions(const std::string &transaction_name,
                                              const std::shared_ptr<Transaction> &transaction);
 
-    std::shared_ptr<Transaction> next_transaction(const std::shared_ptr<Transaction> &transaction);
-
     std::shared_ptr<Loader> get_loader() { return loader_; }
 
 private:
