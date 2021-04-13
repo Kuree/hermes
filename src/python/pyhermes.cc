@@ -32,14 +32,47 @@ void init_event(py::module &m) {
     event.def("__getattr__", [](const hermes::Event &event, const std::string &name) -> py::object {
         auto const &values = event.values();
         if (values.find(name) == values.end()) {
-            return py::none();
+            throw py::value_error("Event object does not have attribute " + name);
         } else {
             auto const &v = values.at(name);
             return py::detail::visit_helper<std::variant>::call(visitor(), v);
         }
     });
+    // through get item
+    event.def("__getitem__", [](const hermes::Event &e, const std::string &name) {
+        auto obj = py::cast(e);
+        auto name_obj = py::cast(name);
+        return obj.attr(name_obj);
+    });
+
+    // set attribute as well
+    event.def("__setattr__", [](hermes::Event &event, const std::string &name, bool value) {
+        event.add_value(name, value);
+    });
+    event.def("__setattr__", [](hermes::Event &event, const std::string &name, uint8_t value) {
+        event.add_value(name, value);
+    });
+    event.def("__setattr__", [](hermes::Event &event, const std::string &name, uint16_t value) {
+        event.add_value(name, value);
+    });
+    event.def("__setattr__", [](hermes::Event &event, const std::string &name, uint32_t value) {
+        event.add_value(name, value);
+    });
+    event.def("__setattr__", [](hermes::Event &event, const std::string &name, uint64_t value) {
+        event.add_value(name, value);
+    });
+    event.def("__setattr__", [](hermes::Event &event, const std::string &name,
+                                const std::string &value) { event.add_value(name, value); });
+
+    // proxy through set item
+    event.def("__setitem__",
+              [](hermes::Event &event, const std::string &name, const py::object &value) {
+                  auto event_obj = py::cast(event);
+                  py::setattr(event_obj, name.c_str(), value);
+              });
 
     event.def("__repr__", [](const hermes::Event &event) {
+        // repr is expensive so it's for debugging only
         auto const &values = event.values();
         auto result = py::dict();
         for (auto const &[name, v] : values) {
@@ -51,12 +84,20 @@ void init_event(py::module &m) {
 
     auto event_batch =
         py::class_<hermes::EventBatch, std::shared_ptr<hermes::EventBatch>>(m, "EventBatch");
+    event_batch.def(py::init<>());
     event_batch.def(
-        "__getitem__", [](const hermes::EventBatch &batch, uint64_t index) { return batch[index]; },
+        "__getitem__",
+        [](const hermes::EventBatch &batch, int64_t index) {
+            if (index >= static_cast<int64_t>(batch.size())) throw py::index_error();
+            if (index < -static_cast<int64_t>(batch.size())) throw py::index_error();
+            if (index < 0) index += static_cast<int64_t>(batch.size());
+            return batch[index];
+        },
         py::arg("index"));
     event_batch.def("__len__", [](const hermes::EventBatch &batch) { return batch.size(); });
     event_batch.def("sort", &hermes::EventBatch::sort);
     event_batch.def("where", &hermes::EventBatch::where);
+    event_batch.def("append", &hermes::EventBatch::emplace_back);
 }
 
 void init_transaction(py::module &m) {
@@ -77,12 +118,19 @@ void init_transaction(py::module &m) {
     transaction_batch.def(py::init<>());
 
     transaction_batch.def(
-        "__getitem__", [](const hermes::EventBatch &batch, uint64_t index) { return batch[index]; },
+        "__getitem__",
+        [](const hermes::EventBatch &batch, uint64_t index) {
+            if (index >= static_cast<int64_t>(batch.size())) throw py::index_error();
+            if (index < -static_cast<int64_t>(batch.size())) throw py::index_error();
+            if (index < 0) index += static_cast<int64_t>(batch.size());
+            return batch[index];
+        },
         py::arg("index"));
     transaction_batch.def("__len__",
                           [](const hermes::TransactionBatch &batch) { return batch.size(); });
     transaction_batch.def("sort", [](hermes::TransactionBatch &batch) {});
     transaction_batch.def("where", &hermes::TransactionBatch::where);
+    transaction_batch.def("append", &hermes::TransactionBatch::emplace_back);
 }
 
 void init_serializer(py::module &m) {
@@ -118,7 +166,18 @@ void init_logger(py::module &m) {
 
 void init_loader(py::module &m) {
     auto loader = py::class_<hermes::Loader, std::shared_ptr<hermes::Loader>>(m, "Loader");
-    loader.def(py::init<std::string>(), "data_dir");
+    loader.def(py::init<std::string>(), py::arg("data_dir"));
+    loader.def(py::init<std::vector<std::string>>(), py::arg("data_dirs"));
+    loader.def(py::init([](const py::args &args) {
+        std::vector<std::string> dirs;
+        dirs.reserve(args.size());
+        for (auto const &dir : args) {
+            auto str = dir.cast<std::string>();
+            dirs.emplace_back(str);
+        }
+        return std::make_unique<hermes::Loader>(dirs);
+    }));
+
     loader.def("__getitem__", [](hermes::Loader &loader, std::string &name) {
         auto stream = loader.get_transaction_stream(name);
         return stream;
