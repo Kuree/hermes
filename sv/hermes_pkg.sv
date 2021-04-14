@@ -1,10 +1,13 @@
 package hermes;
 
 // DPI imports
-import "DPI-C" function void hermes_set_output_dir(string directory);
-import "DPI-C" function chandle hermes_create_logger(string directory);
+import "DPI-C" function void hermes_set_output_dir(input string directory);
+import "DPI-C" function chandle hermes_create_logger(input string directory);
 import "DPI-C" function void hermes_create_events(input chandle logger,
-                                                  longint unsigned times[]);
+                                                  input longint unsigned times[]);
+import "DPI-C" function void hermes_create_events_id(input chandle logger,
+                                                     input longint unsigned times[],
+                                                     output chandle event_handles[]);
 import "DPI-C" function void hermes_set_values_bool(input chandle logger, input string names[],
                                                     input bit values[]);
 import "DPI-C" function void hermes_set_values_uint8(input chandle logger, input string names[],
@@ -18,6 +21,13 @@ import "DPI-C" function void hermes_set_values_uint64(input chandle logger, inpu
 import "DPI-C" function void hermes_set_values_string(input chandle logger, input string names[],
                                                       input string values[]);
 import "DPI-C" function void hermes_send_events(input chandle logger);
+
+import "DPI-C" function chandle hermes_create_tracker(input string name);
+import "DPI-C" function chandle hermes_tracker_new_transaction(input chandle tracker);
+import "DPI-C" function void hermes_transaction_finish(input chandle transaction);
+import "DPI-C" function void hermes_retire_transaction(input chandle tracker, input chandle transaction);
+import "DPI-C" function void hermes_add_event_transaction(input chandle transaction, input chandle event);
+
 import "DPI-C" function void hermes_final();
 // help functions
 import "DPI-C" function void hermes_add_dummy_serializer(input string topic);
@@ -235,6 +245,23 @@ class Logger;
         end
         hermes_final();
     endfunction
+
+endclass
+
+
+
+
+class Transaction;
+    local chandle transaction_;
+
+    function void add_event();
+
+endclass
+
+class Tracker;
+
+    local chandle tracker_;
+
 
 endclass
 

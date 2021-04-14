@@ -38,6 +38,7 @@ DPILogger::~DPILogger() {
 
 // global variables
 std::vector<DPILogger *> loggers;
+std::vector<std::shared_ptr<DPITracker>> trackers;
 std::string serializer_path;
 std::shared_ptr<hermes::Serializer> serializer_;
 
@@ -61,7 +62,15 @@ std::shared_ptr<hermes::Serializer> get_serializer() {
     return logger;
 }
 
-DPILogger *get_logger(void *logger) { return reinterpret_cast<DPILogger *>(logger); }
+inline DPILogger *get_logger(void *logger) { return reinterpret_cast<DPILogger *>(logger); }
+inline hermes::Tracker *get_tracker(void *tracker) {
+    return reinterpret_cast<hermes::Tracker *>(tracker);
+}
+inline hermes::Transaction *get_transaction(void *transaction) {
+    return reinterpret_cast<hermes::Transaction *>(transaction);
+}
+
+inline hermes::Event *get_event(void *event) { return reinterpret_cast<hermes::Event *>(event); }
 
 template <typename T>
 T *get_pointer(svOpenArrayHandle array, int index) {
@@ -77,6 +86,18 @@ T *get_pointer(svOpenArrayHandle array, int index) {
     for (auto i = low; i <= high; i++) {
         auto *v = get_pointer<uint64_t>(times, i);
         l->set_time(i, *v);
+    }
+}
+
+[[maybe_unused]] void hermes_create_events_id(void *logger, svOpenArrayHandle times,
+                                              svOpenArrayHandle event_ids) {
+    hermes_create_events(logger, times);
+    // get events and set them
+    auto *l = get_logger(logger);
+    auto events = l->events();
+    for (int i = 0; i < svSize(event_ids, 1); i++) {
+        auto *ptr = reinterpret_cast<void **>(svGetArrElemPtr1(event_ids, i));
+        *ptr = events[i].get();
     }
 }
 
@@ -171,6 +192,11 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
         delete ptr;
     }
     loggers.clear();
+    for (auto const &t : trackers) {
+        t->stop();
+    }
+
+    trackers.clear();
 
     // need to flush the subscriber as well, if any
     auto *bus = hermes::MessageBus::default_bus();
@@ -183,6 +209,35 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
     auto serializer = get_serializer();
     auto p = std::make_shared<hermes::DummyEventSerializer>(topic);
     p->connect(serializer);
+}
+
+[[maybe_unused]] void *hermes_create_tracker(const char *name) {
+    auto tracker = std::make_shared<DPITracker>(name);
+    trackers.emplace_back(tracker);
+    return tracker.get();
+}
+
+[[maybe_unused]] void *hermes_tracker_new_transaction(void *tracker) {
+    auto *t = get_tracker(tracker);
+    return t->get_new_transaction();
+}
+
+[[maybe_unused]] void hermes_transaction_finish(void *transaction) {
+    auto *t = get_transaction(transaction);
+    t->finish();
+}
+
+[[maybe_unused]] void hermes_retire_transaction(void *tracker, void *transaction) {
+    auto *tracker_ = get_tracker(tracker);
+    auto *transaction_ = get_transaction(transaction);
+
+    tracker_->retire_transaction(transaction_->shared_from_this());
+}
+
+[[maybe_unused]] void hermes_add_event_transaction(void *transaction, void *event) {
+    auto *transaction_ = get_transaction(transaction);
+    auto *event_ = get_event(event);
+    transaction_->add_event(event_);
 }
 
 // implement the add tracker to simulator

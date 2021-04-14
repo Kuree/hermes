@@ -46,19 +46,23 @@ Transaction *Tracker::get_new_transaction() {
     finished_transactions_.set_transaction_name(transaction_name_);
 }
 
+void Tracker::retire_transaction(const std::shared_ptr<Transaction> &transaction) {
+    inflight_transactions.erase(transaction);
+    finished_transactions_.emplace_back(transaction);
+
+    // decide whether to flush
+    if (finished_transactions_.size() >= transaction_flush_threshold_) {
+        flush(false);
+    }
+}
+
 void Tracker::on_message(const std::string &, const std::shared_ptr<Event> &event) {
     auto *event_ptr = event.get();
     auto *t = track(event_ptr);
     if (t) {
         if (t->finished()) {
             auto transaction = t->shared_from_this();
-            inflight_transactions.erase(transaction);
-            finished_transactions_.emplace_back(transaction);
-
-            // decide whether to flush
-            if (finished_transactions_.size() >= transaction_flush_threshold_) {
-                flush(false);
-            }
+            retire_transaction(transaction);
         }
     }
 }

@@ -24,6 +24,8 @@ public:
     [[maybe_unused]] void set_transaction_name(std::string transaction_name);
     const std::string &transaction_name() const { return transaction_name_; }
 
+    void retire_transaction(const std::shared_ptr<Transaction> &transaction);
+
     ~Tracker() { flush(true); }
     void stop() override { flush(true); }
 
