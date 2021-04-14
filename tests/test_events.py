@@ -36,6 +36,24 @@ def test_event_batch():
         assert e.time == i
 
     assert batch[-1] == batch[42-1]
+    res = batch.where(lambda event: event.time >= 20)
+    assert len(res) == 42 - 20
+    new_batch = batch[0:-1:2]
+    assert len(new_batch) == 21
+
+
+def test_transaction():
+    transaction_batch = pyhermes.TransactionBatch()
+    t = None
+    for i in range(100):
+        e = pyhermes.Event(i)
+        e.a = i
+        if i % 10 == 0:
+            t = pyhermes.Transaction()
+        t.add_event(e)
+        if i % 10 == 9:
+            transaction_batch.append(t)
+    assert len(transaction_batch) == 10
 
 
 if __name__ == "__main__":

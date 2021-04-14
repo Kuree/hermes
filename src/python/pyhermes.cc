@@ -98,6 +98,25 @@ void init_event(py::module &m) {
     event_batch.def("sort", &hermes::EventBatch::sort);
     event_batch.def("where", &hermes::EventBatch::where);
     event_batch.def("append", &hermes::EventBatch::emplace_back);
+
+    // slice
+    event_batch.def("__getitem__", [](const hermes::EventBatch &batch, const py::slice &slice) {
+        py::ssize_t start, stop, step, slice_length;
+        if (!slice.compute(static_cast<int64_t>(batch.size()), &start, &stop, &step,
+                           &slice_length)) {
+            throw py::error_already_set();
+        }
+
+        int i_start = static_cast<int>(start);
+        int i_step = static_cast<int>(step);
+        auto result = std::make_shared<hermes::EventBatch>();
+        result->reserve(slice_length);
+        for (int i = 0; i < slice_length; i++) {
+            result->emplace_back(batch[i_start]);
+            i_start += i_step;
+        }
+        return result;
+    });
 }
 
 void init_transaction(py::module &m) {
@@ -131,6 +150,26 @@ void init_transaction(py::module &m) {
     transaction_batch.def("sort", [](hermes::TransactionBatch &batch) {});
     transaction_batch.def("where", &hermes::TransactionBatch::where);
     transaction_batch.def("append", &hermes::TransactionBatch::emplace_back);
+
+    // slice
+    transaction_batch.def("__getitem__",
+                          [](const hermes::TransactionBatch &batch, const py::slice &slice) {
+                              py::ssize_t start, stop, step, slice_length;
+                              if (!slice.compute(static_cast<int64_t>(batch.size()), &start, &stop,
+                                                 &step, &slice_length)) {
+                                  throw py::error_already_set();
+                              }
+
+                              int i_start = static_cast<int>(start);
+                              int i_step = static_cast<int>(step);
+                              auto result = std::make_shared<hermes::TransactionBatch>();
+                              result->reserve(slice_length);
+                              for (int i = 0; i < slice_length; i++) {
+                                  result->emplace_back(batch[i_start]);
+                                  i_start += i_step;
+                              }
+                              return result;
+                          });
 }
 
 void init_serializer(py::module &m) {
