@@ -25,8 +25,10 @@ import "DPI-C" function void hermes_send_events(input chandle logger);
 import "DPI-C" function chandle hermes_create_tracker(input string name);
 import "DPI-C" function chandle hermes_tracker_new_transaction(input chandle tracker);
 import "DPI-C" function void hermes_transaction_finish(input chandle transaction);
-import "DPI-C" function void hermes_retire_transaction(input chandle tracker, input chandle transaction);
-import "DPI-C" function void hermes_add_event_transaction(input chandle transaction, input chandle event);
+import "DPI-C" function void hermes_retire_transaction(input chandle tracker,
+                                                       input chandle transaction);
+import "DPI-C" function void hermes_add_event_transaction(input chandle transaction,
+                                                          input chandle event_);
 
 import "DPI-C" function void hermes_final();
 // help functions
@@ -76,11 +78,26 @@ class LogEvent;
     function void add_value_string(string name, string value);
         string_[name] = value;
     endfunction
+
+    function static LogEvent copy();
+        automatic LogEvent e = new();
+        e.time_ = time_;
+        // per 7.9.9, associated array assignment is a copy assignment
+        e.bool = bool;
+        e.uint8 = uint8;
+        e.uint16 = uint16;
+        e.uint32 = uint32;
+        e.uint64 = uint64;
+        e.string_ = string_;
+        return e;
+    endfunction
+
 endclass
 
-
+typedef class Tracker;
 class Logger;
     // local values
+    local string            event_name;
     local bit               bool[$];
     local string            bool_names[$];
     local byte unsigned     uint8[$];
@@ -102,11 +119,18 @@ class Logger;
     local static int        num_events_batch = 1024;
     // all the loggers are here
     static Logger loggers[$];
+    // trackers as well
+    // notice that we can't implement sub/pub since we can pass systemverilog
+    // functions around
+    static local Tracker trackers[string][$];
+    // unused funless trackers are used
+    local LogEvent       tracker_events[$];
 
     function new(string event_name);
         this.logger_ = hermes_create_logger(event_name);
         loggers.push_back(this);
         this.num_events = 0;
+        this.event_name = event_name;
     endfunction
 
     function void log(LogEvent event_);
@@ -155,6 +179,10 @@ class Logger;
             end
         end
 
+        if (trackers.size() > 0) begin
+            tracker_events.push_back(event_.copy());
+        end
+
         this.num_events++;
         if (this.num_events > this.num_events_batch) begin
             this.flush();
@@ -177,10 +205,16 @@ class Logger;
         string            uint32_name_batch[];
         string            uint64_name_batch[];
         string            string_name_batch[];
+        // event ids. we only use this if there is tracker attached
+        chandle           event_handles[];
 
         times_batch = new[num_events];
         foreach (times[i]) begin
             times_batch[i] = times[i];
+        end
+
+        if (trackers.size() > 0) begin
+            event_handles = new[num_events];
         end
 
         // maybe the simulator will do zero-copy aliasing?
@@ -199,7 +233,12 @@ class Logger;
 
         // call DPI functions to store data
         // create events
-        hermes_create_events(logger_, times_batch);
+        if (trackers.size() == 0) begin
+            hermes_create_events(logger_, times_batch);
+        end else begin
+            hermes_create_events_id(logger_, times_batch, event_handles);
+        end
+
         if (bool_batch.size() > 0) begin
             hermes_set_values_bool(logger_, bool_name_batch, bool_batch);
         end
@@ -217,6 +256,17 @@ class Logger;
         end
         if (string_batch.size() > 0) begin
             hermes_set_values_string(logger_, string_name_batch, string_batch);
+        end
+
+        // track it if necessary
+        if (trackers.size() > 0) begin
+            foreach(trackers[name]) begin
+                if (name == this.event_name) begin
+                    foreach(trackers[name][i]) begin
+                        trackers[name][i].trigger(tracker_events, event_handles);
+                    end
+                end
+            end
         end
 
         // send events
@@ -246,22 +296,60 @@ class Logger;
         hermes_final();
     endfunction
 
+    static function void add_tracker(string topic, Tracker tracker);
+        trackers[topic].push_back(tracker);
+    endfunction
+
 endclass
-
-
 
 
 class Transaction;
-    local chandle transaction_;
+    chandle transaction_handle;
+    bit finished;
 
-    function void add_event();
+    function new(chandle t);
+        transaction_handle = t;
+    endfunction
+
+    function void add_event(chandle event_);
+        hermes_add_event_transaction(transaction_handle, event_);
+    endfunction
+
+    function void finish();
+        finished = 1'b1;
+    endfunction
 
 endclass
 
-class Tracker;
-
+virtual class Tracker;
     local chandle tracker_;
 
+    pure virtual function Transaction track(LogEvent event_);
+
+    function void trigger(LogEvent events[$], chandle event_handles[]);
+        foreach(events[i]) begin
+            Transaction transaction;
+            transaction = track(events[i]);
+
+            if (transaction == null) begin
+                return;
+            end
+
+            transaction.add_event(event_handles[i]);
+
+            if (transaction.finished) begin
+                hermes_retire_transaction(tracker_, transaction.transaction_handle);
+            end
+        end
+    endfunction
+
+    function Transaction get_new_transaction();
+        automatic chandle t;
+        automatic Transaction transaction;
+        t = hermes_tracker_new_transaction(tracker_);
+        transaction = new(t);
+        return transaction;
+    endfunction
 
 endclass
 
