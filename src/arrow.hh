@@ -15,8 +15,8 @@ class Table;
 namespace hermes {
 
 // helper functions to deal with arrow
-std::shared_ptr<arrow::Buffer> serialize(
-    const std::shared_ptr<arrow::RecordBatch> &batch, const std::shared_ptr<arrow::Schema> &schema);
+std::shared_ptr<arrow::Buffer> serialize(const std::shared_ptr<arrow::RecordBatch> &batch,
+                                         const std::shared_ptr<arrow::Schema> &schema);
 std::shared_ptr<arrow::Table> deserialize(const std::shared_ptr<arrow::Buffer> &buffer);
 
 std::shared_ptr<arrow::RecordBatch> get_batch(const std::shared_ptr<arrow::Buffer> &buffer);
@@ -29,6 +29,9 @@ uint32_t get_uint32(const std::shared_ptr<arrow::Scalar> &scalar);
 uint64_t get_uint64(const std::shared_ptr<arrow::Scalar> &scalar);
 std::string get_string(const std::shared_ptr<arrow::Scalar> &scalar);
 bool get_bool(const std::shared_ptr<arrow::Scalar> &scalar);
+
+std::vector<uint64_t> get_uint64s(const std::shared_ptr<arrow::Scalar> &scalar);
+std::vector<bool> get_bools(const std::shared_ptr<arrow::Scalar> &scalar);
 
 }  // namespace hermes
 

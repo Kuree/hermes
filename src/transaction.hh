@@ -53,11 +53,62 @@ public:
 private:
     std::string transaction_name_;
 
-    std::unordered_map<uint64_t, Transaction*> id_index_;
+    std::unordered_map<uint64_t, Transaction *> id_index_;
     std::map<uint64_t, TransactionBatch::iterator> time_lower_bound_;
 
     void build_time_index();
     void build_id_index();
+};
+
+class TransactionGroupBatch;
+class TransactionGroup : std::enable_shared_from_this<TransactionGroup> {
+    // tree based structure, also optimized for parquet
+public:
+    explicit TransactionGroup(uint64_t id);
+    TransactionGroup();
+
+    void add_transaction(const std::shared_ptr<Transaction> &transaction);
+    void add_transaction(const std::shared_ptr<TransactionGroup> &group);
+
+    [[nodiscard]] uint64_t id() const { return id_; }
+    [[nodiscard]] const std::vector<uint64_t> &transactions() const { return transactions_; }
+    [[nodiscard]] const std::vector<bool> &transaction_masks() const { return transaction_masks_; }
+    [[nodiscard]] auto start_time() const { return start_time_; }
+    [[nodiscard]] auto end_time() const { return end_time_; }
+
+private:
+    uint64_t id_;
+    std::vector<uint64_t> transactions_;
+    // true means group, false means the actual transaction
+    std::vector<bool> transaction_masks_;
+    uint64_t start_time_ = std::numeric_limits<uint64_t>::max();
+    uint64_t end_time_ = 0;
+
+    static uint64_t id_allocator_;
+
+    friend class TransactionGroupBatch;
+};
+
+class TransactionGroupBatch : public Batch<TransactionGroup, TransactionGroupBatch> {
+public:
+    void set_transaction_name(std::string name) { transaction_name_ = std::move(name); }
+    [[nodiscard]] const std::string &transaction_name() const { return transaction_name_; }
+
+    [[nodiscard]] std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>>
+    serialize() const noexcept override;
+    // factory method to construct transaction group batch
+    static std::unique_ptr<TransactionGroupBatch> deserialize(
+        const std::shared_ptr<arrow::Table> &table);
+
+    void sort() override;
+
+    bool contains(uint64_t id) override;
+
+private:
+    std::string transaction_name_;
+    std::unordered_map<uint64_t, TransactionGroup *> id_index_;
+
+    void build_index();
 };
 
 }  // namespace hermes
