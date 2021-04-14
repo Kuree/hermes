@@ -18,8 +18,7 @@ fs::path get_build_dir(const fs::path &root) {
     for (auto const &dir : fs::directory_iterator(root)) {
         std::string filename = dir.path();
         if (filename.find("build") != std::string::npos) {
-            if (result.string().size() < filename.size())
-            result = dir.path();
+            if (result.string().size() < filename.size()) result = dir.path();
         }
     }
     return result;
@@ -102,6 +101,40 @@ TEST(logger, tracker_lib) {  // NOLINT
     auto transactions_batches = loader.get_transactions(0, 2000);
     auto &batch = transactions_batches[0];
     auto t = (*batch)[0];
+    auto events = loader.get_events(*t);
+    EXPECT_EQ(events->size(), 10);
+    auto v = (*events)[9]->get_value<uint8_t>("uint8_1");
+    EXPECT_TRUE(v);
+    EXPECT_EQ(*v, 9);
+}
+
+TEST(tracker, sv) {  // NOLINT
+                     // first check if Xcelium is available or not
+    auto xrun = hermes::which("xrun");
+    if (xrun.empty()) GTEST_SKIP_("xrun not available");
+
+    TempDirectory temp;
+
+    auto root = get_root_dir();
+    auto tracker_lib = get_tracker_lib(root);
+    EXPECT_TRUE(fs::exists(tracker_lib));
+
+    auto sv_pkg = root / "sv" / "hermes_pkg.sv";
+    auto test_tracker_sv = root / "tests" / "test_tracker.sv";
+    EXPECT_TRUE(fs::exists(sv_pkg));
+    EXPECT_TRUE(fs::exists(test_tracker_sv));
+    auto so = get_so(root);
+    EXPECT_TRUE(fs::exists(so));
+
+    const std::vector<std::string> args = {"xrun", sv_pkg,    test_tracker_sv, "-sv_lib",
+                                           so,     "-sv_lib", tracker_lib};
+    auto p = hermes::Process(args, temp.path());
+    p.wait();
+
+    hermes::Loader loader(temp.path());
+    auto transaction_batches = loader.get_transactions("test-transaction", 0, 1000);
+    EXPECT_EQ(transaction_batches->size(), 2000 / 10);
+    auto t = (*transaction_batches)[0];
     auto events = loader.get_events(*t);
     EXPECT_EQ(events->size(), 10);
     auto v = (*events)[9]->get_value<uint8_t>("uint8_1");

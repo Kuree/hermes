@@ -214,6 +214,8 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
 [[maybe_unused]] void *hermes_create_tracker(const char *name) {
     auto tracker = std::make_shared<DPITracker>(name);
     trackers.emplace_back(tracker);
+    auto serializer = get_serializer();
+    tracker->set_serializer(serializer);
     return tracker.get();
 }
 

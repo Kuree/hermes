@@ -263,10 +263,11 @@ class Logger;
             foreach(trackers[name]) begin
                 if (name == this.event_name) begin
                     foreach(trackers[name][i]) begin
-                        trackers[name][i].trigger(tracker_events, event_handles);
+                        trackers[name][i].trigger(name, tracker_events, event_handles);
                     end
                 end
             end
+            tracker_events.delete();
         end
 
         // send events
@@ -324,12 +325,17 @@ endclass
 virtual class Tracker;
     local chandle tracker_;
 
-    pure virtual function Transaction track(LogEvent event_);
+    function new(string transaction_name);
+        tracker_ = hermes_create_tracker(transaction_name);
+    endfunction
 
-    function void trigger(LogEvent events[$], chandle event_handles[]);
+    pure virtual function Transaction track(string topic, LogEvent event_);
+
+    function void trigger(string name, LogEvent events[$], chandle event_handles[]);
+        $display("event size: %d handle size: %d", events.size(), event_handles.size());
         foreach(events[i]) begin
             Transaction transaction;
-            transaction = track(events[i]);
+            transaction = track(name, events[i]);
 
             if (transaction == null) begin
                 return;
