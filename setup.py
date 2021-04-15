@@ -95,7 +95,7 @@ with open(os.path.join(root, "VERSION")) as f:
     version = f.read().strip()
 
 setup(
-    name='hermes',
+    name='pyhermes',
     version=version,
     author='Keyi Zhang',
     author_email='keyi@cs.stanford.edu',
