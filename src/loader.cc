@@ -74,21 +74,28 @@ Loader::Loader(const std::vector<std::string> &dirs) {
     // initialize the cache based on the stats
     // get total memory
     auto total_mem = os::get_total_system_memory();
-    // we divide the mem in 5 parts
     // we expect the majority of the memory will be consumed by events
-    total_mem = total_mem / 5;
+    total_mem = total_mem / 6;
     auto mem_events = total_mem * 3;
     auto mem_transaction = total_mem;
+    auto mem_transaction_group = total_mem;
     auto num_events =
         stats_.average_event_chunk_size > 0 ? mem_events / stats_.average_event_chunk_size : 16;
     auto num_transactions = stats_.average_transaction_chunk_size > 0
                                 ? mem_transaction / stats_.average_transaction_chunk_size
                                 : 16;
+    auto num_transaction_groups =
+        stats_.average_transaction_group_chunk_size > 0
+            ? mem_transaction_group / stats_.average_transaction_group_chunk_size
+            : 16;
     event_cache_ =
         std::make_unique<lru_cache<const arrow::Table *, std::shared_ptr<EventBatch>>>(num_events);
     transaction_cache_ =
         std::make_unique<lru_cache<const arrow::Table *, std::shared_ptr<TransactionBatch>>>(
             num_transactions);
+    transaction_group_cache_ =
+        std::make_unique<lru_cache<const arrow::Table *, std::shared_ptr<TransactionGroupBatch>>>(
+            num_transaction_groups);
 }
 
 bool contains_value(const std::shared_ptr<parquet::Statistics> &stats, uint64_t value) {
@@ -166,10 +173,9 @@ std::vector<std::shared_ptr<TransactionBatch>> Loader::get_transactions(uint64_t
 template <typename T>
 std::shared_ptr<T> merge_batch(const std::shared_ptr<T> &left, const std::shared_ptr<T> right,
                                const std::string &name) {
-    auto temp = left;
     auto result = std::make_shared<T>();
-    result->reserve(temp->size() + right->size());
-    result->insert(result->end(), temp->begin(), temp->end());
+    result->reserve(left->size() + right->size());
+    result->insert(result->end(), left->begin(), left->end());
     result->insert(result->end(), right->begin(), right->end());
     result->set_transaction_name(name);
     return result;
@@ -485,6 +491,7 @@ void Loader::load_json(const arrow::fs::FileInfo &json_info,
         }
         case FileInfo::FileType::transaction_group: {
             transaction_groups_.emplace_back(info.get());
+            stats_.average_transaction_group_chunk_size += file_size;
         }
     }
     // get name
@@ -582,36 +589,52 @@ void Loader::compute_stats() {
     std::unordered_set<const FileInfo *> seen_files;
     for (auto const &[info, table] : tables_) {
         auto const &[file, blk_id] = info;
-        if (file->type == FileInfo::FileType::event) {
-            stats_.num_event_files++;
-            stats_.num_events += table->num_rows();
-            // need to load the column stats
+        switch (file->type) {
+            case FileInfo::FileType::event: {
+                stats_.num_event_files++;
+                stats_.num_events += table->num_rows();
+                // need to load the column stats
 
-            auto const &stats = file_metadata_.at(file).at("time")[blk_id];
-            auto typed =
-                std::reinterpret_pointer_cast<parquet::TypedStatistics<arrow::UInt64Type>>(stats);
-            auto min = typed->min();
-            auto max = typed->max();
+                auto const &stats = file_metadata_.at(file).at("time")[blk_id];
+                auto typed =
+                    std::reinterpret_pointer_cast<parquet::TypedStatistics<arrow::UInt64Type>>(
+                        stats);
+                auto min = typed->min();
+                auto max = typed->max();
 
-            if (min < stats_.min_event_time) {
-                stats_.min_event_time = min;
+                if (min < stats_.min_event_time) {
+                    stats_.min_event_time = min;
+                }
+
+                if (max > stats_.max_event_time) {
+                    stats_.max_event_time = max;
+                }
+                break;
             }
-
-            if (max > stats_.max_event_time) {
-                stats_.max_event_time = max;
+            case FileInfo::FileType::transaction: {
+                stats_.num_transaction_files++;
+                stats_.num_transactions += table->num_rows();
+                break;
             }
-
-        } else {
-            stats_.num_transaction_files++;
-            stats_.num_transactions += table->num_rows();
+            case FileInfo::FileType::transaction_group: {
+                stats_.num_transaction_group_files++;
+                stats_.num_transaction_groups += table->num_rows();
+                break;
+            }
         }
     }
+
+    // actually compute the average
     if (stats_.num_event_files > 0) {
         stats_.average_event_chunk_size = stats_.average_event_chunk_size / stats_.num_event_files;
     }
     if (stats_.num_transaction_files > 0) {
         stats_.average_transaction_chunk_size =
             stats_.average_transaction_chunk_size / stats_.num_transaction_files;
+    }
+    if (stats_.num_transaction_group_files > 0) {
+        stats_.average_transaction_group_chunk_size =
+            stats_.average_transaction_group_chunk_size / stats_.num_transaction_group_files;
     }
 }
 

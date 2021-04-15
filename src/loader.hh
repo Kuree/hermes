@@ -111,10 +111,13 @@ struct LoaderStats {
     uint64_t max_event_time = 0;
     uint64_t num_events = 0;
     uint64_t num_transactions = 0;
+    uint64_t num_transaction_groups = 0;
     uint64_t num_event_files = 0;
     uint64_t num_transaction_files = 0;
+    uint64_t num_transaction_group_files = 0;
     uint64_t average_event_chunk_size = 0;
     uint64_t average_transaction_chunk_size = 0;
+    uint64_t average_transaction_group_chunk_size = 0;
 };
 
 class MessageBus;

@@ -170,3 +170,37 @@ TEST(serilizaiton, transaction_stream) {  // NOLINT
         EXPECT_GE(events->size(), 1);
     }
 }
+
+TEST(serialization, transaction_group) {  // NOLINT
+    TempDirectory dir;
+
+    hermes::TransactionGroupBatch batch;
+    constexpr auto num_group = 1000;
+    batch.reserve(num_group);
+    uint64_t time = 0;
+    for (auto i = 0; i < num_group; i++) {
+        auto group = std::make_shared<hermes::TransactionGroup>();
+        for (int j = 0; j < (i % 10 + 1); j++) {
+            auto num_events = i % 10 + 1;
+            auto transaction = std::make_shared<hermes::Transaction>();
+            for (auto k = 0; k < num_events; k++) {
+                auto e = std::make_shared<hermes::Event>(time++);
+                transaction->add_event(e);
+            }
+            group->add_transaction(transaction);
+        }
+        batch.emplace_back(group);
+    }
+    batch.set_transaction_name("test");
+
+    hermes::Serializer s(dir.path());
+    s.serialize(batch);
+    s.finalize();
+
+    hermes::Loader loader(dir.path());
+    auto new_batch = loader.get_transaction_groups("test", 0, num_group * 10);
+    EXPECT_EQ(new_batch->size(), num_group);
+    for (auto const &group: *new_batch) {
+        EXPECT_GT(group->size(), 0);
+    }
+}

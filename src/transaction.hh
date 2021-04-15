@@ -77,6 +77,8 @@ public:
     [[nodiscard]] auto start_time() const { return start_time_; }
     [[nodiscard]] auto end_time() const { return end_time_; }
 
+    [[nodiscard]] auto size() const { return transactions_.size(); }
+
 private:
     uint64_t id_;
     std::vector<uint64_t> transactions_;

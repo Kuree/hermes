@@ -47,7 +47,7 @@ TEST(transaction_group, serilization) { // NOLINT
         if (i % 2 == 0) {
             for (int j = 0; j < (i % 10 + 1); j++) {
                 auto num_events = i % 10 + 1;
-                auto transaction = std::make_shared<hermes::Transaction>(i);
+                auto transaction = std::make_shared<hermes::Transaction>();
                 for (auto k = 0; k < num_events; k++) {
                     auto e = std::make_shared<hermes::Event>(time++);
                     transaction->add_event(e);
