@@ -59,6 +59,13 @@ void DummyEventSerializer::flush() {
             transactions.clear();
         }
     }
+
+    for (auto &[name, groups] : transaction_groups_) {
+        if (!groups.empty()) {
+            serializer_->serialize(groups);
+            groups.clear();
+        }
+    }
 }
 
 void DummyEventSerializer::stop() {

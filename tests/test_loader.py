@@ -50,5 +50,46 @@ def test_loader_stream():
         assert transactions[4].id > 0
 
 
+def test_transaction_group_stream():
+    with tempfile.TemporaryDirectory() as temp:
+        temp = "temp"
+        logger = pyhermes.Logger("test")
+        dummy_serializer = pyhermes.DummyEventSerializer()
+        serializer = pyhermes.Serializer(temp)
+        dummy_serializer.connect(serializer)
+
+        time = 0
+        for i in range(100):
+            g = pyhermes.TransactionGroup()
+            for t in range(10):
+                transaction = pyhermes.Transaction()
+                for e in range(5):
+                    e = pyhermes.Event(time)
+                    time += 1
+                    transaction.add_event(e)
+                    logger.log(e)
+                g.add_transaction(transaction)
+                logger.log(transaction)
+            # use a new topic to avoid stream conflict
+            logger.log("test-g", g)
+
+        pyhermes.default_bus().flush()
+        serializer.finalize()
+
+        loader = pyhermes.Loader(temp)
+        groups = loader["test-g"]
+        assert len(groups) == 100
+        count = 0
+        for group in groups:
+            assert group.is_group
+            assert len(group) == 10
+            t = group[0]
+            assert not t.is_group
+            e = t[1]
+            assert isinstance(e, pyhermes.Event)
+            count += 1
+        assert count == len(groups)
+
+
 if __name__ == "__main__":
-    test_loader_stream()
+    test_transaction_group_stream()

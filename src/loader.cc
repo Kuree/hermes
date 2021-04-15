@@ -79,7 +79,7 @@ TransactionData TransactionDataIter::operator*() const {
         data.group->group = (*groups)[idx];
 
         // recursively construct the values
-
+        load_transaction_group(*data.group, stream_->loader_);
     } else {
         auto transactions = stream_->loader_->load_transactions(table);
         data.transaction = (*transactions)[idx];

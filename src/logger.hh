@@ -15,6 +15,16 @@ public:
     void log(const std::shared_ptr<Transaction> &transaction) { publish(topic_, transaction); }
     void log(const std::shared_ptr<TransactionGroup> &group) { publish(topic_, group); }
 
+    void log(const std::string &topic, const std::shared_ptr<Transaction> &transaction) {
+        publish(topic, transaction);
+    }
+    void log(const std::string &topic, const std::shared_ptr<Event> &event) {
+        publish(topic, event);
+    }
+    void log(const std::string &topic, const std::shared_ptr<TransactionGroup> &group) {
+        publish(topic, group);
+    }
+
 protected:
     std::string topic_;
 };
