@@ -106,6 +106,7 @@ public:
     void sort() override;
 
     bool contains(uint64_t id) override;
+    std::shared_ptr<TransactionGroup> at(uint64_t id);
 
 private:
     std::string transaction_name_;

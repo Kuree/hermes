@@ -17,7 +17,7 @@ void Checker::run(const std::string &transaction_name, const std::shared_ptr<Loa
         std::vector<std::thread> threads;
         threads.reserve(tables.size());
         for (auto const &table : tables) {
-            std::vector<std::shared_ptr<arrow::Table>> ts = {table.table};
+            std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> ts = {{false, table.table}};
             auto thread = std::thread([ts, loader, query, this]() {
                 auto stream = TransactionStream(ts, loader.get());
                 if (assert_exception_) {
@@ -51,10 +51,10 @@ void Checker::run(const std::string &transaction_name, const std::shared_ptr<Loa
         }
     } else {
         // linear
-        std::vector<std::shared_ptr<arrow::Table>> ts;
+        std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> ts;
         ts.reserve(tables.size());
         for (auto const &res : tables) {
-            ts.emplace_back(res.table);
+            ts.emplace_back(std::make_pair(false, res.table));
         }
         auto stream = TransactionStream(ts, loader.get());
         for (auto &&it : stream) {

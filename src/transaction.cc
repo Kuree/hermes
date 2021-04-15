@@ -301,6 +301,13 @@ bool TransactionGroupBatch::contains(uint64_t id) {
     return id_index_.find(id) != id_index_.end();
 }
 
+std::shared_ptr<TransactionGroup> TransactionGroupBatch::at(uint64_t id) {
+    if (id_index_.empty())
+        return nullptr;
+    else
+        id_index_.at(id)->shared_from_this();
+}
+
 void TransactionGroupBatch::build_index() {
     for (auto const &t : *this) {
         id_index_.emplace(t->id(), t.get());

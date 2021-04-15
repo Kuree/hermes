@@ -41,8 +41,14 @@ struct LoaderResult {
 
 struct TransactionData {
 public:
+    struct TransactionGroupData {
+        std::shared_ptr<TransactionGroup> group;
+        std::vector<TransactionData> values;
+    };
+
     std::shared_ptr<Transaction> transaction;
     std::shared_ptr<EventBatch> events;
+    std::optional<TransactionGroupData> group;
 
     template <std::size_t N>
     decltype(auto) get() const {
@@ -50,7 +56,11 @@ public:
             return transaction;
         else if constexpr (N == 1)
             return events;
+        else if constexpr (N == 2)
+            return group;
     }
+
+    [[nodiscard]] bool is_group() const { return group.has_value(); }
 };
 
 class TransactionStream;
@@ -89,7 +99,8 @@ private:
 class Loader;
 class TransactionStream {
 public:
-    TransactionStream(const std::vector<std::shared_ptr<arrow::Table>> &tables, Loader *loader);
+    TransactionStream(const std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> &tables,
+                      Loader *loader);
 
     [[nodiscard]] inline TransactionDataIter begin() { return TransactionDataIter(this, 0); }
     [[nodiscard]] inline TransactionDataIter end() {
@@ -99,7 +110,7 @@ public:
     [[nodiscard]] uint64_t size() const { return num_entries_; }
 
 private:
-    std::map<uint64_t, std::shared_ptr<arrow::Table>> tables_;
+    std::map<uint64_t, std::pair<bool, std::shared_ptr<arrow::Table>>> tables_;
     uint64_t num_entries_ = 0;
     Loader *loader_;
 
@@ -127,6 +138,7 @@ public:
     explicit Loader(const std::string &dir);
     explicit Loader(const std::vector<std::string> &dirs);
     std::shared_ptr<Transaction> get_transaction(uint64_t id);
+    std::shared_ptr<TransactionGroup> get_transaction_group(uint64_t id);
     std::vector<std::shared_ptr<TransactionBatch>> get_transactions(uint64_t min_time,
                                                                     uint64_t max_time);
     std::shared_ptr<TransactionBatch> get_transactions(const std::string &name, uint64_t min_time,

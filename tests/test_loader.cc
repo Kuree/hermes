@@ -89,7 +89,7 @@ TEST_F(LoaderTest, stream_iter) {  // NOLINT
     hermes::Loader loader(dir.path());
     auto stream = loader.get_transaction_stream(event_name);
     uint64_t num_trans = 0;
-    for (auto const &[transaction, events]: *stream) {
+    for (auto const &[transaction, events, _]: *stream) {
         EXPECT_EQ(transaction->id(), num_trans);
         EXPECT_EQ(events->size(), chunk_size);
         num_trans++;

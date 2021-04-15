@@ -29,6 +29,37 @@ std::string FileInfo::type_str(FileType type) {
     return "";
 }
 
+void load_transaction(TransactionData &data, Loader *loader) {
+    data.events = std::make_shared<EventBatch>();
+    auto events = loader->get_events(*data.transaction);
+    data.events->reserve(events->size());
+    for (auto const &e : *events) {
+        data.events->emplace_back(e);
+    }
+}
+
+void load_transaction_group(TransactionData::TransactionGroupData &data, Loader *loader) {
+    // assume the group is already set
+    auto const &ts = data.group->transactions();
+    auto const &masks = data.group->transaction_masks();
+    data.values.reserve(ts.size());
+    for (auto i = 0; i < data.group->size(); i++) {
+        auto tid = ts[i];
+        auto is_group = masks[i];
+        TransactionData d;
+        if (is_group) {
+            d.group = TransactionData::TransactionGroupData();
+            (*d.group).group = loader->get_transaction_group(tid);
+            load_transaction_group(*d.group, loader);
+        } else {
+            d.transaction = loader->get_transaction(tid);
+            // load the event and get the events
+            load_transaction(d, loader);
+        }
+        data.values.emplace_back(d);
+    }
+}
+
 TransactionData TransactionDataIter::operator*() const {
     TransactionData data;
     if (current_row_ >= stream_->size()) {
@@ -37,28 +68,34 @@ TransactionData TransactionDataIter::operator*() const {
     // need to load transactions
     // figure out which table to load
     auto table_iter = stream_->tables_.lower_bound(current_row_);
-    auto const &table = table_iter->second;
-    auto transactions = stream_->loader_->load_transactions(table);
+    auto const &[is_group, table] = table_iter->second;
     // compute the index
     auto offset = table_iter->first - current_row_;
     auto idx = table->num_rows() - offset;
-    data.transaction = (*transactions)[idx];
-    data.events = std::make_shared<EventBatch>();
-    auto events = stream_->loader_->get_events(*data.transaction);
-    data.events->reserve(events->size());
-    for (auto const &e : *events) {
-        data.events->emplace_back(e);
+
+    if (is_group) {
+        auto groups = stream_->loader_->load_transaction_groups(table);
+        data.group = TransactionData::TransactionGroupData();
+        data.group->group = (*groups)[idx];
+
+        // recursively construct the values
+
+    } else {
+        auto transactions = stream_->loader_->load_transactions(table);
+        data.transaction = (*transactions)[idx];
+        load_transaction(data, stream_->loader_);
     }
+
     return data;
 }
 
-TransactionStream::TransactionStream(const std::vector<std::shared_ptr<arrow::Table>> &tables,
-                                     Loader *loader)
+TransactionStream::TransactionStream(
+    const std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> &tables, Loader *loader)
     : loader_(loader) {
     num_entries_ = 0;
-    for (auto const &table : tables) {
+    for (auto const &[group, table] : tables) {
         num_entries_ += table->num_rows();
-        tables_.emplace(num_entries_, table);
+        tables_.emplace(num_entries_, std::make_pair(group, table));
     }
 }
 
@@ -130,25 +167,52 @@ std::shared_ptr<Transaction> Loader::get_transaction(uint64_t id) {
     // find out ids
     std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
     for (auto const *file : transactions_) {
-        if (file->type == FileInfo::FileType::transaction) {
-            auto stats = file_metadata_.at(file);
-            auto id_stats = stats.at("id");
-            std::vector<uint64_t> chunks;
-            for (uint64_t i = 0; i < id_stats.size(); i++) {
-                if (contains_value(id_stats[i], id)) {
-                    // we assume that most of the ids are stored together, so this method
-                    // should be very fast actually
-                    chunks.emplace_back(i);
-                }
+        auto stats = file_metadata_.at(file);
+        auto id_stats = stats.at("id");
+        std::vector<uint64_t> chunks;
+        for (uint64_t i = 0; i < id_stats.size(); i++) {
+            if (contains_value(id_stats[i], id)) {
+                // we assume that most of the ids are stored together, so this method
+                // should be very fast actually
+                chunks.emplace_back(i);
             }
-            files.emplace_back(std::make_pair(file, chunks));
         }
+        files.emplace_back(std::make_pair(file, chunks));
     }
     if (files.empty()) return nullptr;
     auto tables = load_tables(files);
     // we expect there is only one entry
     for (auto const &table : tables) {
         auto t = load_transactions(table.table);
+        if (t->contains(id)) {
+            return t->at(id);
+        }
+    }
+    return nullptr;
+}
+
+std::shared_ptr<TransactionGroup> Loader::get_transaction_group(uint64_t id) {
+    // TODO: refactor this
+    // find out ids
+    std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
+    for (auto const *file : transaction_groups_) {
+        auto stats = file_metadata_.at(file);
+        auto id_stats = stats.at("id");
+        std::vector<uint64_t> chunks;
+        for (uint64_t i = 0; i < id_stats.size(); i++) {
+            if (contains_value(id_stats[i], id)) {
+                // we assume that most of the ids are stored together, so this method
+                // should be very fast actually
+                chunks.emplace_back(i);
+            }
+        }
+        files.emplace_back(std::make_pair(file, chunks));
+    }
+    if (files.empty()) return nullptr;
+    auto tables = load_tables(files);
+    // we expect there is only one entry
+    for (auto const &table : tables) {
+        auto t = load_transaction_groups(table.table);
         if (t->contains(id)) {
             return t->at(id);
         }
@@ -351,20 +415,21 @@ std::shared_ptr<EventBatch> Loader::get_events(const Transaction &transaction) {
 
 std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::string &name) {
     // need to find files
-    const FileInfo *info = nullptr;
+    std::unordered_set<const FileInfo *> files;
     for (auto const &file : files_) {
-        if (file->name == name && file->type == FileInfo::FileType::transaction) {
-            info = file.get();
-            break;
+        if (file->name == name && (file->type == FileInfo::FileType::transaction ||
+                                   file->type == FileInfo::FileType::transaction_group)) {
+            files.emplace(file.get());
         }
     }
-    if (!info) return nullptr;
+    if (files.empty()) return nullptr;
     // need to gather all the tables given the info
-    std::vector<std::shared_ptr<arrow::Table>> tables;
+    std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> tables;
     for (auto const &[entry, table] : tables_) {
         auto const &[f, c_id] = entry;
-        if (f == info) {
-            tables.emplace_back(table);
+        if (files.find(f) != files.end()) {
+            tables.emplace_back(
+                std::make_pair(f->type == FileInfo::FileType::transaction_group, table));
         }
     }
 
