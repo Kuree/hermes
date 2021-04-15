@@ -305,7 +305,7 @@ std::shared_ptr<TransactionGroup> TransactionGroupBatch::at(uint64_t id) {
     if (id_index_.empty())
         return nullptr;
     else
-        id_index_.at(id)->shared_from_this();
+        return id_index_.at(id)->shared_from_this();
 }
 
 void TransactionGroupBatch::build_index() {

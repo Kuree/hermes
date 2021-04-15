@@ -29,6 +29,17 @@ void MessageBus::publish(const std::string &topic,
     }
 }
 
+void MessageBus::publish(const std::string &topic, const std::shared_ptr<TransactionGroup> &group) {
+    for (auto const &[name, subs] : subscribers_) {
+        if (fnmatch(name.c_str(), topic.c_str(), FNM_EXTMATCH) == 0) {
+            // this is a match
+            for (auto const &sub : subs) {
+                sub->on_message(topic, group);
+            }
+        }
+    }
+}
+
 void MessageBus::add_subscriber(const std::string &topic, std::shared_ptr<Subscriber> &subscriber) {
     subscribers_[topic].emplace(subscriber);
 }
@@ -65,6 +76,14 @@ void MessageBus::stop() const {
 bool Publisher::publish(const std::string &topic, const std::shared_ptr<Event> &event) {
     if (bus_) {
         bus_->publish(topic, event);
+        return true;
+    }
+    return false;
+}
+
+bool Publisher::publish(const std::string &topic, const std::shared_ptr<TransactionGroup> &group) {
+    if (bus_) {
+        bus_->publish(topic, group);
         return true;
     }
     return false;

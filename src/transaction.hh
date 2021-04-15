@@ -62,7 +62,7 @@ private:
 };
 
 class TransactionGroupBatch;
-class TransactionGroup : std::enable_shared_from_this<TransactionGroup> {
+class TransactionGroup : public std::enable_shared_from_this<TransactionGroup> {
     // tree based structure, also optimized for parquet
 public:
     explicit TransactionGroup(uint64_t id);

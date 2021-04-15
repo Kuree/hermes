@@ -10,10 +10,11 @@ namespace hermes {
 class Publisher;
 class Subscriber;
 
-class MessageBus: public std::enable_shared_from_this<MessageBus> {
+class MessageBus : public std::enable_shared_from_this<MessageBus> {
 public:
     void publish(const std::string &topic, const std::shared_ptr<Event> &event);
     void publish(const std::string &topic, const std::shared_ptr<Transaction> &transaction);
+    void publish(const std::string &topic, const std::shared_ptr<TransactionGroup> &group);
     void add_subscriber(const std::string &topic, std::shared_ptr<Subscriber> &subscriber);
     void unsubscribe(const std::shared_ptr<Subscriber> &sub);
 
@@ -32,6 +33,7 @@ public:
 
     bool publish(const std::string &topic, const std::shared_ptr<Transaction> &transaction);
     bool publish(const std::string &topic, const std::shared_ptr<Event> &event);
+    bool publish(const std::string &topic, const std::shared_ptr<TransactionGroup> &group);
 
 private:
     MessageBus *bus_;
@@ -47,6 +49,8 @@ protected:
     virtual void on_message(const std::string &topic, const std::shared_ptr<Event> &event) {}
     virtual void on_message(const std::string &topic,
                             const std::shared_ptr<Transaction> &transaction) {}
+    virtual void on_message(const std::string &topic,
+                            const std::shared_ptr<TransactionGroup> &group) {}
 
     MessageBus *bus_ = nullptr;
 

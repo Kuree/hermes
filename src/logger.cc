@@ -33,6 +33,15 @@ void DummyEventSerializer::on_message(const std::string &topic,
     }
 }
 
+void DummyEventSerializer::on_message(const std::string &topic,
+                                      const std::shared_ptr<TransactionGroup> &group) {
+    transaction_groups_[topic].emplace_back(group);
+
+    if (transaction_groups_.at(topic).transaction_name().empty()) {
+        transaction_groups_.at(topic).set_transaction_name(topic);
+    }
+}
+
 void DummyEventSerializer::flush() {
     if (!serializer_) return;
 

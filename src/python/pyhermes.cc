@@ -17,6 +17,45 @@ struct visitor {
     }
 };
 
+
+template<typename T>
+void init_batch(py::class_<T, std::shared_ptr<T>> &batch_class) {
+    batch_class.def(py::init<>());
+    batch_class.def(
+        "__getitem__",
+        [](const T &batch, int64_t index) {
+          if (index >= static_cast<int64_t>(batch.size())) throw py::index_error();
+          if (index < -static_cast<int64_t>(batch.size())) throw py::index_error();
+          if (index < 0) index += static_cast<int64_t>(batch.size());
+          return batch[index];
+        },
+        py::arg("index"));
+    batch_class.def("__len__", [](const T &batch) { return batch.size(); });
+    batch_class.def("sort", &T::sort);
+    batch_class.def("where", &T::where);
+    batch_class.def("append", &T::emplace_back);
+
+    // slice
+    batch_class.def("__getitem__", [](const T &batch, const py::slice &slice) {
+      py::ssize_t start, stop, step, slice_length;
+      if (!slice.compute(static_cast<int64_t>(batch.size()), &start, &stop, &step,
+                         &slice_length)) {
+          throw py::error_already_set();
+      }
+
+      int i_start = static_cast<int>(start);
+      int i_step = static_cast<int>(step);
+      auto result = std::make_shared<T>();
+      result->reserve(slice_length);
+      for (int i = 0; i < slice_length; i++) {
+          result->emplace_back(batch[i_start]);
+          i_start += i_step;
+      }
+      return result;
+    });
+}
+
+
 void init_event(py::module &m) {
     auto event = py::class_<hermes::Event, std::shared_ptr<hermes::Event>>(m, "Event");
     event.def(py::init<uint64_t>(), py::arg("time"));
@@ -84,39 +123,7 @@ void init_event(py::module &m) {
 
     auto event_batch =
         py::class_<hermes::EventBatch, std::shared_ptr<hermes::EventBatch>>(m, "EventBatch");
-    event_batch.def(py::init<>());
-    event_batch.def(
-        "__getitem__",
-        [](const hermes::EventBatch &batch, int64_t index) {
-            if (index >= static_cast<int64_t>(batch.size())) throw py::index_error();
-            if (index < -static_cast<int64_t>(batch.size())) throw py::index_error();
-            if (index < 0) index += static_cast<int64_t>(batch.size());
-            return batch[index];
-        },
-        py::arg("index"));
-    event_batch.def("__len__", [](const hermes::EventBatch &batch) { return batch.size(); });
-    event_batch.def("sort", &hermes::EventBatch::sort);
-    event_batch.def("where", &hermes::EventBatch::where);
-    event_batch.def("append", &hermes::EventBatch::emplace_back);
-
-    // slice
-    event_batch.def("__getitem__", [](const hermes::EventBatch &batch, const py::slice &slice) {
-        py::ssize_t start, stop, step, slice_length;
-        if (!slice.compute(static_cast<int64_t>(batch.size()), &start, &stop, &step,
-                           &slice_length)) {
-            throw py::error_already_set();
-        }
-
-        int i_start = static_cast<int>(start);
-        int i_step = static_cast<int>(step);
-        auto result = std::make_shared<hermes::EventBatch>();
-        result->reserve(slice_length);
-        for (int i = 0; i < slice_length; i++) {
-            result->emplace_back(batch[i_start]);
-            i_start += i_step;
-        }
-        return result;
-    });
+    init_batch(event_batch);
 }
 
 void init_transaction(py::module &m) {
@@ -134,42 +141,27 @@ void init_transaction(py::module &m) {
     auto transaction_batch =
         py::class_<hermes::TransactionBatch, std::shared_ptr<hermes::TransactionBatch>>(
             m, "TransactionBatch");
-    transaction_batch.def(py::init<>());
+    init_batch(transaction_batch);
 
-    transaction_batch.def(
-        "__getitem__",
-        [](const hermes::EventBatch &batch, uint64_t index) {
-            if (index >= static_cast<int64_t>(batch.size())) throw py::index_error();
-            if (index < -static_cast<int64_t>(batch.size())) throw py::index_error();
-            if (index < 0) index += static_cast<int64_t>(batch.size());
-            return batch[index];
-        },
-        py::arg("index"));
-    transaction_batch.def("__len__",
-                          [](const hermes::TransactionBatch &batch) { return batch.size(); });
-    transaction_batch.def("sort", [](hermes::TransactionBatch &batch) {});
-    transaction_batch.def("where", &hermes::TransactionBatch::where);
-    transaction_batch.def("append", &hermes::TransactionBatch::emplace_back);
+    // group
+    auto transaction_group =
+        py::class_<hermes::TransactionGroup, std::shared_ptr<hermes::TransactionGroup>>(
+            m, "TransactionGroup");
+    transaction_group.def(py::init<>());
+    transaction_group.def("add_transaction",
+                          py::overload_cast<const std::shared_ptr<hermes::TransactionGroup> &>(
+                              &hermes::TransactionGroup::add_transaction));
+    transaction_group.def("add_transaction",
+                          py::overload_cast<const std::shared_ptr<hermes::Transaction> &>(
+                              &hermes::TransactionGroup::add_transaction));
+    transaction_group.def("__len__", &hermes::TransactionGroup::size);
+    transaction_group.def_property_readonly("id", &hermes::TransactionGroup::id);
 
-    // slice
-    transaction_batch.def("__getitem__",
-                          [](const hermes::TransactionBatch &batch, const py::slice &slice) {
-                              py::ssize_t start, stop, step, slice_length;
-                              if (!slice.compute(static_cast<int64_t>(batch.size()), &start, &stop,
-                                                 &step, &slice_length)) {
-                                  throw py::error_already_set();
-                              }
+    auto transaction_group_batch =
+        py::class_<hermes::TransactionGroupBatch, std::shared_ptr<hermes::TransactionGroupBatch>>(
+            m, "TransactionGroupBatch");
+    init_batch(transaction_group_batch);
 
-                              int i_start = static_cast<int>(start);
-                              int i_step = static_cast<int>(step);
-                              auto result = std::make_shared<hermes::TransactionBatch>();
-                              result->reserve(slice_length);
-                              for (int i = 0; i < slice_length; i++) {
-                                  result->emplace_back(batch[i_start]);
-                                  i_start += i_step;
-                              }
-                              return result;
-                          });
 }
 
 void init_serializer(py::module &m) {
@@ -191,6 +183,8 @@ void init_logger(py::module &m) {
         "log",
         py::overload_cast<const std::shared_ptr<hermes::Transaction> &>(&hermes::Logger::log),
         py::arg("transaction"));
+    logger.def("log", py::overload_cast<const std::shared_ptr<hermes::TransactionGroup> &>(
+                          &hermes::Logger::log));
 
     auto dummy_log_serializer =
         py::class_<hermes::DummyEventSerializer, std::shared_ptr<hermes::DummyEventSerializer>>(

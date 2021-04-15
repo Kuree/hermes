@@ -13,6 +13,7 @@ public:
 
     void log(const std::shared_ptr<Event> &event) { publish(topic_, event); }
     void log(const std::shared_ptr<Transaction> &transaction) { publish(topic_, transaction); }
+    void log(const std::shared_ptr<TransactionGroup> &group) { publish(topic_, group); }
 
 protected:
     std::string topic_;
@@ -31,6 +32,8 @@ public:
     void on_message(const std::string &topic, const std::shared_ptr<Event> &event) override;
     void on_message(const std::string &topic,
                     const std::shared_ptr<Transaction> &transaction) override;
+    void on_message(const std::string &topic,
+                    const std::shared_ptr<TransactionGroup> &group) override;
     void stop() override;
     void flush();
 
@@ -41,6 +44,7 @@ private:
 
     std::map<std::string, EventBatch> events_;
     std::map<std::string, TransactionBatch> transactions_;
+    std::map<std::string, TransactionGroupBatch> transaction_groups_;
 };
 
 }  // namespace hermes
