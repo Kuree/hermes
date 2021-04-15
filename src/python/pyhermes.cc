@@ -250,24 +250,56 @@ void init_loader(py::module &m) {
     data.def(
         "__getitem__",
         [](const hermes::TransactionData &t, int64_t index) {
-            if (index >= static_cast<int64_t>(t.events->size()) ||
-                index < -static_cast<int64_t>(t.events->size())) {
+            // depends on whether it carries group data or not
+            uint64_t size;
+            if (t.is_group()) {
+                size = (*t.group).values.size();
+            } else {
+                size = t.events->size();
+            }
+            if (index >= static_cast<int64_t>(size) || index < -static_cast<int64_t>(size)) {
                 throw py::index_error();
             }
             if (index < 0) {
-                index += static_cast<int64_t>(t.events->size());
+                index += static_cast<int64_t>(size);
             }
-            return (*t.events)[index];
+            if (t.is_group()) {
+                return py::cast((*t.group).values[index]);
+            } else {
+                return py::cast((*t.events)[index]);
+            }
         },
         py::arg("index"));
     data.def("__iter__", [](const hermes::TransactionData &t) {
-        return py::make_iterator(t.events->begin(), t.events->end());
+        if (t.is_group()) {
+            return py::make_iterator((*t.group).values.begin(), (*t.group).values.end());
+        } else {
+            return py::make_iterator(t.events->begin(), t.events->end());
+        }
     });
-    data.def("__len__", [](const hermes::TransactionData &t) { return t.events->size(); });
-    data.def_property_readonly(
-        "finished", [](const hermes::TransactionData &t) { return t.transaction->finished(); });
-    data.def_property_readonly(
-        "id", [](const hermes::TransactionData &t) { return t.transaction->id(); });
+    data.def("__len__", [](const hermes::TransactionData &t) {
+        uint64_t size;
+        if (t.is_group()) {
+            size = (*t.group).values.size();
+        } else {
+            size = t.events->size();
+        }
+        return size;
+    });
+    data.def_property_readonly("finished", [](const hermes::TransactionData &t) {
+        // we assume the transaction group always deals with finished transaction
+        if (t.is_group())
+            return true;
+        else
+            return t.transaction->finished();
+    });
+    data.def_property_readonly("id", [](const hermes::TransactionData &t) {
+        if (t.is_group()) {
+            return (*t.group).group->id();
+        } else {
+            return t.transaction->id();
+        }
+    });
 }
 
 void init_tracker(py::module &m) {
