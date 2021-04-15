@@ -49,6 +49,7 @@ public:
     void sort() override;
 
     bool contains(uint64_t id) override;
+    std::shared_ptr<Transaction> at(uint64_t id) const;
 
 private:
     std::string transaction_name_;

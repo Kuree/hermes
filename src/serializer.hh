@@ -33,6 +33,7 @@ public:
 
     bool serialize(EventBatch &batch);
     bool serialize(TransactionBatch &batch);
+    bool serialize(TransactionGroupBatch &batch);
 
     void finalize();
 
@@ -56,6 +57,7 @@ private:
                    const std::shared_ptr<arrow::RecordBatch> &record);
     static void update_stat(SerializationStat &stat, const EventBatch &batch);
     static void update_stat(SerializationStat &stat, const TransactionBatch &batch);
+    static void update_stat(SerializationStat &stat, const TransactionGroupBatch &batch);
     static void write_stat(const SerializationStat &stat);
 };
 

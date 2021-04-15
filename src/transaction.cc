@@ -152,6 +152,14 @@ bool TransactionBatch::contains(uint64_t id) {
     return id_index_.find(id) != id_index_.end();
 }
 
+std::shared_ptr<Transaction> TransactionBatch::at(uint64_t id) const {
+    if (id_index_.find(id) != id_index_.end()) {
+        auto *ptr = id_index_.at(id);
+        return ptr->shared_from_this();
+    }
+    return nullptr;
+}
+
 void TransactionBatch::sort() {
     std::stable_sort(begin(), end(),
                      [](const auto &a, const auto &b) { return a->end_time() < b->end_time(); });

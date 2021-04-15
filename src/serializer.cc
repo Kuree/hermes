@@ -72,6 +72,20 @@ bool Serializer::serialize(TransactionBatch &batch) {
     return true;
 }
 
+bool Serializer::serialize(TransactionGroupBatch &batch) {
+    batch.sort();
+    // serialize
+    auto [record, schema] = batch.serialize();
+    auto *writer = get_writer(&batch, schema);
+    auto res = serialize(writer, record);
+    if (!res) return false;
+
+    // write out event batch properties
+    auto &stat = get_stat(&batch);
+    update_stat(stat, batch);
+    return true;
+}
+
 void Serializer::finalize() {
     if (writers_.empty()) return;
     for (auto const &[ptr, writer] : writers_) {
@@ -211,6 +225,13 @@ void Serializer::update_stat(SerializationStat &stat, const EventBatch &batch) {
 
 void Serializer::update_stat(SerializationStat &stat, const TransactionBatch &batch) {
     if (stat.type.empty()) stat.type = "transaction";
+    if (stat.name.empty() && !batch.transaction_name().empty()) {
+        stat.name = batch.transaction_name();
+    }
+}
+
+void Serializer::update_stat(SerializationStat &stat, const TransactionGroupBatch &batch) {
+    if (stat.type.empty()) stat.type = "transaction-group";
     if (stat.name.empty() && !batch.transaction_name().empty()) {
         stat.name = batch.transaction_name();
     }

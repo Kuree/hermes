@@ -17,6 +17,18 @@ namespace fs = std::filesystem;
 
 namespace hermes {
 
+std::string FileInfo::type_str(FileType type) {
+    switch (type) {
+        case FileType::event:
+            return "event";
+        case FileType::transaction:
+            return "transaction";
+        case FileType::transaction_group:
+            return "transaction-group";
+    }
+    return "";
+}
+
 TransactionData TransactionDataIter::operator*() const {
     TransactionData data;
     if (current_row_ >= stream_->size()) {
@@ -107,6 +119,36 @@ bool contains_value(const std::shared_ptr<parquet::Statistics> &min_stats,
     return min <= max_value && min_value <= max;
 }
 
+std::shared_ptr<Transaction> Loader::get_transaction(uint64_t id) {
+    // find out ids
+    std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
+    for (auto const *file : transactions_) {
+        if (file->type == FileInfo::FileType::transaction) {
+            auto stats = file_metadata_.at(file);
+            auto id_stats = stats.at("id");
+            std::vector<uint64_t> chunks;
+            for (uint64_t i = 0; i < id_stats.size(); i++) {
+                if (contains_value(id_stats[i], id)) {
+                    // we assume that most of the ids are stored together, so this method
+                    // should be very fast actually
+                    chunks.emplace_back(i);
+                }
+            }
+            files.emplace_back(std::make_pair(file, chunks));
+        }
+    }
+    if (files.empty()) return nullptr;
+    auto tables = load_tables(files);
+    // we expect there is only one entry
+    for (auto const &table : tables) {
+        auto t = load_transactions(table.table);
+        if (t->contains(id)) {
+            return t->at(id);
+        }
+    }
+    return nullptr;
+}
+
 std::vector<std::shared_ptr<TransactionBatch>> Loader::get_transactions(uint64_t min_time,
                                                                         uint64_t max_time) {
     // load the tables
@@ -121,6 +163,18 @@ std::vector<std::shared_ptr<TransactionBatch>> Loader::get_transactions(uint64_t
     return result;
 }
 
+template <typename T>
+std::shared_ptr<T> merge_batch(const std::shared_ptr<T> &left, const std::shared_ptr<T> right,
+                               const std::string &name) {
+    auto temp = left;
+    auto result = std::make_shared<T>();
+    result->reserve(temp->size() + right->size());
+    result->insert(result->end(), temp->begin(), temp->end());
+    result->insert(result->end(), right->begin(), right->end());
+    result->set_transaction_name(name);
+    return result;
+}
+
 std::shared_ptr<TransactionBatch> Loader::get_transactions(const std::string &name,
                                                            uint64_t min_time, uint64_t max_time) {
     auto tables = load_transaction_table(name, min_time, max_time);
@@ -130,12 +184,23 @@ std::shared_ptr<TransactionBatch> Loader::get_transactions(const std::string &na
         if (!result) {
             result = batch;
         } else {
-            auto temp = result;
-            result = std::make_shared<TransactionBatch>();
-            result->reserve(temp->size() + batch->size());
-            result->insert(result->end(), temp->begin(), temp->end());
-            result->insert(result->end(), batch->begin(), batch->end());
-            result->set_transaction_name(load_result.name);
+            result = merge_batch(result, batch, load_result.name);
+        }
+    }
+    return result;
+}
+
+std::shared_ptr<TransactionGroupBatch> Loader::get_transaction_groups(const std::string &name,
+                                                                      uint64_t min_time,
+                                                                      uint64_t max_time) {
+    auto tables = load_transaction_group_table(name, min_time, max_time);
+    std::shared_ptr<TransactionGroupBatch> result;
+    for (auto const &load_result : tables) {
+        auto batch = load_transaction_groups(load_result.table);
+        if (!result) {
+            result = batch;
+        } else {
+            result = merge_batch(result, batch, load_result.name);
         }
     }
     return result;
@@ -307,9 +372,7 @@ std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::str
 [[maybe_unused]] void Loader::print_files() const {
     for (auto const &file : files_) {
         std::cout << "File: " << std::filesystem::absolute(file->filename) << std::endl
-                  << '\t'
-                  << "Type: " << (file->type == FileInfo::FileType::event ? "event" : "transaction")
-                  << std::endl;
+                  << '\t' << "Type: " << FileInfo::type_str(file->type) << std::endl;
     }
 }
 
@@ -353,8 +416,7 @@ void Loader::open_dir(const std::string &dir) {
     auto selector = arrow::fs::FileSelector();
     selector.base_dir = path;
     auto res = fs->GetFileInfo(selector);
-    if (!res.ok())
-        return;
+    if (!res.ok()) return;
     auto files = *res;
     for (auto const &file_info : files) {
         // notice that arrow's fs doesn't include .
@@ -399,18 +461,31 @@ void Loader::load_json(const arrow::fs::FileInfo &json_info,
     if (!size_res.ok()) return;
     file_size = *size_res;
 
-    auto info = std::make_unique<FileInfo>(
-        type == "event" ? FileInfo::FileType::event : FileInfo::FileType::transaction,
-        parquet_file);
-    if (type == "event") {
-        events_.emplace_back(info.get());
-        // also add to the stats
-        stats_.average_event_chunk_size += file_size;
-    } else if (type == "transaction") {
-        transactions_.emplace_back(info.get());
-        stats_.average_transaction_chunk_size += file_size;
-    } else {
+    FileInfo::FileType file_type;
+    if (type == "event")
+        file_type = FileInfo::FileType::event;
+    else if (type == "transaction")
+        file_type = FileInfo::FileType::transaction;
+    else if (type == "transaction-group")
+        file_type = FileInfo::FileType::transaction_group;
+    else
         return;
+
+    auto info = std::make_unique<FileInfo>(file_type, parquet_file);
+    switch (file_type) {
+        case FileInfo::FileType::event: {
+            events_.emplace_back(info.get());
+            // also add to the stats
+            stats_.average_event_chunk_size += file_size;
+            break;
+        }
+        case FileInfo::FileType::transaction: {
+            transactions_.emplace_back(info.get());
+            stats_.average_transaction_chunk_size += file_size;
+        }
+        case FileInfo::FileType::transaction_group: {
+            transaction_groups_.emplace_back(info.get());
+        }
     }
     // get name
     auto name_opt = get_member<std::string>(document, "name");
@@ -491,6 +566,16 @@ std::shared_ptr<TransactionBatch> Loader::load_transactions(
         transaction_cache_->put(table.get(), std::move(transactions));
     }
     return transaction_cache_->get(table.get());
+}
+
+std::shared_ptr<TransactionGroupBatch> Loader::load_transaction_groups(
+    const std::shared_ptr<arrow::Table> &table) {
+    std::lock_guard guard(transaction_group_cache_mutex_);
+    if (!transaction_group_cache_->exists(table.get())) {
+        auto group = TransactionGroupBatch::deserialize(table);
+        transaction_group_cache_->put(table.get(), std::move(group));
+    }
+    return transaction_group_cache_->get(table.get());
 }
 
 void Loader::compute_stats() {
@@ -670,8 +755,19 @@ std::vector<LoaderResult> Loader::load_events_table(uint64_t min_time, uint64_t 
 
 std::vector<LoaderResult> Loader::load_transaction_table(const std::optional<std::string> &name,
                                                          uint64_t min_time, uint64_t max_time) {
+    return load_batch_table(transactions_, name, min_time, max_time);
+}
+
+std::vector<LoaderResult> Loader::load_transaction_group_table(
+    const std::optional<std::string> &name, uint64_t min_time, uint64_t max_time) {
+    return load_batch_table(transaction_groups_, name, min_time, max_time);
+}
+
+std::vector<LoaderResult> Loader::load_batch_table(const std::vector<const FileInfo *> &info,
+                                                   const std::optional<std::string> &name,
+                                                   uint64_t min_time, uint64_t max_time) {
     std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
-    for (auto const &file : transactions_) {
+    for (auto const &file : info) {
         if (name) {
             if (file->name != name) continue;
         }

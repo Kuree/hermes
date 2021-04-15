@@ -24,12 +24,14 @@ namespace hermes {
 
 struct FileInfo {
 public:
-    enum class FileType { event, transaction };
+    enum class FileType { event, transaction, transaction_group };
     FileInfo(FileType type, std::string filename) : type(type), filename(std::move(filename)) {}
     FileType type;
     std::string filename;
 
     std::string name;
+
+    static std::string type_str(FileType type);
 };
 
 struct LoaderResult {
@@ -121,10 +123,15 @@ class Loader {
 public:
     explicit Loader(const std::string &dir);
     explicit Loader(const std::vector<std::string> &dirs);
+    std::shared_ptr<Transaction> get_transaction(uint64_t id);
     std::vector<std::shared_ptr<TransactionBatch>> get_transactions(uint64_t min_time,
                                                                     uint64_t max_time);
     std::shared_ptr<TransactionBatch> get_transactions(const std::string &name, uint64_t min_time,
                                                        uint64_t max_time);
+    std::shared_ptr<TransactionGroupBatch> get_transaction_groups(const std::string &name,
+                                                                  uint64_t min_time,
+                                                                  uint64_t max_time);
+
     std::shared_ptr<TransactionBatch> get_transactions(
         const std::shared_ptr<Transaction> &transaction);
 
@@ -150,6 +157,7 @@ private:
     // indices
     std::vector<const FileInfo *> events_;
     std::vector<const FileInfo *> transactions_;
+    std::vector<const FileInfo *> transaction_groups_;
     std::map<std::pair<const FileInfo *, uint64_t>, std::shared_ptr<arrow::Table>> tables_;
     // we store all the statistics here
     FileMetadata file_metadata_;
@@ -159,6 +167,9 @@ private:
     std::mutex transaction_cache_mutex_;
     std::unique_ptr<lru_cache<const arrow::Table *, std::shared_ptr<TransactionBatch>>>
         transaction_cache_;
+    std::mutex transaction_group_cache_mutex_;
+    std::unique_ptr<lru_cache<const arrow::Table *, std::shared_ptr<TransactionGroupBatch>>>
+        transaction_group_cache_;
     // stats about the folder we're reading
     LoaderStats stats_;
 
@@ -171,12 +182,19 @@ private:
         const std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> &files);
     std::shared_ptr<EventBatch> load_events(const std::shared_ptr<arrow::Table> &table);
     std::shared_ptr<TransactionBatch> load_transactions(const std::shared_ptr<arrow::Table> &table);
+    std::shared_ptr<TransactionGroupBatch> load_transaction_groups(
+        const std::shared_ptr<arrow::Table> &table);
     void compute_stats();
 
     // only return the table
     std::vector<LoaderResult> load_events_table(uint64_t min_time, uint64_t max_time);
     std::vector<LoaderResult> load_transaction_table(const std::optional<std::string> &name,
                                                      uint64_t min_time, uint64_t max_time);
+    std::vector<LoaderResult> load_transaction_group_table(const std::optional<std::string> &name,
+                                                           uint64_t min_time, uint64_t max_time);
+    std::vector<LoaderResult> load_batch_table(const std::vector<const FileInfo *> &info,
+                                               const std::optional<std::string> &name,
+                                               uint64_t min_time, uint64_t max_time);
 
     friend class Checker;
     friend class TransactionDataIter;
