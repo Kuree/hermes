@@ -36,3 +36,68 @@ TEST(transaction, serialization) {  // NOLINT
         EXPECT_EQ(test_t->events()[i], ref_t->events()[i]);
     }
 }
+
+TEST(transaction_group, serilization) { // NOLINT
+    hermes::TransactionGroupBatch batch;
+    constexpr auto num_group = 1000;
+    batch.reserve(num_group);
+    uint64_t time = 0;
+    for (auto i = 0; i < num_group; i++) {
+        auto group = std::make_shared<hermes::TransactionGroup>();
+        if (i % 2 == 0) {
+            for (int j = 0; j < (i % 10 + 1); j++) {
+                auto num_events = i % 10 + 1;
+                auto transaction = std::make_shared<hermes::Transaction>(i);
+                for (auto k = 0; k < num_events; k++) {
+                    auto e = std::make_shared<hermes::Event>(time++);
+                    transaction->add_event(e);
+                }
+                group->add_transaction(transaction);
+            }
+        } else {
+            // two groups
+            auto group1 = std::make_shared<hermes::TransactionGroup>();
+            auto group2 = std::make_shared<hermes::TransactionGroup>();
+            for (int j = 0; j < 10; j++) {
+                auto transaction = std::make_shared<hermes::Transaction>(i);
+                for (int k = 0; k < 5; k++) {
+                    auto e = std::make_shared<hermes::Event>(time++);
+                    transaction->add_event(e);
+                }
+                group1->add_transaction(transaction);
+            }
+
+            for (int j = 0; j < 10; j++) {
+                auto transaction = std::make_shared<hermes::Transaction>(i);
+                for (int k = 0; k < 5; k++) {
+                    auto e = std::make_shared<hermes::Event>(time++);
+                    transaction->add_event(e);
+                }
+                group2->add_transaction(transaction);
+            }
+
+            group->add_transaction(group1);
+            group->add_transaction(group2);
+        }
+        batch.emplace_back(group);
+    }
+
+    auto [record, schema] = batch.serialize();
+    auto buffer = hermes::serialize(record, schema);
+    EXPECT_TRUE(buffer);
+
+    auto table = hermes::deserialize(buffer);
+    auto new_batch_ptr = hermes::TransactionGroupBatch::deserialize(table);
+    auto &new_batch = *new_batch_ptr;
+    EXPECT_EQ(new_batch.size(), num_group);
+    auto group1 = new_batch[42];
+    // should all be transactions
+    for (auto const &m: group1->transaction_masks()) {
+        EXPECT_FALSE(m);
+    }
+    auto group2 = new_batch[43];
+    EXPECT_EQ(group2->transaction_masks().size(), 2);
+    for (auto const &m: group2->transaction_masks()) {
+        EXPECT_TRUE(m);
+    }
+}

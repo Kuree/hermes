@@ -291,7 +291,7 @@ std::unique_ptr<TransactionGroupBatch> TransactionGroupBatch::deserialize(
 
 void TransactionGroupBatch::sort() {
     std::sort(begin(), end(),
-              [](const auto &a, const auto &b) { return a->end_time_ < b->end_time; });
+              [](const auto &a, const auto &b) { return a->end_time_ < b->end_time_; });
 }
 
 bool TransactionGroupBatch::contains(uint64_t id) {
