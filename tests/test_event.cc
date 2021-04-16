@@ -22,8 +22,6 @@ TEST(event, event_set_get) {    // NOLINT
     auto v2 = e.get_value<std::string>("v2");
     EXPECT_TRUE(v2);
     EXPECT_EQ(*v2, "42");
-    EXPECT_FALSE(e.add_value<uint8_t>("v2", 1));
-    EXPECT_FALSE(e.get_value<uint64_t>("v3"));
 }
 
 

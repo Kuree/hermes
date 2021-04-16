@@ -24,10 +24,8 @@ public:
 
     explicit Event(uint64_t time) noexcept;
     template <typename T>
-    bool add_value(const std::string &name, const T &value) noexcept {
-        if (values_.find(name) != values_.end()) return false;
-        values_.emplace(name, value);
-        return true;
+    void add_value(const std::string &name, const T &value) noexcept {
+        values_[name] = value;
     }
 
     template <typename T>
@@ -52,9 +50,9 @@ public:
         return values_.find(name) != values_.end();
     }
 
-    [[nodiscard]] uint64_t time() const { return time_; }
+    [[nodiscard]] uint64_t time() const { return *get_value<uint64_t>(TIME_NAME); }
     void set_time(uint64_t time);
-    [[nodiscard]] uint64_t id() const { return id_; }
+    [[nodiscard]] uint64_t id() const { return *get_value<uint64_t>(ID_NAME); }
     void set_id(uint64_t id);
 
     [[nodiscard]] auto const &values() const { return values_; }
@@ -62,8 +60,6 @@ public:
     using EventValue = std::variant<uint64_t, uint32_t, uint16_t, uint8_t, bool, std::string>;
 
 private:
-    uint64_t time_;
-    uint64_t id_;
     std::map<std::string, EventValue> values_;
 
     static uint64_t event_id_count_;

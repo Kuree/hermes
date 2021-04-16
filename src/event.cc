@@ -12,9 +12,9 @@ namespace hermes {
 
 uint64_t Event::event_id_count_ = 0;
 
-Event::Event(uint64_t time) noexcept : time_(time), id_(event_id_count_++) {
+Event::Event(uint64_t time) noexcept {
     add_value(TIME_NAME, time);
-    add_value(ID_NAME, id_);
+    add_value(ID_NAME, event_id_count_++);
 }
 
 bool Event::remove_value(const std::string &name) {
@@ -25,12 +25,10 @@ bool Event::remove_value(const std::string &name) {
 }
 
 void Event::set_time(uint64_t time) {
-    time_ = time;
     values_[TIME_NAME] = time;
 }
 
 void Event::set_id(uint64_t id) {
-    id_ = id;
     values_[ID_NAME] = id;
 }
 
@@ -193,13 +191,7 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(
                     (*event_batch)[j]->add_value(name, get_uint32(v));
                 } else if (type->Equals(uint64)) {
                     auto int_val = get_uint64(v);
-                    if (name == Event::TIME_NAME) {
-                        (*event_batch)[j]->set_time(int_val);
-                    } else if (name == Event::ID_NAME) {
-                        (*event_batch)[j]->set_id(int_val);
-                    } else {
-                        (*event_batch)[j]->add_value(name, int_val);
-                    }
+                    (*event_batch)[j]->add_value(name, int_val);
                 } else if (type->Equals(bool_)) {
                     auto bool_val_ = std::reinterpret_pointer_cast<arrow::BooleanScalar>(v);
                     (*event_batch)[j]->add_value(name, get_bool(v));
