@@ -4,6 +4,7 @@
 
 #include "../checker.hh"
 #include "../logger.hh"
+#include "../rtl.hh"
 #include "../serializer.hh"
 
 namespace py = pybind11;
@@ -67,6 +68,14 @@ void init_message_bus(py::module &m) {
         py::return_value_policy::reference_internal);
 }
 
+void init_rtl(py::module &m) {
+    auto rtl = py::class_<hermes::RTL>(m, "RTL");
+    rtl.def(py::init<const std::string &>(), py::arg("filename"));
+    rtl.def(py::init<const std::vector<std::string> &>(), py::arg("filenames"));
+    rtl.def(py::init<const std::vector<std::string> &, const std::vector<std::string> &>(),
+            py::arg("filenames"), py::arg("include_dirs"));
+}
+
 void init_meta(py::module &m) {
     // some metadata functions
     m.def("reset", []() {
@@ -86,5 +95,6 @@ PYBIND11_MODULE(pyhermes, m) {
     init_loader(m);
     init_query(m);
     init_checker(m);
+    init_rtl(m);
     init_meta(m);
 }

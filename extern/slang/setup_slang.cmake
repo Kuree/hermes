@@ -4,7 +4,8 @@ set(SLANG_ROOT ${CMAKE_BINARY_DIR}/slang)
 
 set(SLANG_CMAKE_ARGS " -DCMAKE_BUILD_TYPE=Release"
             " -DSLANG_INCLUDE_TESTS=OFF"
-            " -DSTATIC_BUILD=ON")
+            " -DSTATIC_BUILD=ON"
+            " -DCMAKE_POSITION_INDEPENDENT_CODE=ON")
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/slang.CMakeLists.txt.cmake"
         "${SLANG_ROOT}/CMakeLists.txt")
