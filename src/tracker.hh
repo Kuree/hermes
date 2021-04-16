@@ -54,7 +54,7 @@ public:
         transaction_name_ = std::move(transaction_name);
         finished_transactions_.set_name(transaction_name_);
     }
-    
+
     const std::string &transaction_name() const { return transaction_name_; }
     [[nodiscard]] const BatchType &finished_transactions() const { return finished_transactions_; }
     [[nodiscard]] bool publish_transaction() const { return publish_transaction_; }
