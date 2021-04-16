@@ -339,6 +339,8 @@ void init_tracker_base(py::class_<T, K, std::shared_ptr<T>> &tracker) {
     tracker.def(py::init<const std::string &>());
     tracker.def("track", &T::track);
     tracker.def_property("transaction_name", &T::transaction_name, &T::set_transaction_name);
+    tracker.def_property("publish_transaction", &T::publish_transaction,
+                         &T::set_publish_transaction);
 }
 
 void init_tracker(py::module &m) {

@@ -55,6 +55,8 @@ public:
     }
     const std::string &transaction_name() const { return transaction_name_; }
     [[nodiscard]] const BatchType &finished_transactions() const { return finished_transactions_; }
+    [[nodiscard]] bool publish_transaction() const { return publish_transaction_; }
+    void set_publish_transaction(bool value) { publish_transaction_ = value; }
 
     virtual TransactionObject *track(TargetObject *event) = 0;
 
@@ -65,6 +67,10 @@ public:
         // decide whether to flush
         if (finished_transactions_.size() >= transaction_flush_threshold_) {
             flush(false);
+        }
+
+        if (publish_transaction_) {
+            bus_->publish(transaction_name_, transaction);
         }
     }
 
@@ -86,7 +92,8 @@ private:
     // are called, since transaction data are not that big.
     BatchType finished_transactions_;
 
-    // avoid virtual function lookup during construction
+    // whether to publish the finished transactions
+    bool publish_transaction_ = false;
 };
 
 class Tracker : public TrackerBase<Event, Transaction, TransactionBatch> {
