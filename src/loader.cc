@@ -707,6 +707,70 @@ void Loader::stream(bool stream_transactions) {
     stream(MessageBus::default_bus(), stream_transactions);
 }
 
+template <typename T>
+void should_stop(const std::vector<std::shared_ptr<T>> &values,
+                 const std::vector<uint64_t> &indices, bool &stop) {
+    if (!values.empty()) {
+        for (uint64_t i = 0; i < values.size(); i++) {
+            if (indices[i] < values[i]->size()) {
+                stop = false;
+            }
+        }
+    }
+}
+
+template <typename T>
+void stream_values(std::vector<std::shared_ptr<T>> &values, std::vector<uint64_t> &indices,
+                   MessageBus *bus) {
+    if (!values.empty()) {
+        uint32_t min_index = 0;
+        auto value = (*values[min_index])[indices[min_index]];
+        for (uint64_t i = 1; i < values.size(); i++) {
+            if constexpr (std::is_same<T, Event>::value) {
+                if ((*values[i])[indices[i]]->time() < value->time()) {
+                    min_index = i;
+                    value = (*values[i])[indices[i]];
+                }
+            } else if constexpr (std::is_same<T, Transaction>::value ||
+                                 std::is_same<T, TransactionGroup>::value) {
+                if ((*values[i])[indices[i]]->start_time() < value->start_time()) {
+                    min_index = i;
+                    value = (*values[i])[indices[i]];
+                }
+            }
+        }
+        indices[min_index]++;
+        bus->publish(values[min_index]->name(), value);
+
+        // need to be careful about the boundary
+        if (indices[min_index] >= values[min_index]->size()) {
+            // need to pop that entry
+            values.erase(values.begin() + min_index);
+            indices.erase(indices.begin() + min_index);
+        }
+    }
+}
+
+template <typename T>
+void load_values(
+    const std::vector<LoaderResult> &load_results, std::vector<std::shared_ptr<T>> &values,
+    const std::function<std::shared_ptr<T>(const std::shared_ptr<arrow::Table> &)> &load_func,
+    std::unordered_set<arrow::Table *> &loaded_table_) {
+    for (auto const &res : load_results) {
+        auto const &table = res.table;
+        if (loaded_table_.find(table.get()) != loaded_table_.end()) {
+            // we already streamed this one
+            continue;
+        }
+        loaded_table_.emplace(table.get());
+
+        // load the table
+        auto event_batch = load_func(table);
+        event_batch->set_name(res.name);
+        values.emplace_back(std::move(event_batch));
+    }
+}
+
 void Loader::stream(MessageBus *bus, bool stream_transactions) {
     // we stream out every items roughly based on the time
     // because each table is a chunk, as long as the cache doesn't
@@ -724,50 +788,32 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
         std::vector<std::shared_ptr<TransactionBatch>> transactions;
         std::vector<std::shared_ptr<TransactionGroupBatch>> transaction_groups;
 
-        for (auto const &res : load_results) {
-            auto const &table = res.table;
-            if (loaded_table_.find(table.get()) != loaded_table_.end()) {
-                // we already streamed this one
-                continue;
-            }
-            loaded_table_.emplace(table.get());
-            // stream this event out
-            auto event_batch = load_events(table);
-            event_batch->set_name(res.name);
-            events.emplace_back(std::move(event_batch));
-        }
+        // gcc failed to induce the template type
+        load_values<EventBatch>(
+            load_results, events,
+            [this](const std::shared_ptr<arrow::Table> &table) { return load_events(table); },
+            loaded_table_);
 
         // decide whether to stream transactions or not
         if (stream_transactions) {
             load_results = load_transaction_table(std::nullopt, start_time, start_time + interval);
-            for (auto const &res : load_results) {
-                auto const &table = res.table;
-                if (loaded_table_.find(table.get()) != loaded_table_.end()) {
-                    // we already streamed this one
-                    continue;
-                }
-                loaded_table_.emplace(table.get());
-                // stream this event out
-                auto transaction_batch = load_transactions(table);
-                transaction_batch->set_name(res.name);
-                transactions.emplace_back(std::move(transaction_batch));
-            }
+
+            load_values<TransactionBatch>(
+                load_results, transactions,
+                [this](const std::shared_ptr<arrow::Table> &table) {
+                    return load_transactions(table);
+                },
+                loaded_table_);
 
             // groups as well
             load_results =
                 load_transaction_group_table(std::nullopt, start_time, start_time + interval);
-            for (auto const &res : load_results) {
-                auto const &table = res.table;
-                if (loaded_table_.find(table.get()) != loaded_table_.end()) {
-                    // we already streamed this one
-                    continue;
-                }
-                loaded_table_.emplace(table.get());
-                // stream this event out
-                auto transaction_batch = load_transaction_groups(table);
-                transaction_batch->set_name(res.name);
-                transaction_groups.emplace_back(std::move(transaction_batch));
-            }
+            load_values<TransactionGroupBatch>(
+                load_results, transaction_groups,
+                [this](const std::shared_ptr<arrow::Table> &table) {
+                    return load_transaction_groups(table);
+                },
+                loaded_table_);
         }
 
         std::vector<uint64_t> event_indices;
@@ -781,92 +827,16 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
 
         while (true) {
             bool stop = true;
-            if (!events.empty()) {
-                for (uint64_t i = 0; i < events.size(); i++) {
-                    if (event_indices[i] < events[i]->size()) {
-                        stop = false;
-                    }
-                }
-            }
-            if (!transactions.empty()) {
-                for (uint64_t i = 0; i < transactions.size(); i++) {
-                    if (transaction_indices[i] < transactions[i]->size()) {
-                        stop = false;
-                    }
-                }
-            }
-            if (!transaction_groups.empty()) {
-                for (uint64_t i = 0; i < transaction_groups.size(); i++) {
-                    if (transaction_group_indices[i] < transaction_groups[i]->size()) {
-                        stop = false;
-                    }
-                }
-            }
+            should_stop(events, event_indices, stop);
+            should_stop(transactions, transaction_indices, stop);
+            should_stop(transaction_groups, transaction_group_indices, stop);
+
             if (stop) break;
 
-            // search for the min index
-            if (!events.empty()) {
-                uint32_t min_index = 0;
-                auto event = (*events[min_index])[event_indices[min_index]];
-                for (uint64_t i = 1; i < events.size(); i++) {
-                    if ((*events[i])[event_indices[i]]->time() < event->time()) {
-                        min_index = i;
-                        event = (*events[i])[event_indices[i]];
-                    }
-                }
-                event_indices[min_index]++;
-                bus->publish(events[min_index]->name(), event);
-
-                // need to be careful about the boundary
-                if (event_indices[min_index] >= events[min_index]->size()) {
-                    // need to pop that entry
-                    events.erase(events.begin() + min_index);
-                    event_indices.erase(event_indices.begin() + min_index);
-                }
-            }
-
-            if (!transactions.empty()) {
-                uint32_t min_index = 0;
-                auto transaction = (*transactions[min_index])[transaction_indices[min_index]];
-                for (uint64_t i = 1; i < transactions.size(); i++) {
-                    if ((*transactions[i])[transaction_indices[i]]->start_time() <
-                        transaction->start_time()) {
-                        min_index = i;
-                        transaction = (*transactions[i])[transaction_indices[i]];
-                    }
-                }
-                transaction_indices[min_index]++;
-                bus->publish(transactions[min_index]->name(), transaction);
-
-                // need to be careful about the boundary
-                if (transaction_indices[min_index] >= transactions[min_index]->size()) {
-                    // need to pop that entry
-                    transactions.erase(transactions.begin() + min_index);
-                    transaction_indices.erase(transaction_indices.begin() + min_index);
-                }
-            }
-
-            if (!transaction_groups.empty()) {
-                uint32_t min_index = 0;
-                auto transaction =
-                    (*transaction_groups[min_index])[transaction_group_indices[min_index]];
-                for (uint64_t i = 1; i < transaction_groups.size(); i++) {
-                    if ((*transaction_groups[i])[transaction_group_indices[i]]->start_time() <
-                        transaction->start_time()) {
-                        min_index = i;
-                        transaction = (*transaction_groups[i])[transaction_group_indices[i]];
-                    }
-                }
-                transaction_group_indices[min_index]++;
-                bus->publish(transaction_groups[min_index]->name(), transaction);
-
-                // need to be careful about the boundary
-                if (transaction_group_indices[min_index] >= transaction_groups[min_index]->size()) {
-                    // need to pop that entry
-                    transaction_groups.erase(transaction_groups.begin() + min_index);
-                    transaction_group_indices.erase(transaction_group_indices.begin() + min_index);
-                }
-            }
+            // stream events
+            stream_values(events, event_indices, bus);
+            stream_values(transactions, transaction_indices, bus);
+            stream_values(transaction_groups, transaction_group_indices, bus);
         }
     }
 }
