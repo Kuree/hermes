@@ -722,6 +722,8 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
         auto load_results = load_events_table(start_time, start_time + interval);
         std::vector<std::shared_ptr<EventBatch>> events;
         std::vector<std::shared_ptr<TransactionBatch>> transactions;
+        std::vector<std::shared_ptr<TransactionGroupBatch>> transaction_groups;
+
         for (auto const &res : load_results) {
             auto const &table = res.table;
             if (loaded_table_.find(table.get()) != loaded_table_.end()) {
@@ -750,12 +752,30 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
                 transaction_batch->set_name(res.name);
                 transactions.emplace_back(std::move(transaction_batch));
             }
+
+            // groups as well
+            load_results =
+                load_transaction_group_table(std::nullopt, start_time, start_time + interval);
+            for (auto const &res : load_results) {
+                auto const &table = res.table;
+                if (loaded_table_.find(table.get()) != loaded_table_.end()) {
+                    // we already streamed this one
+                    continue;
+                }
+                loaded_table_.emplace(table.get());
+                // stream this event out
+                auto transaction_batch = load_transaction_groups(table);
+                transaction_batch->set_name(res.name);
+                transaction_groups.emplace_back(std::move(transaction_batch));
+            }
         }
 
         std::vector<uint64_t> event_indices;
         event_indices.resize(events.size(), 0);
         std::vector<uint64_t> transaction_indices;
         transaction_indices.resize(transactions.size(), 0);
+        std::vector<uint64_t> transaction_group_indices;
+        transaction_group_indices.resize(transactions.size(), 0);
 
         // stream out the events and transactions
 
@@ -771,6 +791,13 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
             if (!transactions.empty()) {
                 for (uint64_t i = 0; i < transactions.size(); i++) {
                     if (transaction_indices[i] < transactions[i]->size()) {
+                        stop = false;
+                    }
+                }
+            }
+            if (!transaction_groups.empty()) {
+                for (uint64_t i = 0; i < transaction_groups.size(); i++) {
+                    if (transaction_group_indices[i] < transaction_groups[i]->size()) {
                         stop = false;
                     }
                 }
@@ -801,7 +828,7 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
             if (!transactions.empty()) {
                 uint32_t min_index = 0;
                 auto transaction = (*transactions[min_index])[transaction_indices[min_index]];
-                for (uint64_t i = 1; i < events.size(); i++) {
+                for (uint64_t i = 1; i < transactions.size(); i++) {
                     if ((*transactions[i])[transaction_indices[i]]->start_time() <
                         transaction->start_time()) {
                         min_index = i;
@@ -809,13 +836,35 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
                     }
                 }
                 transaction_indices[min_index]++;
-                bus->publish(events[min_index]->name(), transaction);
+                bus->publish(transactions[min_index]->name(), transaction);
 
                 // need to be careful about the boundary
                 if (transaction_indices[min_index] >= transactions[min_index]->size()) {
                     // need to pop that entry
                     transactions.erase(transactions.begin() + min_index);
                     transaction_indices.erase(transaction_indices.begin() + min_index);
+                }
+            }
+
+            if (!transaction_groups.empty()) {
+                uint32_t min_index = 0;
+                auto transaction =
+                    (*transaction_groups[min_index])[transaction_group_indices[min_index]];
+                for (uint64_t i = 1; i < transaction_groups.size(); i++) {
+                    if ((*transaction_groups[i])[transaction_group_indices[i]]->start_time() <
+                        transaction->start_time()) {
+                        min_index = i;
+                        transaction = (*transaction_groups[i])[transaction_group_indices[i]];
+                    }
+                }
+                transaction_group_indices[min_index]++;
+                bus->publish(transaction_groups[min_index]->name(), transaction);
+
+                // need to be careful about the boundary
+                if (transaction_group_indices[min_index] >= transaction_groups[min_index]->size()) {
+                    // need to pop that entry
+                    transaction_groups.erase(transaction_groups.begin() + min_index);
+                    transaction_group_indices.erase(transaction_group_indices.begin() + min_index);
                 }
             }
         }
