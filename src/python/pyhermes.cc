@@ -322,6 +322,25 @@ void init_loader(py::module &m) {
     });
 }
 
+template <typename T, typename K>
+void init_tracker_base(py::class_<T, K, std::shared_ptr<T>> &tracker) {
+    tracker.def("get_new_transaction", &T::get_new_transaction,
+                py::return_value_policy::reference_internal);
+    tracker.def("set_serializer", &T::set_serializer, py::arg("serializer"));
+    tracker.def_property("transaction_name", &T::transaction_name, &T::set_transaction_name);
+    tracker.def("connect", &T::connect);
+    tracker.def(
+        "connect",
+        [](T &tracker, const std::shared_ptr<hermes::Serializer> &serializer) {
+            tracker.set_serializer(serializer);
+            tracker.connect();
+        },
+        py::arg("serializer"));
+    tracker.def(py::init<const std::string &>());
+    tracker.def("track", &T::track);
+    tracker.def_property("transaction_name", &T::transaction_name, &T::set_transaction_name);
+}
+
 void init_tracker(py::module &m) {
     class PyTracker : public hermes::Tracker {
     public:
@@ -334,23 +353,22 @@ void init_tracker(py::module &m) {
 
     auto tracker =
         py::class_<hermes::Tracker, PyTracker, std::shared_ptr<hermes::Tracker>>(m, "Tracker");
-    tracker.def("get_new_transaction", &hermes::Tracker::get_new_transaction,
-                py::return_value_policy::reference_internal);
-    tracker.def("set_serializer", &hermes::Tracker::set_serializer, py::arg("serializer"));
-    tracker.def_property("transaction_name", &hermes::Tracker::transaction_name,
-                         &hermes::Tracker::set_transaction_name);
-    tracker.def("connect", &hermes::Tracker::connect);
-    tracker.def(
-        "connect",
-        [](hermes::Tracker &tracker, const std::shared_ptr<hermes::Serializer> &serializer) {
-            tracker.set_serializer(serializer);
-            tracker.connect();
-        },
-        py::arg("serializer"));
-    tracker.def(py::init<const std::string &>());
-    tracker.def("track", &hermes::Tracker::track);
-    tracker.def_property("transaction_name", &hermes::Tracker::transaction_name,
-                         &hermes::Tracker::set_transaction_name);
+    init_tracker_base(tracker);
+
+    class PyGroupTracker : public hermes::GroupTracker {
+    public:
+        using hermes::GroupTracker::GroupTracker;
+
+        hermes::TransactionGroup *track(hermes::Transaction *transaction) override {
+            PYBIND11_OVERRIDE_PURE(hermes::TransactionGroup *, hermes::GroupTracker, track,
+                                   transaction);
+        }
+    };
+
+    auto group_tracker =
+        py::class_<hermes::GroupTracker, PyGroupTracker, std::shared_ptr<hermes::GroupTracker>>(
+            m, "GroupTracker");
+    init_tracker_base(group_tracker);
 }
 
 void init_query(py::module &m) {
