@@ -158,6 +158,8 @@ void init_transaction(py::module &m) {
     transaction_group.def_property_readonly("id", &hermes::TransactionGroup::id);
     transaction_group.def_property("name", &hermes::TransactionGroup::name,
                                    &hermes::TransactionGroup::set_name);
+    transaction_group.def("finish", &hermes::TransactionGroup::finish);
+    transaction_group.def_property_readonly("finished", &hermes::TransactionGroup::finished);
 
     auto transaction_group_batch =
         py::class_<hermes::TransactionGroupBatch, std::shared_ptr<hermes::TransactionGroupBatch>>(

@@ -81,6 +81,8 @@ public:
     [[nodiscard]] auto const &name() const { return name_; }
 
     void set_name(const std::string &name) { name_ = name; }
+    void finish() { finished_ = true; }
+    [[nodiscard]] auto finished() const { return finished_; }
 
     void static reset_id() { id_allocator_ = 0; }
 
@@ -92,6 +94,7 @@ private:
     uint64_t start_time_ = std::numeric_limits<uint64_t>::max();
     uint64_t end_time_ = 0;
     std::string name_;
+    bool finished_ = false;
 
     static uint64_t id_allocator_;
 
