@@ -4,13 +4,17 @@
 
 namespace hermes {
 
-Tracker::Tracker(MessageBus *bus, std::string topic) : topic_(std::move(topic)) { bus_ = bus; }
+TrackerBase::TrackerBase(MessageBus *bus, std::string topic) : topic_(std::move(topic)) { bus_ = bus; }
 
-Tracker::Tracker(const std::string &topic) : Tracker(MessageBus::default_bus(), topic) {}
+TrackerBase::TrackerBase(const std::string &topic) : TrackerBase(MessageBus::default_bus(), topic) {}
 
-void Tracker::connect() { subscribe(bus_, topic_); }
+void TrackerBase::connect() { subscribe(bus_, topic_); }
 
-void Tracker::flush(bool save_inflight_transaction) {
+[[maybe_unused]] void TrackerBase::set_transaction_name(std::string transaction_name) {
+    transaction_name_ = std::move(transaction_name);
+}
+
+void Tracker::flush_(bool save_inflight_transaction) {
     if (!serializer_) return;
     if (!finished_transactions_.empty()) {
         serializer_->serialize(finished_transactions_);
@@ -39,12 +43,6 @@ Transaction *Tracker::get_new_transaction() {
     inflight_transactions.emplace(t);
     t->set_name(transaction_name_);
     return ptr;
-}
-
-[[maybe_unused]] void Tracker::set_transaction_name(std::string transaction_name) {
-    transaction_name_ = std::move(transaction_name);
-
-    finished_transactions_.set_name(transaction_name_);
 }
 
 void Tracker::retire_transaction(const std::shared_ptr<Transaction> &transaction) {
