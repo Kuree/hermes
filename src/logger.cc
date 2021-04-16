@@ -12,8 +12,8 @@ void DummyEventSerializer::connect(MessageBus *bus, const std::shared_ptr<Serial
 void DummyEventSerializer::on_message(const std::string &topic,
                                       const std::shared_ptr<Event> &event) {
     events_[topic].emplace_back(event);
-    if (events_.at(topic).event_name().empty()) {
-        events_.at(topic).set_event_name(topic);
+    if (events_.at(topic).name().empty()) {
+        events_.at(topic).set_name(topic);
     }
 
     if (serializer_ && events_.at(topic).size() >= event_dump_threshold) {
@@ -28,8 +28,8 @@ void DummyEventSerializer::on_message(const std::string &topic,
                                       const std::shared_ptr<Transaction> &transaction) {
     transactions_[topic].emplace_back(transaction);
 
-    if (transactions_.at(topic).transaction_name().empty()) {
-        transactions_.at(topic).set_transaction_name(topic);
+    if (transactions_.at(topic).name().empty()) {
+        transactions_.at(topic).set_name(topic);
     }
 }
 
@@ -37,8 +37,8 @@ void DummyEventSerializer::on_message(const std::string &topic,
                                       const std::shared_ptr<TransactionGroup> &group) {
     transaction_groups_[topic].emplace_back(group);
 
-    if (transaction_groups_.at(topic).transaction_name().empty()) {
-        transaction_groups_.at(topic).set_transaction_name(topic);
+    if (transaction_groups_.at(topic).name().empty()) {
+        transaction_groups_.at(topic).set_name(topic);
     }
 }
 

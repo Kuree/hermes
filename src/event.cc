@@ -12,9 +12,12 @@ namespace hermes {
 
 uint64_t Event::event_id_count_ = 0;
 
-Event::Event(uint64_t time) noexcept {
+Event::Event(uint64_t time) noexcept : Event("", time) {}
+
+Event::Event(const std::string &name, uint64_t time) noexcept {
     add_value(TIME_NAME, time);
     add_value(ID_NAME, event_id_count_++);
+    add_value(NAME_NAME, name);
 }
 
 bool Event::remove_value(const std::string &name) {
@@ -24,13 +27,9 @@ bool Event::remove_value(const std::string &name) {
     return true;
 }
 
-void Event::set_time(uint64_t time) {
-    values_[TIME_NAME] = time;
-}
+void Event::set_time(uint64_t time) { values_[TIME_NAME] = time; }
 
-void Event::set_id(uint64_t id) {
-    values_[ID_NAME] = id;
-}
+void Event::set_id(uint64_t id) { values_[ID_NAME] = id; }
 
 template <class... Ts>
 struct overloaded : Ts... {

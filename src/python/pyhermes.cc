@@ -33,6 +33,7 @@ void init_batch(py::class_<T, std::shared_ptr<T>> &batch_class) {
     batch_class.def("sort", &T::sort);
     batch_class.def("where", &T::where);
     batch_class.def("append", &T::emplace_back);
+    batch_class.def_property("name", &T::name, &T::set_name);
 
     // slice
     batch_class.def("__getitem__", [](const T &batch, const py::slice &slice) {
@@ -135,6 +136,7 @@ void init_transaction(py::module &m) {
     transaction.def_property_readonly("id", &hermes::Transaction::id);
     transaction.def("finish", &hermes::Transaction::finish);
     transaction.def_property_readonly("finished", &hermes::Transaction::finished);
+    transaction.def_property("name", &hermes::Transaction::name, &hermes::Transaction::set_name);
 
     auto transaction_batch =
         py::class_<hermes::TransactionBatch, std::shared_ptr<hermes::TransactionBatch>>(
@@ -154,6 +156,8 @@ void init_transaction(py::module &m) {
                               &hermes::TransactionGroup::add_transaction));
     transaction_group.def("__len__", &hermes::TransactionGroup::size);
     transaction_group.def_property_readonly("id", &hermes::TransactionGroup::id);
+    transaction_group.def_property("name", &hermes::TransactionGroup::name,
+                                   &hermes::TransactionGroup::set_name);
 
     auto transaction_group_batch =
         py::class_<hermes::TransactionGroupBatch, std::shared_ptr<hermes::TransactionGroupBatch>>(
@@ -307,6 +311,13 @@ void init_loader(py::module &m) {
         }
     });
     data.def_property_readonly("is_group", &hermes::TransactionData::is_group);
+    data.def_property_readonly("name", [](const hermes::TransactionData &t) {
+        if (t.is_group()) {
+            return (*t.group).group->name();
+        } else {
+            return t.transaction->name();
+        }
+    });
 }
 
 void init_tracker(py::module &m) {
@@ -324,7 +335,8 @@ void init_tracker(py::module &m) {
     tracker.def("get_new_transaction", &hermes::Tracker::get_new_transaction,
                 py::return_value_policy::reference_internal);
     tracker.def("set_serializer", &hermes::Tracker::set_serializer, py::arg("serializer"));
-    tracker.def("set_event_name", &hermes::Tracker::set_transaction_name);
+    tracker.def_property("transaction_name", &hermes::Tracker::transaction_name,
+                         &hermes::Tracker::set_transaction_name);
     tracker.def("connect", &hermes::Tracker::connect);
     tracker.def(
         "connect",
@@ -447,6 +459,15 @@ void init_message_bus(py::module &m) {
         py::return_value_policy::reference_internal);
 }
 
+void init_meta(py::module &m) {
+    // some metadata functions
+    m.def("reset", []() {
+        hermes::Event::reset_id();
+        hermes::Transaction::reset_id();
+        hermes::TransactionGroup::reset_id();
+    });
+}
+
 PYBIND11_MODULE(pyhermes, m) {
     init_event(m);
     init_transaction(m);
@@ -457,4 +478,5 @@ PYBIND11_MODULE(pyhermes, m) {
     init_loader(m);
     init_query(m);
     init_checker(m);
+    init_meta(m);
 }

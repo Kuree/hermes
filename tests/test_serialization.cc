@@ -53,7 +53,7 @@ TEST(serialization, multiple_event_batches) {  // NOLINT
     EXPECT_TRUE(batch.validate());
     // serialize it
     hermes::Serializer s(dir.path());
-    batch.set_event_name("test");
+    batch.set_name("test");
     s.serialize(batch);
     batch.clear();
 
@@ -71,6 +71,7 @@ TEST(serialization, multiple_event_batches) {  // NOLINT
     EXPECT_EQ(event_batch->size(), num_event * 2);
     auto const &event = (*event_batch)[42 + num_event];
     EXPECT_EQ(event->time(), 42 + num_event);
+    EXPECT_EQ( event->name(), "test");
 }
 
 TEST(serialization, transactions) {  // NOLINT
@@ -78,6 +79,8 @@ TEST(serialization, transactions) {  // NOLINT
 
     hermes::TransactionBatch batch;
     constexpr auto num_transactions = 1000;
+    constexpr auto transaction_name = "transaction-test";
+
     for (auto i = 0; i < num_transactions; i++) {
         auto t = std::make_shared<hermes::Transaction>(i);
         for (uint32_t j = 0; j < (i % 10 + (i % 10 == 0 ? 1 : 0)); j++) {
@@ -87,6 +90,7 @@ TEST(serialization, transactions) {  // NOLINT
         }
         batch.emplace_back(t);
     }
+    batch.set_name(transaction_name);
 
     // serialize it
     hermes::Serializer s(dir.path());
@@ -101,6 +105,7 @@ TEST(serialization, transactions) {  // NOLINT
     auto const &transaction = (*transaction_batch)[42];
     EXPECT_EQ(transaction->start_time(), 42);
     EXPECT_EQ(transaction->events().size(), 42 % 10);
+    EXPECT_EQ(transaction->name(), transaction_name);
 }
 
 TEST(serialization, get_events) {  // NOLINT
@@ -142,7 +147,7 @@ TEST(serilizaiton, transaction_stream) {  // NOLINT
     TempDirectory dir;
 
     hermes::TransactionBatch transaction_batch;
-    transaction_batch.set_transaction_name("test");
+    transaction_batch.set_name("test");
     hermes::EventBatch event_batch;
     constexpr auto num_transactions = 1000;
     for (auto i = 0; i < num_transactions; i++) {
@@ -191,7 +196,7 @@ TEST(serialization, transaction_group) {  // NOLINT
         }
         batch.emplace_back(group);
     }
-    batch.set_transaction_name("test");
+    batch.set_name("test");
 
     hermes::Serializer s(dir.path());
     s.serialize(batch);

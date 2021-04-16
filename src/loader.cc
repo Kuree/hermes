@@ -228,7 +228,7 @@ std::vector<std::shared_ptr<TransactionBatch>> Loader::get_transactions(uint64_t
     result.reserve(tables.size());
     for (auto const &load_result : tables) {
         auto batch = load_transactions(load_result.table);
-        batch->set_transaction_name(load_result.name);
+        batch->set_name(load_result.name);
         result.emplace_back(std::move(batch));
     }
     return result;
@@ -241,7 +241,7 @@ std::shared_ptr<T> merge_batch(const std::shared_ptr<T> &left, const std::shared
     result->reserve(left->size() + right->size());
     result->insert(result->end(), left->begin(), left->end());
     result->insert(result->end(), right->begin(), right->end());
-    result->set_transaction_name(name);
+    result->set_name(name);
     return result;
 }
 
@@ -313,7 +313,7 @@ std::vector<std::shared_ptr<EventBatch>> Loader::get_events(uint64_t min_time, u
     result.reserve(tables.size());
     for (auto const &load_result : tables) {
         auto batch = load_events(load_result.table);
-        batch->set_event_name(load_result.name);
+        batch->set_name(load_result.name);
         result.emplace_back(std::move(batch));
     }
     return result;
@@ -343,7 +343,7 @@ std::shared_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t
         auto batch = load_events(load_result.table);
         if (!result) {
             result = batch;
-            result->set_event_name(load_result.name);
+            result->set_name(load_result.name);
         } else {
             // since the old one is used for caching
             // we have to create new result instead of reusing the old one
@@ -352,7 +352,7 @@ std::shared_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t
             result->reserve(temp->size() + batch->size());
             result->insert(result->end(), temp->begin(), temp->end());
             result->insert(result->end(), batch->begin(), batch->end());
-            result->set_event_name(load_result.name);
+            result->set_name(load_result.name);
         }
     }
 
@@ -731,7 +731,7 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
             loaded_table_.emplace(table.get());
             // stream this event out
             auto event_batch = load_events(table);
-            event_batch->set_event_name(res.name);
+            event_batch->set_name(res.name);
             events.emplace_back(std::move(event_batch));
         }
 
@@ -747,7 +747,7 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
                 loaded_table_.emplace(table.get());
                 // stream this event out
                 auto transaction_batch = load_transactions(table);
-                transaction_batch->set_transaction_name(res.name);
+                transaction_batch->set_name(res.name);
                 transactions.emplace_back(std::move(transaction_batch));
             }
         }
@@ -788,7 +788,7 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
                     }
                 }
                 event_indices[min_index]++;
-                bus->publish(events[min_index]->event_name(), event);
+                bus->publish(events[min_index]->name(), event);
 
                 // need to be careful about the boundary
                 if (event_indices[min_index] >= events[min_index]->size()) {
@@ -809,7 +809,7 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
                     }
                 }
                 transaction_indices[min_index]++;
-                bus->publish(events[min_index]->event_name(), transaction);
+                bus->publish(events[min_index]->name(), transaction);
 
                 // need to be careful about the boundary
                 if (transaction_indices[min_index] >= transactions[min_index]->size()) {

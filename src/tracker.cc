@@ -37,13 +37,14 @@ Transaction *Tracker::get_new_transaction() {
     auto t = std::make_shared<Transaction>();
     auto *ptr = t.get();
     inflight_transactions.emplace(t);
+    t->set_name(transaction_name_);
     return ptr;
 }
 
 [[maybe_unused]] void Tracker::set_transaction_name(std::string transaction_name) {
     transaction_name_ = std::move(transaction_name);
 
-    finished_transactions_.set_transaction_name(transaction_name_);
+    finished_transactions_.set_name(transaction_name_);
 }
 
 void Tracker::retire_transaction(const std::shared_ptr<Transaction> &transaction) {

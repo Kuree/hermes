@@ -21,8 +21,11 @@ class Event : public std::enable_shared_from_this<Event> {
 public:
     static constexpr auto TIME_NAME = "time";
     static constexpr auto ID_NAME = "id";
+    static constexpr auto NAME_NAME = "name";
 
     explicit Event(uint64_t time) noexcept;
+    Event(const std::string &name, uint64_t time) noexcept;
+
     template <typename T>
     void add_value(const std::string &name, const T &value) noexcept {
         values_[name] = value;
@@ -54,10 +57,14 @@ public:
     void set_time(uint64_t time);
     [[nodiscard]] uint64_t id() const { return *get_value<uint64_t>(ID_NAME); }
     void set_id(uint64_t id);
+    [[nodiscard]] std::string name() const { return *get_value<std::string>(NAME_NAME); }
+    void set_name(const std::string &name) { add_value(NAME_NAME, name); }
 
     [[nodiscard]] auto const &values() const { return values_; }
 
     using EventValue = std::variant<uint64_t, uint32_t, uint16_t, uint8_t, bool, std::string>;
+
+    void static reset_id() { event_id_count_ = 0; }
 
 private:
     std::map<std::string, EventValue> values_;
@@ -110,8 +117,18 @@ public:
         array_.insert(pos, first, last);
     }
 
+    void set_name(const std::string &name) {
+        name_ = name;
+        for (auto &elem: *this) {
+            elem->set_name(name);
+        }
+    }
+    [[nodiscard]] const std::string &name() const { return name_; }
+
+
 private:
     std::vector<std::shared_ptr<T>> array_;
+    std::string name_;
 };
 
 // a batch of events
@@ -129,16 +146,12 @@ public:
     EventBatch::iterator lower_bound(uint64_t time);
     EventBatch::iterator upper_bound(uint64_t time);
 
-    void set_event_name(std::string name) { event_name_ = std::move(name); }
-    [[nodiscard]] const std::string &event_name() const { return event_name_; }
-
     bool contains(uint64_t id) override;
 
 private:
     std::unordered_map<uint64_t, Event *> id_index_;
     std::map<uint64_t, EventBatch::iterator> lower_bound_index_;
     std::map<uint64_t, EventBatch::iterator> upper_bounder_index_;
-    std::string event_name_;
 
     void build_id_index();
     void build_time_index();

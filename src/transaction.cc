@@ -33,6 +33,7 @@ TransactionBatch::serialize() const noexcept {
     arrow::UInt64Builder id_builder(pool);
     arrow::UInt64Builder start_builder(pool);
     arrow::UInt64Builder end_builder(pool);
+    arrow::StringBuilder name_builder(pool);
     arrow::BooleanBuilder finished_builder(pool);
     arrow::ListBuilder event_ids_list_builder(pool, std::make_shared<arrow::UInt64Builder>(pool));
     auto &event_ids_builder =
@@ -42,6 +43,7 @@ TransactionBatch::serialize() const noexcept {
         (void)id_builder.Append(transaction->id());
         (void)start_builder.Append(transaction->start_time());
         (void)end_builder.Append(transaction->end_time());
+        (void)name_builder.Append(transaction->name());
         (void)finished_builder.Append(transaction->finished());
         std::vector<uint64_t> ids;
         auto const &events = transaction->events();
@@ -60,6 +62,9 @@ TransactionBatch::serialize() const noexcept {
     std::shared_ptr<arrow::Array> end_array;
     r = end_builder.Finish(&end_array);
     if (!r.ok()) return error_return;
+    std::shared_ptr<arrow::Array> name_array;
+    r = name_builder.Finish(&name_array);
+    if (!r.ok()) return error_return;
     std::shared_ptr<arrow::Array> finished_array;
     r = finished_builder.Finish(&finished_array);
     if (!r.ok()) return error_return;
@@ -68,14 +73,17 @@ TransactionBatch::serialize() const noexcept {
     if (!r.ok()) return error_return;
 
     std::vector<std::shared_ptr<arrow::Field>> schema_vector = {
-        arrow::field("id", arrow::uint64()), arrow::field("start_time", arrow::uint64()),
-        arrow::field("end_time", arrow::uint64()), arrow::field("finished", arrow::boolean()),
+        arrow::field("id", arrow::uint64()),
+        arrow::field("start_time", arrow::uint64()),
+        arrow::field("end_time", arrow::uint64()),
+        arrow::field("name", arrow::utf8()),
+        arrow::field("finished", arrow::boolean()),
         arrow::field("events", arrow::list(arrow::uint64()))};
     auto schema = std::make_shared<arrow::Schema>(schema_vector);
 
     auto batch = arrow::RecordBatch::Make(
         schema, static_cast<int64_t>(size()),
-        {id_array, start_array, end_array, finished_array, event_id_array});
+        {id_array, start_array, end_array, name_array, finished_array, event_id_array});
     return {batch, schema};
 }
 
@@ -88,14 +96,16 @@ std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
     auto id = table->column(0);
     auto start = table->column(1);
     auto end = table->column(2);
-    auto finished = table->column(3);
-    auto e = table->column(4);
+    auto name = table->column(3);
+    auto finished = table->column(4);
+    auto e = table->column(5);
 
     // need to iterate over the chunks
     for (auto idx = 0; idx < id->num_chunks(); idx++) {
         auto id_column = id->chunk(idx);
         auto start_time = start->chunk(idx);
         auto end_time = end->chunk(idx);
+        auto name_ = name->chunk(idx);
         auto finished_ = finished->chunk(idx);
         auto events = e->chunk(idx);
 
@@ -105,6 +115,7 @@ std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
 
             transaction->start_time_ = get_uint64(*start_time->GetScalar(i));
             transaction->end_time_ = get_uint64(*end_time->GetScalar(i));
+            transaction->name_ = get_string(*name_->GetScalar(i));
             transaction->finished_ = get_bool(*finished_->GetScalar(i));
 
             transaction->events_ids_ = get_uint64s(*events->GetScalar(i));
@@ -202,6 +213,7 @@ TransactionGroupBatch::serialize() const noexcept {
     arrow::UInt64Builder id_builder(pool);
     arrow::UInt64Builder start_builder(pool);
     arrow::UInt64Builder end_builder(pool);
+    arrow::StringBuilder name_builder(pool);
     // we use a bit mask to mask ids that are
     arrow::ListBuilder transaction_ids_list_builder(pool,
                                                     std::make_shared<arrow::UInt64Builder>(pool));
@@ -216,6 +228,7 @@ TransactionGroupBatch::serialize() const noexcept {
         (void)id_builder.Append(transaction->id());
         (void)start_builder.Append(transaction->start_time());
         (void)end_builder.Append(transaction->end_time());
+        (void)name_builder.Append(transaction->name());
         // indicate the start of a new list row
         (void)transaction_ids_list_builder.Append();
         (void)transaction_mask_list_builder.Append();
@@ -232,6 +245,9 @@ TransactionGroupBatch::serialize() const noexcept {
     std::shared_ptr<arrow::Array> end_array;
     r = end_builder.Finish(&end_array);
     if (!r.ok()) return error_return;
+    std::shared_ptr<arrow::Array> name_array;
+    r = name_builder.Finish(&name_array);
+    if (!r.ok()) return error_return;
     std::shared_ptr<arrow::Array> transaction_ids_array;
     r = transaction_ids_list_builder.Finish(&transaction_ids_array);
     if (!r.ok()) return error_return;
@@ -240,15 +256,17 @@ TransactionGroupBatch::serialize() const noexcept {
     if (!r.ok()) return error_return;
 
     std::vector<std::shared_ptr<arrow::Field>> schema_vector = {
-        arrow::field("id", arrow::uint64()), arrow::field("start_time", arrow::uint64()),
+        arrow::field("id", arrow::uint64()),
+        arrow::field("start_time", arrow::uint64()),
         arrow::field("end_time", arrow::uint64()),
+        arrow::field("name", arrow::utf8()),
         arrow::field("transaction_ids", arrow::list(arrow::uint64())),
         arrow::field("transaction_masks", arrow::list(arrow::boolean()))};
     auto schema = std::make_shared<arrow::Schema>(schema_vector);
 
-    auto batch = arrow::RecordBatch::Make(
-        schema, static_cast<int64_t>(size()),
-        {id_array, start_array, end_array, transaction_ids_array, transaction_masks_Array});
+    auto batch = arrow::RecordBatch::Make(schema, static_cast<int64_t>(size()),
+                                          {id_array, start_array, end_array, name_array,
+                                           transaction_ids_array, transaction_masks_Array});
     return {batch, schema};
 }
 
@@ -261,14 +279,16 @@ std::unique_ptr<TransactionGroupBatch> TransactionGroupBatch::deserialize(
     auto id = table->column(0);
     auto start = table->column(1);
     auto end = table->column(2);
-    auto ids = table->column(3);
-    auto masks = table->column(4);
+    auto names = table->column(3);
+    auto ids = table->column(4);
+    auto masks = table->column(5);
 
     // need to iterate over the chunks
     for (auto idx = 0; idx < id->num_chunks(); idx++) {
         auto id_column = id->chunk(idx);
         auto start_time = start->chunk(idx);
         auto end_time = end->chunk(idx);
+        auto name_ = names->chunk(idx);
         auto ids_ = ids->chunk(idx);
         auto masks_ = masks->chunk(idx);
 
@@ -278,6 +298,7 @@ std::unique_ptr<TransactionGroupBatch> TransactionGroupBatch::deserialize(
 
             transaction->start_time_ = get_uint64(*start_time->GetScalar(i));
             transaction->end_time_ = get_uint64(*end_time->GetScalar(i));
+            transaction->name_ = get_string(*name_->GetScalar(i));
 
             transaction->transactions_ = get_uint64s(*ids_->GetScalar(i));
             transaction->transaction_masks_ = get_bools(*masks_->GetScalar(i));

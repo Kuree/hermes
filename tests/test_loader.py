@@ -46,8 +46,11 @@ def test_loader_stream():
             for e in trans:
                 values.add(e.v)
             assert trans[-1] is not None
+            assert trans.name == "test"
+
         assert len(values) == 100
         assert transactions[4].id > 0
+        assert transactions[4].name == "test"
 
 
 def test_transaction_group_stream():

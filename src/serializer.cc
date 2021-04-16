@@ -218,22 +218,22 @@ void write_stat_to_file(rapidjson::Document &document, const std::string &filena
 
 void Serializer::update_stat(SerializationStat &stat, const EventBatch &batch) {
     if (stat.type.empty()) stat.type = "event";
-    if (stat.name.empty() && !batch.event_name().empty()) {
-        stat.name = batch.event_name();
+    if (stat.name.empty() && !batch.name().empty()) {
+        stat.name = batch.name();
     }
 }
 
 void Serializer::update_stat(SerializationStat &stat, const TransactionBatch &batch) {
     if (stat.type.empty()) stat.type = "transaction";
-    if (stat.name.empty() && !batch.transaction_name().empty()) {
-        stat.name = batch.transaction_name();
+    if (stat.name.empty() && !batch.name().empty()) {
+        stat.name = batch.name();
     }
 }
 
 void Serializer::update_stat(SerializationStat &stat, const TransactionGroupBatch &batch) {
     if (stat.type.empty()) stat.type = "transaction-group";
-    if (stat.name.empty() && !batch.transaction_name().empty()) {
-        stat.name = batch.transaction_name();
+    if (stat.name.empty() && !batch.name().empty()) {
+        stat.name = batch.name();
     }
 }
 
