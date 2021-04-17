@@ -18,7 +18,8 @@ enum int {
 enum int {
     D = 0,
     E = 1,
-    F = 2
+    F = 2,
+    G = 3
 } ENUM_2;
 
 endpackage

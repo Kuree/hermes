@@ -14,8 +14,7 @@
 
 namespace hermes {
 
-void parse_enum(const slang::Symbol &symbol, std::unordered_map<std::string, uint64_t> &enums,
-                std::string &error_message) {
+void parse_enum(const slang::Symbol &symbol, EnumMap &enums, std::string &error_message) {
     if (slang::VariableSymbol::isKind(symbol.kind)) {
         // this might be an enum
         auto const &variable = symbol.as<slang::VariableSymbol>();
@@ -31,16 +30,16 @@ void parse_enum(const slang::Symbol &symbol, std::unordered_map<std::string, uin
                     error_message = fmt::format("Unable to parse enum {0}", variable.name);
                     return;
                 }
-                enums.emplace(std::string(name), *value);
+                enums.emplace(std::string(name),
+                              std::make_pair(std::string(variable.name), *value));
             }
         }
     }
 }
 
-void parse_enum(
-    const slang::RootSymbol &root, std::unordered_map<std::string, uint64_t> &enums,
-    std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>> &package_enums,
-    std::string &error_message) {
+void parse_enum(const slang::RootSymbol &root, EnumMap &enums,
+                std::unordered_map<std::string, EnumMap> &package_enums,
+                std::string &error_message) {
     auto const &compilation_units = root.compilationUnits;
     for (auto const &cu : compilation_units) {
         for (auto const &member : cu->members()) {
@@ -114,15 +113,24 @@ RTL::RTL(const std::vector<std::string> &files, const std::vector<std::string> &
 
 std::optional<uint64_t> PackageProxy::get(const std::string &name) const {
     if (values.find(name) != values.end()) {
-        return values.at(name);
+        return values.at(name).second;
     } else {
         return std::nullopt;
     }
 }
 
+PackageProxy::PackageProxy(const EnumMap &values) : values(values) {
+    // build index
+    // make cache it?
+    for (auto const &[value_name, vs] : values) {
+        auto const &[def_name, v] = vs;
+        index[def_name][value_name] = v;
+    }
+}
+
 std::optional<uint64_t> RTL::get(const std::string &name) const {
     if (enums_.find(name) != enums_.end()) {
-        return enums_.at(name);
+        return enums_.at(name).second;
     } else {
         return std::nullopt;
     }
@@ -134,6 +142,40 @@ std::optional<PackageProxy> RTL::package(const std::string &name) const {
     } else {
         return std::nullopt;
     }
+}
+
+std::optional<std::string> RTL::lookup(uint64_t value) {
+    for (auto const &[enum_name, value_pair] : enums_) {
+        auto const &[def_name, v] = value_pair;
+        if (value == v) {
+            return enum_name;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> RTL::lookup(uint64_t value, const std::string &enum_name) {
+    return lookup(value, enum_name, enums_);
+}
+
+std::optional<std::string> RTL::lookup(uint64_t value, const std::string &pkg_name,
+                                       const std::string &enum_name) {
+    if (package_enums_.find(pkg_name) != package_enums_.end()) {
+        return lookup(value, enum_name, package_enums_.at(pkg_name));
+    } else {
+        return std::nullopt;
+    }
+}
+
+std::optional<std::string> RTL::lookup(uint64_t value, const std::string &enum_def_name,
+                                       const EnumMap &enum_map) {
+    for (auto const &[enum_name_, value_pair] : enum_map) {
+        auto const &[def_name, v] = value_pair;
+        if (value == v && def_name == enum_def_name) {
+            return enum_name_;
+        }
+    }
+    return std::nullopt;
 }
 
 }  // namespace hermes

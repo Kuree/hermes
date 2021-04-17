@@ -21,3 +21,25 @@ TEST(rtl, load_enum) {  // NOLINT
     auto F = pkg.get("F");
     EXPECT_EQ(*F, 2);
 }
+
+TEST(rtl, enum_lookup) {  // NOLINT
+    auto filename = get_vector_path("test_enum.sv");
+    EXPECT_TRUE(fs::exists(filename));
+    auto rtl = hermes::RTL(filename);
+    EXPECT_FALSE(rtl.has_error());
+
+    auto name = rtl.lookup(0);
+    EXPECT_TRUE(name);
+    EXPECT_TRUE(*name == "A" || *name == "C");
+
+    name = rtl.lookup(1, "ENUM_2");
+    EXPECT_TRUE(name);
+    EXPECT_EQ(*name, "D");
+
+    name = rtl.lookup(3, "test_pkg", "ENUM_2");
+    EXPECT_TRUE(name);
+    EXPECT_EQ(*name, "G");
+
+    name = rtl.lookup(3, "test_pkg", "ENUM_1");
+    EXPECT_FALSE(name);
+}
