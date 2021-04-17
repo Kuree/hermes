@@ -26,6 +26,7 @@ setup_test_target(test_sv)
 setup_test_target(test_loader)
 setup_test_target(test_query)
 setup_test_target(test_checker)
+setup_test_target(test_rtl)
 
 # add as a library
 add_library(test_tracker_lib SHARED test_tracker_lib.cc)

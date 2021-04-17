@@ -6,6 +6,7 @@
 #include "slang/parsing/Preprocessor.h"
 #include "slang/syntax/SyntaxTree.h"
 #include "slang/text/SourceManager.h"
+#include "slang/diagnostics/DiagnosticEngine.h"
 
 namespace hermes {
 RTL::RTL(const std::vector<std::string> &files, const std::vector<std::string> &includes) {
@@ -44,6 +45,14 @@ RTL::RTL(const std::vector<std::string> &files, const std::vector<std::string> &
     slang::Compilation compilation;
     for (const slang::SourceBuffer &buffer : buffers)
         compilation.addSyntaxTree(slang::SyntaxTree::fromBuffer(buffer, source_manager, options));
+
+    slang::DiagnosticEngine diag_engine(source_manager);
+    // issuing all diagnosis
+    for (auto const &diag : compilation.getAllDiagnostics()) diag_engine.issue(diag);
+
+    if (diag_engine.getNumErrors() > 0) {
+        error_message_ = "Error when parsing RTL files.";
+    }
 
     // loop through every enum definition and collect their values
 }

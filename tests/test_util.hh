@@ -43,6 +43,11 @@ private:
     std::string path_;
 };
 
+std::string get_vector_path(const std::string &filename) {
+    auto test_root = fs::path(__FILE__).parent_path();
+    return test_root / "vectors" / filename;
+}
+
 class EventTransactionInitializer {
 public:
     std::shared_ptr<hermes::Loader> loader;
