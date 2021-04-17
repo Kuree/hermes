@@ -112,7 +112,7 @@ RTL::RTL(const std::vector<std::string> &files, const std::vector<std::string> &
     parse_enum(root, enums_, package_enums_, error_message_);
 }
 
-std::optional<uint64_t> PackageProxy::get(const std::string &name) {
+std::optional<uint64_t> PackageProxy::get(const std::string &name) const {
     if (values.find(name) != values.end()) {
         return values.at(name);
     } else {
@@ -120,7 +120,7 @@ std::optional<uint64_t> PackageProxy::get(const std::string &name) {
     }
 }
 
-std::optional<uint64_t> RTL::get(const std::string &name) {
+std::optional<uint64_t> RTL::get(const std::string &name) const {
     if (enums_.find(name) != enums_.end()) {
         return enums_.at(name);
     } else {
@@ -128,7 +128,7 @@ std::optional<uint64_t> RTL::get(const std::string &name) {
     }
 }
 
-std::optional<PackageProxy> RTL::package(const std::string &name) {
+std::optional<PackageProxy> RTL::package(const std::string &name) const {
     if (package_enums_.find(name) != package_enums_.end()) {
         return PackageProxy(package_enums_.at(name));
     } else {

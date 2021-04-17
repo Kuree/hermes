@@ -15,6 +15,7 @@ void init_transaction(py::module &m);
 void init_logger(py::module &m);
 void init_loader(py::module &m);
 void init_checker(py::module &m);
+void init_rtl(py::module &m);
 
 void init_serializer(py::module &m) {
     auto serializer =
@@ -66,14 +67,6 @@ void init_message_bus(py::module &m) {
             return bus->shared_from_this();
         },
         py::return_value_policy::reference_internal);
-}
-
-void init_rtl(py::module &m) {
-    auto rtl = py::class_<hermes::RTL>(m, "RTL");
-    rtl.def(py::init<const std::string &>(), py::arg("filename"));
-    rtl.def(py::init<const std::vector<std::string> &>(), py::arg("filenames"));
-    rtl.def(py::init<const std::vector<std::string> &, const std::vector<std::string> &>(),
-            py::arg("filenames"), py::arg("include_dirs"));
 }
 
 void init_meta(py::module &m) {

@@ -11,7 +11,7 @@ struct PackageProxy {
 public:
     explicit PackageProxy(const std::unordered_map<std::string, uint64_t> &values)
         : values(values) {}
-    std::optional<uint64_t> get(const std::string &name);
+    std::optional<uint64_t> get(const std::string &name) const;
     const std::unordered_map<std::string, uint64_t> &values;
 };
 
@@ -22,10 +22,13 @@ public:
     RTL(const std::vector<std::string> &files, const std::vector<std::string> &includes);
 
     [[nodiscard]] bool has_error() const { return !error_message_.empty(); }
-    [[nodiscard]] const std::string &error_message() { return error_message_; }
+    [[nodiscard]] const std::string &error_message() const { return error_message_; }
 
-    std::optional<uint64_t> get(const std::string &name);
-    std::optional<PackageProxy> package(const std::string &name);
+    std::optional<uint64_t> get(const std::string &name) const;
+    std::optional<PackageProxy> package(const std::string &name) const;
+    [[nodiscard]] bool has_package(const std::string &name) const {
+        return package_enums_.find(name) != package_enums_.end();
+    }
 
 private:
     using EnumDef = std::unordered_map<std::string, uint64_t>;
