@@ -14,7 +14,12 @@ class TrackerBase : public Subscriber {
 public:
     explicit TrackerBase(const std::string &topic)
         : TrackerBase(MessageBus::default_bus(), topic) {}
-    TrackerBase(MessageBus *bus, std::string topic) : topic_(std::move(topic)) { bus_ = bus; }
+    TrackerBase(MessageBus *bus, std::string topic) : topic_(std::move(topic)) {
+        bus_ = bus;
+        // we use a high priority so that we can modify the event if necessary before
+        // sending it to the downstream
+        priority_ = default_priority / 10;
+    }
     void connect() { subscribe(bus_, topic_); }
 
     void set_serializer(const std::shared_ptr<Serializer> &serializer) { serializer_ = serializer; }

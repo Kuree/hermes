@@ -67,6 +67,9 @@ void init_message_bus(py::module &m) {
             return bus->shared_from_this();
         },
         py::return_value_policy::reference_internal);
+
+    auto sub = py::class_<hermes::Subscriber, std::shared_ptr<hermes::Subscriber>>(m, "Subscriber");
+    sub.def_property("priority", &hermes::Subscriber::priority, &hermes::Subscriber::set_priority);
 }
 
 void init_meta(py::module &m) {

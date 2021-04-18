@@ -40,7 +40,8 @@ void MessageBus::publish(const std::string &topic, const std::shared_ptr<Transac
     }
 }
 
-void MessageBus::add_subscriber(const std::string &topic, std::shared_ptr<Subscriber> &subscriber) {
+void MessageBus::add_subscriber(const std::string &topic,
+                                const std::shared_ptr<Subscriber> &subscriber) {
     subscribers_[topic].emplace(subscriber);
 }
 
@@ -66,10 +67,31 @@ std::set<std::shared_ptr<Subscriber>> MessageBus::get_subscribers() const {
     return result;
 }
 
+const MessageBus::SubList *MessageBus::get_subscribers(const std::string &topic) const {
+    if (subscribers_.find(topic) != subscribers_.end()) {
+        return &subscribers_.at(topic);
+    } else {
+        return nullptr;
+    }
+}
+
 void MessageBus::stop() const {
     auto subs = get_subscribers();
     for (const auto &sub : subs) {
         sub->stop();
+    }
+}
+
+bool MessageBus::SubCmp::operator()(const std::shared_ptr<Subscriber> &a,
+                                    const std::shared_ptr<Subscriber> &b) const {
+    // we need custom comparator to allow strict week ordering based on priority as well as
+    // pointer address
+    if (a == b) return false;
+    if (a->priority() != b->priority()) {
+        return a->priority() < b->priority();
+    } else {
+        // use pointer address
+        return a < b;
     }
 }
 

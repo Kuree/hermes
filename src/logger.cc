@@ -4,6 +4,10 @@
 
 namespace hermes {
 
+DummyEventSerializer::DummyEventSerializer(std::string topic) : topic_(std::move(topic)) {
+    priority_ = default_priority * 10;
+}
+
 void DummyEventSerializer::connect(MessageBus *bus, const std::shared_ptr<Serializer> &serializer) {
     subscribe(bus, topic_);
     serializer_ = serializer;

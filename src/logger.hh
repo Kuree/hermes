@@ -34,7 +34,7 @@ class Serializer;
 class DummyEventSerializer : public Subscriber {
 public:
     DummyEventSerializer() : DummyEventSerializer("*") {}
-    explicit DummyEventSerializer(std::string topic) : topic_(std::move(topic)) {}
+    explicit DummyEventSerializer(std::string topic);
     void connect(const std::shared_ptr<Serializer> &serializer) {
         connect(MessageBus::default_bus(), serializer);
     }

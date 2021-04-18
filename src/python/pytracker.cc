@@ -7,7 +7,7 @@
 namespace py = pybind11;
 
 template <typename T, typename K>
-void init_tracker_base(py::class_<T, K, std::shared_ptr<T>> &tracker) {
+void init_tracker_base(py::class_<T, K, hermes::Subscriber, std::shared_ptr<T>> &tracker) {
     tracker.def("get_new_transaction", &T::get_new_transaction,
                 py::return_value_policy::reference_internal);
     tracker.def("set_serializer", &T::set_serializer, py::arg("serializer"));
@@ -47,12 +47,11 @@ public:
 };
 
 void init_tracker(py::module &m) {
-    auto tracker =
-        py::class_<hermes::Tracker, PyTracker, std::shared_ptr<hermes::Tracker>>(m, "Tracker");
+    auto tracker = py::class_<hermes::Tracker, PyTracker, hermes::Subscriber,
+                              std::shared_ptr<hermes::Tracker>>(m, "Tracker");
     init_tracker_base(tracker);
 
-    auto group_tracker =
-        py::class_<hermes::GroupTracker, PyGroupTracker, std::shared_ptr<hermes::GroupTracker>>(
-            m, "GroupTracker");
+    auto group_tracker = py::class_<hermes::GroupTracker, PyGroupTracker, hermes::Subscriber,
+                                    std::shared_ptr<hermes::GroupTracker>>(m, "GroupTracker");
     init_tracker_base(group_tracker);
 }
