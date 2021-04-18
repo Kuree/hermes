@@ -65,8 +65,6 @@ public:
     using EventValue = std::variant<uint64_t, uint32_t, uint16_t, uint8_t, bool, std::string>;
 
     void static reset_id() { event_id_count_ = 0; }
-    // used to avoid allocating lots of event objects
-    void get_new_id();
 
 private:
     std::map<std::string, EventValue> values_;

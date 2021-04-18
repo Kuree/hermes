@@ -34,8 +34,6 @@ void Event::set_time(uint64_t time) { values_[TIME_NAME] = time; }
 
 void Event::set_id(uint64_t id) { values_[ID_NAME] = id; }
 
-void Event::get_new_id() { values_[ID_NAME] = event_id_count_++; }
-
 template <class... Ts>
 struct overloaded : Ts... {
     using Ts::operator()...;
@@ -367,16 +365,15 @@ bool parse_event_log_fmt(const std::string &filename, const std::string &event_n
     std::ifstream stream(filename);
     if (stream.bad()) return false;
     std::string line;
-    auto event = std::make_shared<Event>(0);
-    event->set_name(event_name);
 
     while (std::getline(stream, line)) {
         if (line.empty()) continue;
         // parse it
         std::smatch matches;
         if (std::regex_search(line, matches, re)) {
-            // new id for event
-            event->get_new_id();
+            // new event
+            auto event = std::make_shared<Event>(0);
+            event->set_name(event_name);
             // convert types and log values
             for (auto i = 1u; i < matches.size(); i++) {
                 // need to convert the types
@@ -384,10 +381,14 @@ bool parse_event_log_fmt(const std::string &filename, const std::string &event_n
                 auto type = types[idx];
                 auto const &match = matches[i];
                 switch (type) {
-                    case ValueType::Int:
-                    case ValueType::Time: {
+                    case ValueType::Int: {
                         auto value = std::stol(match.str());
                         event->add_value<uint32_t>(fields[idx], value);
+                        break;
+                    }
+                    case ValueType::Time: {
+                        auto value = std::stol(match.str());
+                        event->add_value<uint64_t>(fields[idx], value);
                         break;
                     }
                     case ValueType::Hex: {
@@ -404,6 +405,7 @@ bool parse_event_log_fmt(const std::string &filename, const std::string &event_n
             bus->publish(event_name, event);
         }
     }
+    stream.close();
 
     return true;
 }

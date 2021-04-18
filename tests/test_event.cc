@@ -1,18 +1,20 @@
-#include "event.hh"
+#include <fstream>
+
 #include "arrow.hh"
+#include "event.hh"
+#include "fmt/format.h"
 #include "gtest/gtest.h"
+#include "loader.hh"
+#include "serializer.hh"
+#include "test_util.hh"
 
-#include "arrow/api.h"
-
-
-TEST(event, event_time) {   // NOLINT
+TEST(event, event_time) {  // NOLINT
     constexpr auto event_time = 1u;
     hermes::Event e(event_time);
     EXPECT_EQ(e.time(), event_time);
 }
 
-
-TEST(event, event_set_get) {    // NOLINT
+TEST(event, event_set_get) {  // NOLINT
     hermes::Event e(0);
     e.add_value<uint8_t>("v1", 1);
     auto v1 = e.get_value<uint8_t>("v1");
@@ -23,7 +25,6 @@ TEST(event, event_set_get) {    // NOLINT
     EXPECT_TRUE(v2);
     EXPECT_EQ(*v2, "42");
 }
-
 
 TEST(event_batch, serilizattion) {  // NOLINT
     // create random events
@@ -63,9 +64,38 @@ TEST(event_batch, where) {  // NOLINT
         batch.emplace_back(std::move(event));
     }
 
-    auto res = batch.where([](const auto &e) -> bool {
-        return e->time() < 42;
-    });
+    auto res = batch.where([](const auto &e) -> bool { return e->time() < 42; });
 
     EXPECT_EQ(res->size(), 42);
+}
+
+TEST(event, log_parsing) {  // NOLINT
+    TempDirectory temp;
+    auto serializer = std::make_shared<hermes::Serializer>(temp.path());
+
+    auto dummy = std::make_shared<hermes::DummyEventSerializer>();
+    dummy->connect(serializer);
+    auto path = fs::path(temp.path()) / "test.log";
+
+    // need to generate some fake log files
+    std::ofstream stream(path);
+    for (int i = 0; i < 2000; i++) {
+        stream << fmt::format("@{0}: CMD: {1} VALUE: {2}", i, i, "AAA") << std::endl;
+    }
+    stream.close();
+    // readout the stream
+    auto r = hermes::parse_event_log_fmt(path, "test", R"(@%t: CMD: %d VALUE: %s)",
+                                         {"time", "cmd", "value"});
+    EXPECT_TRUE(r);
+
+    dummy->stop();
+    serializer->finalize();
+
+    // make sure we have them stored
+    hermes::Loader loader(temp.path());
+    auto event_batch = loader.get_events("test", 0, 2000);
+    EXPECT_EQ(event_batch->size(), 2000);
+    auto const &event = (*event_batch)[42];
+    EXPECT_EQ(event->time(), 42);
+    EXPECT_EQ(*event->get_value<std::string>("value"), "AAA");
 }

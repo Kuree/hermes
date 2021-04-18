@@ -1,4 +1,5 @@
 #include "../event.hh"
+#include "../pubsub.hh"
 #include "pybatch.hh"
 
 namespace py = pybind11;
@@ -10,6 +11,16 @@ struct visitor {
         return py::cast(value);
     }
 };
+
+void init_event_util(py::module &m) {
+    m.def("parse_event_log_fmt",
+          py::overload_cast<const std::string &, const std::string &, const std::string &,
+                            const std::vector<std::string> &>(&hermes::parse_event_log_fmt));
+    m.def("parse_event_log_fmt",
+          py::overload_cast<const std::string &, const std::string &, const std::string &,
+                            const std::vector<std::string> &, hermes::MessageBus *>(
+              &hermes::parse_event_log_fmt));
+}
 
 void init_event(py::module &m) {
     auto event = py::class_<hermes::Event, std::shared_ptr<hermes::Event>>(m, "Event");
@@ -79,4 +90,6 @@ void init_event(py::module &m) {
     auto event_batch =
         py::class_<hermes::EventBatch, std::shared_ptr<hermes::EventBatch>>(m, "EventBatch");
     init_batch(event_batch);
+
+    init_event_util(m);
 }
