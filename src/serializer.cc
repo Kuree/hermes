@@ -11,10 +11,10 @@
 #include "loader.hh"
 #include "parquet/arrow/writer.h"
 #include "parquet/metadata.h"
-#include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
+#include "json.hh"
 
 namespace fs = std::filesystem;
 
@@ -176,35 +176,6 @@ bool Serializer::serialize(parquet::arrow::FileWriter *writer,
     return true;
 }
 
-// the implementation below copies from hgdb
-template <typename T, typename K, typename A>
-void set_member(K &json_value, A &allocator, const char *name, const T &value) {
-    rapidjson::Value key(name, allocator);  // NOLINT
-    if constexpr (std::is_same<T, std::string>::value) {
-        rapidjson::Value v(value.c_str(), allocator);
-        json_value.AddMember(key, v, allocator);
-    } else if constexpr (std::is_integral<T>::value) {
-        json_value.AddMember(key.Move(), value, allocator);
-    } else if constexpr (std::is_same<T, rapidjson::Value>::value) {
-        rapidjson::Value v_copy(value, allocator);
-        json_value.AddMember(key.Move(), v_copy.Move(), allocator);
-    } else if constexpr (std::is_same<T, std::map<std::string, std::string>>::value) {
-        rapidjson::Value v(rapidjson::kObjectType);
-        for (auto const &[name, value_] : value) {
-            set_member(v, allocator, name.c_str(), value_);
-        }
-        json_value.AddMember(key.Move(), v.Move(), allocator);
-    } else {
-        throw std::runtime_error(fmt::format("Unable type for {0}", name));
-    }
-}
-
-template <typename T>
-void set_member(rapidjson::Document &document, const char *name, const T &value) {
-    auto &allocator = document.GetAllocator();
-    set_member(document, allocator, name, value);
-}
-
 void write_stat_to_file(rapidjson::Document &document, const std::string &filename) {
     rapidjson::StringBuffer buffer;
     rapidjson::PrettyWriter w(buffer);
@@ -240,9 +211,9 @@ void Serializer::update_stat(SerializationStat &stat, const TransactionGroupBatc
 void Serializer::write_stat(const SerializationStat &stat) {
     rapidjson::Document document(rapidjson::kObjectType);
     auto parquet_basename = std::string(fs::path(stat.parquet_filename).filename());
-    set_member(document, "parquet", parquet_basename);
-    set_member(document, "type", stat.type);
-    set_member(document, "name", stat.name);
+    json::set_member(document, "parquet", parquet_basename);
+    json::set_member(document, "type", stat.type);
+    json::set_member(document, "name", stat.name);
 
     write_stat_to_file(document, stat.json_filename);
 }

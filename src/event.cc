@@ -34,13 +34,6 @@ void Event::set_time(uint64_t time) { values_[TIME_NAME] = time; }
 
 void Event::set_id(uint64_t id) { values_[ID_NAME] = id; }
 
-template <class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
-template <class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
-
 std::shared_ptr<arrow::Schema> get_schema(Event *event) {
     auto const &values = event->values();
     std::vector<std::shared_ptr<arrow::Field>> schema_vector;

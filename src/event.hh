@@ -72,6 +72,14 @@ private:
     static uint64_t event_id_count_;
 };
 
+// template class to visit event values
+template <class... Ts>
+struct overloaded : Ts... {
+    using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
 template <typename T, typename K>
 class Batch {
 public:
