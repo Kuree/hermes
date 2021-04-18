@@ -1,5 +1,7 @@
 #include "event.hh"
 
+#include <fstream>
+#include <regex>
 #include <variant>
 
 #include "arrow.hh"
@@ -7,6 +9,7 @@
 #include "arrow/ipc/reader.h"
 #include "fmt/format.h"
 #include "parquet/stream_writer.h"
+#include "pubsub.hh"
 
 namespace hermes {
 
@@ -30,6 +33,8 @@ bool Event::remove_value(const std::string &name) {
 void Event::set_time(uint64_t time) { values_[TIME_NAME] = time; }
 
 void Event::set_id(uint64_t id) { values_[ID_NAME] = id; }
+
+void Event::get_new_id() { values_[ID_NAME] = event_id_count_++; }
 
 template <class... Ts>
 struct overloaded : Ts... {
@@ -285,6 +290,122 @@ void EventBatch::build_time_index() {
         lower_bound_index_.try_emplace((*it)->time(), it);
         upper_bounder_index_[(*it)->time()] = it;
     }
+}
+
+enum class ValueType { Int, Hex, Str, Time };
+// we need a ways to parse printf format into regex
+auto parse_fmt(const std::string &format, std::vector<ValueType> &types) {
+    // we are interested in any $display related formatting
+    // hand-rolled FSM-based parser
+    int state = 0;
+    std::string regex_data;
+    regex_data.reserve(format.size() * 2);
+    ;
+
+    for (auto c : format) {
+        if (state == 0) {
+            if (c == '\\') {
+                // escape mode
+                state = 2;
+            } else if (c == '%') {
+                state = 1;
+            } else {
+                regex_data.append(std::string(1, c));
+            }
+        } else if (state == 1) {
+            if (isdigit(c)) {
+                continue;
+            } else if (c == 'd') {
+                // put number regex here
+                types.emplace_back(ValueType::Int);
+                regex_data.append(R"(\s?(\d+))");
+            } else if (c == 't') {
+                types.emplace_back(ValueType::Time);
+                regex_data.append(R"(\s?(\d+))");
+            } else if (c == 'x' || c == 'X') {
+                types.emplace_back(ValueType::Hex);
+                regex_data.append(R"(\s?([\da-fA-F]+))");
+            } else if (c == 's') {
+                types.emplace_back(ValueType::Str);
+                regex_data.append(R"((\w+))");
+            } else if (c == 'm') {
+                types.emplace_back(ValueType::Str);
+                regex_data.append(R"(([\w$_\d.]+))");
+            } else {
+                throw std::runtime_error("Unknown formatter " + std::string(1, c));
+            }
+            state = 0;
+        } else {
+            if (c == '%') {
+                // no need to escape this at all
+                regex_data.append(std::string(1, c));
+            } else {
+                regex_data.append(std::string(1, '\\'));
+                regex_data.append(std::string(1, c));
+            }
+            state = 0;
+        }
+    }
+    // set the regex
+    return std::regex(regex_data);
+}
+
+bool parse_event_log_fmt(const std::string &filename, const std::string &event_name,
+                         const std::string &fmt, const std::vector<std::string> &fields) {
+    return parse_event_log_fmt(filename, event_name, fmt, fields, MessageBus::default_bus());
+}
+
+bool parse_event_log_fmt(const std::string &filename, const std::string &event_name,
+                         const std::string &fmt, const std::vector<std::string> &fields,
+                         MessageBus *bus) {
+    // need to open the file and parse the format
+    std::vector<ValueType> types;
+    auto re = parse_fmt(fmt, types);
+    if (types.size() != fields.size()) return false;
+    // need to open the file and read out, assume this is a huge files, we need to
+    // read out as a stream
+    std::ifstream stream(filename);
+    if (stream.bad()) return false;
+    std::string line;
+    auto event = std::make_shared<Event>(0);
+    event->set_name(event_name);
+
+    while (std::getline(stream, line)) {
+        if (line.empty()) continue;
+        // parse it
+        std::smatch matches;
+        if (std::regex_search(line, matches, re)) {
+            // new id for event
+            event->get_new_id();
+            // convert types and log values
+            for (auto i = 1u; i < matches.size(); i++) {
+                // need to convert the types
+                auto idx = i - 1;
+                auto type = types[idx];
+                auto const &match = matches[i];
+                switch (type) {
+                    case ValueType::Int:
+                    case ValueType::Time: {
+                        auto value = std::stol(match.str());
+                        event->add_value<uint32_t>(fields[idx], value);
+                        break;
+                    }
+                    case ValueType::Hex: {
+                        auto value = std::stol(match.str(), nullptr, 16);
+                        event->add_value<uint32_t>(fields[idx], value);
+                        break;
+                    }
+                    case ValueType::Str: {
+                        event->add_value<std::string>(fields[idx], match.str());
+                        break;
+                    }
+                }
+            }
+            bus->publish(event_name, event);
+        }
+    }
+
+    return true;
 }
 
 }  // namespace hermes

@@ -65,6 +65,8 @@ public:
     using EventValue = std::variant<uint64_t, uint32_t, uint16_t, uint8_t, bool, std::string>;
 
     void static reset_id() { event_id_count_ = 0; }
+    // used to avoid allocating lots of event objects
+    void get_new_id();
 
 private:
     std::map<std::string, EventValue> values_;
@@ -119,12 +121,11 @@ public:
 
     void set_name(const std::string &name) {
         name_ = name;
-        for (auto &elem: *this) {
+        for (auto &elem : *this) {
             elem->set_name(name);
         }
     }
     [[nodiscard]] const std::string &name() const { return name_; }
-
 
 private:
     std::vector<std::shared_ptr<T>> array_;
@@ -156,6 +157,14 @@ private:
     void build_id_index();
     void build_time_index();
 };
+
+// helper functions
+class MessageBus;
+bool parse_event_log_fmt(const std::string &filename, const std::string &event_name,
+                         const std::string &fmt, const std::vector<std::string> &fields);
+bool parse_event_log_fmt(const std::string &filename, const std::string &event_name,
+                         const std::string &fmt, const std::vector<std::string> &fields,
+                         MessageBus *bus);
 
 }  // namespace hermes
 
