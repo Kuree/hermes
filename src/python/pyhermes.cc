@@ -86,8 +86,8 @@ PYBIND11_MODULE(pyhermes, m) {
     init_transaction(m);
     init_serializer(m);
     init_logger(m);
-    init_tracker(m);
     init_message_bus(m);
+    init_tracker(m);
     init_loader(m);
     init_query(m);
     init_checker(m);
