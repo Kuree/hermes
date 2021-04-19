@@ -39,6 +39,25 @@ struct LoaderResult {
     std::string name;
 };
 
+struct FileMetadata {
+public:
+    using Value = std::map<std::string, std::vector<std::shared_ptr<parquet::Statistics>>>;
+    FileMetadata() = default;
+    void emplace(const FileInfo *key, const Value &value) { data_.emplace(key, value); }
+
+    Value &operator[](const FileInfo *key) { return data_[key]; }
+
+    [[nodiscard]] const Value &at(const FileInfo *info) const { return data_.at(info); }
+
+    uint64_t size(const FileInfo *file) {
+        return data_.at(file).begin()->second.size(); }
+
+private:
+    std::unordered_map<const FileInfo *,
+                       std::map<std::string, std::vector<std::shared_ptr<parquet::Statistics>>>>
+        data_;
+};
+
 struct TransactionData {
 public:
     struct TransactionGroupData {
@@ -155,6 +174,9 @@ public:
                                            uint64_t max_time);
 
     std::shared_ptr<TransactionStream> get_transaction_stream(const std::string &name);
+    std::shared_ptr<TransactionStream> get_transaction_stream(const std::string &name,
+                                                              uint64_t start_time,
+                                                              uint64_t end_time);
 
     std::shared_ptr<EventBatch> get_events(const Transaction &transaction);
 
@@ -163,9 +185,6 @@ public:
 
     // debug information
     [[maybe_unused]] void print_files() const;
-
-    using FileMetadata = std::unordered_map<
-        const FileInfo *, std::map<std::string, std::vector<std::shared_ptr<parquet::Statistics>>>>;
 
 private:
     std::vector<std::unique_ptr<FileInfo>> files_;
@@ -210,6 +229,8 @@ private:
     std::vector<LoaderResult> load_batch_table(const std::vector<const FileInfo *> &info,
                                                const std::optional<std::string> &name,
                                                uint64_t min_time, uint64_t max_time);
+    bool contains_time(const FileInfo *file, uint64_t chunk_id, uint64_t min_time,
+                       uint64_t max_time);
 
     friend class Checker;
     friend class TransactionDataIter;

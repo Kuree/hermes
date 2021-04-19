@@ -76,6 +76,9 @@ def test_transaction_group_stream():
             # use a new topic to avoid stream conflict
             logger.log("test-g", g)
 
+            if i == 49:
+                dummy_serializer.flush()
+
         pyhermes.default_bus().flush()
         serializer.finalize()
 
@@ -84,6 +87,7 @@ def test_transaction_group_stream():
         assert len(groups) == 100
         count = 0
         for group in groups:
+            assert group.id == count
             assert group.is_group
             assert len(group) == 10
             t = group[0]
@@ -97,6 +101,10 @@ def test_transaction_group_stream():
         group = group_data[0]
         assert len(group) == 10
         assert len(group[0]["events"]) == 5
+
+        # try to load half of it
+        groups = loader["test-g", (0, 49)]
+        assert len(groups) == 50
 
 
 if __name__ == "__main__":

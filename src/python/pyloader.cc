@@ -127,10 +127,18 @@ void init_loader(py::module &m) {
         return std::make_unique<hermes::Loader>(dirs);
     }));
 
-    loader.def("__getitem__", [](hermes::Loader &loader, std::string &name) {
+    loader.def("__getitem__", [](hermes::Loader &loader, const std::string &name) {
         auto stream = loader.get_transaction_stream(name);
         return stream;
     });
+    loader.def("__getitem__",
+               [](hermes::Loader &loader,
+                  const std::pair<std::string, std::pair<uint64_t, uint64_t>> &values) {
+                   auto const &[name, time] = values;
+                   auto [start, end] = time;
+                   auto stream = loader.get_transaction_stream(name, start, end);
+                   return stream;
+               });
     loader.def("stream", [](hermes::Loader &loader) { loader.stream(); });
     loader.def("stream", py::overload_cast<bool>(&hermes::Loader::stream));
 

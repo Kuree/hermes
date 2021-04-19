@@ -44,4 +44,5 @@ void init_logger(py::module &m) {
                              py::overload_cast<const std::shared_ptr<hermes::Serializer> &>(
                                  &hermes::DummyEventSerializer::connect),
                              py::arg("serializer"));
+    dummy_log_serializer.def("flush", &hermes::DummyEventSerializer::flush);
 }

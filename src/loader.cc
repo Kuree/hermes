@@ -67,7 +67,7 @@ TransactionData TransactionDataIter::operator*() const {
     }
     // need to load transactions
     // figure out which table to load
-    auto table_iter = stream_->tables_.lower_bound(current_row_);
+    auto table_iter = stream_->tables_.upper_bound(current_row_);
     auto const &[is_group, table] = table_iter->second;
     // compute the index
     auto offset = table_iter->first - current_row_;
@@ -327,11 +327,9 @@ std::shared_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t
             continue;
         }
         auto stats = file_metadata_.at(file);
-        auto time_stats = stats.at("time");
         auto pair = std::make_pair(file, std::vector<uint64_t>{});
-        for (uint64_t idx = 0; idx < time_stats.size(); idx++) {
-            auto const &s = time_stats[idx];
-            if (contains_value(s, min_time, max_time)) {
+        for (uint64_t idx = 0; idx < file_metadata_.size(file); idx++) {
+            if (contains_time(file, idx, min_time, max_time)) {
                 pair.second.emplace_back(idx);
             }
         }
@@ -360,7 +358,7 @@ std::shared_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t
 }
 
 inline std::unordered_map<const FileInfo *, std::vector<uint64_t>> compute_search_space(
-    const std::vector<const FileInfo *> &events_, const Loader::FileMetadata &file_metadata_,
+    const std::vector<const FileInfo *> &events_, const FileMetadata &file_metadata_,
     const std::vector<uint64_t> &ids) {
     std::unordered_map<const FileInfo *, std::vector<uint64_t>> files;
     for (auto const &file : events_) {
@@ -414,6 +412,13 @@ std::shared_ptr<EventBatch> Loader::get_events(const Transaction &transaction) {
 }
 
 std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::string &name) {
+    // all of them
+    return get_transaction_stream(name, 0, std::numeric_limits<uint64_t>::max());
+}
+
+std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::string &name,
+                                                                  uint64_t start_time,
+                                                                  uint64_t end_time) {
     // need to find files
     std::unordered_set<const FileInfo *> files;
     for (auto const &file : files_) {
@@ -427,6 +432,8 @@ std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::str
     std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> tables;
     for (auto const &[entry, table] : tables_) {
         auto const &[f, c_id] = entry;
+        // need to make sure we have that range
+        if (!contains_time(f, c_id, start_time, end_time)) continue;
         if (files.find(f) != files.end()) {
             tables.emplace_back(
                 std::make_pair(f->type == FileInfo::FileType::transaction_group, table));
@@ -845,11 +852,9 @@ std::vector<LoaderResult> Loader::load_events_table(uint64_t min_time, uint64_t 
     std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> files;
     for (auto const &file : events_) {
         auto stats = file_metadata_.at(file);
-        auto time_stats = stats.at("time");
         auto pair = std::make_pair(file, std::vector<uint64_t>{});
-        for (uint64_t idx = 0; idx < time_stats.size(); idx++) {
-            auto const &s = time_stats[idx];
-            if (contains_value(s, min_time, max_time)) {
+        for (uint64_t idx = 0; idx < file_metadata_.size(file); idx++) {
+            if (contains_time(file, idx, min_time, max_time)) {
                 pair.second.emplace_back(idx);
             }
         }
@@ -879,14 +884,9 @@ std::vector<LoaderResult> Loader::load_batch_table(const std::vector<const FileI
             if (file->name != name) continue;
         }
         auto stats = file_metadata_.at(file);
-        // we use time column
-        auto max_time_stats = stats.at("end_time");
-        auto min_time_stats = stats.at("start_time");
         auto pair = std::make_pair(file, std::vector<uint64_t>{});
-        for (uint64_t idx = 0; idx < max_time_stats.size(); idx++) {
-            auto const &min_s = min_time_stats[idx];
-            auto const &max_s = max_time_stats[idx];
-            if (contains_value(min_s, max_s, min_time, max_time)) {
+        for (uint64_t idx = 0; idx < file_metadata_.size(file); idx++) {
+            if (contains_time(file, idx, min_time, max_time)) {
                 pair.second.emplace_back(idx);
             }
         }
@@ -895,6 +895,24 @@ std::vector<LoaderResult> Loader::load_batch_table(const std::vector<const FileI
     // load the tables
     auto tables = load_tables(files);
     return tables;
+}
+
+bool Loader::contains_time(const FileInfo *file, uint64_t chunk_id, uint64_t min_time,
+                           uint64_t max_time) {
+    auto stats = file_metadata_.at(file);
+    // depends on which type of files we are dealing with
+    if (file->type == FileInfo::FileType::event) {
+        auto time_stats = stats.at("time");
+        auto const &s = time_stats[chunk_id];
+        return contains_value(s, min_time, max_time);
+    } else {
+        auto max_time_stats = stats.at("end_time");
+        auto min_time_stats = stats.at("start_time");
+
+        auto const &min_s = min_time_stats[chunk_id];
+        auto const &max_s = max_time_stats[chunk_id];
+        return contains_value(min_s, max_s, min_time, max_time);
+    }
 }
 
 }  // namespace hermes
