@@ -22,4 +22,11 @@ enum int {
     G = 3
 } ENUM_2;
 
+enum int {
+    FLAG_1 = 1,
+    FLAG_2 = 1 << 1,
+    FLAG_3 = 1 << 2,
+    FLAG_4 = 1 << 3
+} FLAGS;
+
 endpackage

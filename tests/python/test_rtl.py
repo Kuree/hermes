@@ -37,5 +37,16 @@ def test_enum_lookup():
     assert name == "G"
 
 
+def test_enum_flags():
+    enum_file = get_vector("test_enum.sv")
+    rtl = pyhermes.RTL(enum_file)
+    assert not rtl.has_error
+
+    pkg = rtl["test_pkg"]
+    enum = pkg["FLAGS"]
+    s = enum.flags(1 | 3 | 5)
+    assert s == "FLAG_1 | FLAG_2 | FLAG_3"
+
+
 if __name__ == "__main__":
-    test_enum_parsing()
+    test_enum_flags()

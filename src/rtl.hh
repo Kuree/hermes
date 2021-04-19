@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 
 namespace hermes {
 
@@ -30,7 +31,7 @@ public:
     [[nodiscard]] const std::string &error_message() const { return error_message_; }
 
     std::optional<uint64_t> get(const std::string &name) const;
-    std::optional<PackageProxy> package(const std::string &name) const;
+    std::shared_ptr<PackageProxy> package(const std::string &name) const;
     [[nodiscard]] bool has_package(const std::string &name) const {
         return package_enums_.find(name) != package_enums_.end();
     }
@@ -47,12 +48,17 @@ private:
     EnumMap enums_;
     // package level enums
     std::unordered_map<std::string, EnumMap> package_enums_;
+    // also build proxies so that look up can be faster
+    // compilation unit will be indexed as ""
+    std::unordered_map<std::string, std::shared_ptr<PackageProxy>> packages_;
 
     // indicate if there is any error when parsing the RTL
     std::string error_message_;
 
     static std::optional<std::string> lookup(uint64_t value, const std::string &enum_def_name,
                                              const EnumMap &enum_map);
+
+    void index_enums();
 };
 }  // namespace hermes
 

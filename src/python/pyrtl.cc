@@ -3,6 +3,7 @@
 #include <pybind11/stl.h>
 
 #include "../rtl.hh"
+#include "fmt/format.h"
 
 namespace py = pybind11;
 
@@ -26,6 +27,22 @@ public:
         return std::nullopt;
     }
 
+    std::optional<std::string> flags(uint64_t value) {
+        std::vector<std::string> names;
+        for (auto const &[name, v] : values) {
+            if ((v & value) == v) {
+                names.emplace_back(name);
+            }
+        }
+        if (names.empty()) {
+            return std::nullopt;
+        } else {
+            // sort them since the values are unordered
+            std::sort(names.begin(), names.end());
+            return fmt::format("{0}", fmt::join(names.begin(), names.end(), " | "));
+        }
+    }
+
     [[nodiscard]] bool has_def(const std::string &name) {
         return values.find(name) != values.end();
     }
@@ -37,10 +54,9 @@ py::object access_rtl(const hermes::RTL &rtl, const std::string &name) {
         return py::cast(rtl.package(name));
     } else {
         // could be a access to enum
-        auto const &enums = rtl.get_root_enums();
-        auto pkg = hermes::PackageProxy(enums);
-        if (pkg.index.find(name) != pkg.index.end()) {
-            return py::cast(Enum(pkg.index.at(name)));
+        auto const &pkg = rtl.package("");
+        if (pkg->index.find(name) != pkg->index.end()) {
+            return py::cast(Enum(pkg->index.at(name)));
         }
         return py::cast(rtl.get(name));
     }
@@ -70,11 +86,33 @@ void init_rtl(py::module &m) {
     rtl.def("lookup", py::overload_cast<uint64_t, const std::string &>(&hermes::RTL::lookup));
     rtl.def("lookup", py::overload_cast<uint64_t, const std::string &, const std::string &>(
                           &hermes::RTL::lookup));
+    rtl.def(
+        "enum",
+        [](const hermes::RTL &rtl, const std::string &name) -> std::optional<Enum> {
+            auto pkg = rtl.package("");
+            if (pkg->index.find(name) == pkg->index.end()) {
+                return std::nullopt;
+            } else {
+                return Enum(pkg->index.at(name));
+            }
+        },
+        py::arg("enum_name"));
 
     // package proxy
-    auto pkg = py::class_<hermes::PackageProxy>(m, "PackageProxy");
+    auto pkg =
+        py::class_<hermes::PackageProxy, std::shared_ptr<hermes::PackageProxy>>(m, "PackageProxy");
     pkg.def("__getitem__", &access_pkg);
     pkg.def("__getattr__", &access_pkg);
+    pkg.def(
+        "enum",
+        [](const hermes::PackageProxy &pkg, const std::string &name) -> std::optional<Enum> {
+            if (pkg.index.find(name) == pkg.index.end()) {
+                return std::nullopt;
+            } else {
+                return Enum(pkg.index.at(name));
+            }
+        },
+        py::arg("enum_name"));
 
     // enum
     auto enum_ = py::class_<Enum>(m, "Enum");
@@ -87,4 +125,5 @@ void init_rtl(py::module &m) {
         auto obj = py::cast(e.values);
         return py::str(obj);
     });
+    enum_.def("flags", &Enum::flags, py::arg("value"));
 }

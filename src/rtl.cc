@@ -109,6 +109,9 @@ RTL::RTL(const std::vector<std::string> &files, const std::vector<std::string> &
     // are at most 2 level (including the enum)
     auto const &root = compilation.getRoot();
     parse_enum(root, enums_, package_enums_, error_message_);
+
+    // index enums
+    index_enums();
 }
 
 std::optional<uint64_t> PackageProxy::get(const std::string &name) const {
@@ -136,11 +139,11 @@ std::optional<uint64_t> RTL::get(const std::string &name) const {
     }
 }
 
-std::optional<PackageProxy> RTL::package(const std::string &name) const {
-    if (package_enums_.find(name) != package_enums_.end()) {
-        return PackageProxy(package_enums_.at(name));
+std::shared_ptr<PackageProxy> RTL::package(const std::string &name) const {
+    if (packages_.find(name) != packages_.end()) {
+        return packages_.at(name);
     } else {
-        return std::nullopt;
+        return nullptr;
     }
 }
 
@@ -176,6 +179,13 @@ std::optional<std::string> RTL::lookup(uint64_t value, const std::string &enum_d
         }
     }
     return std::nullopt;
+}
+
+void RTL::index_enums() {
+    packages_.emplace("", std::make_shared<PackageProxy>(enums_));
+    for (auto const &[name, map] : package_enums_) {
+        packages_.emplace(name, std::make_shared<PackageProxy>(map));
+    }
 }
 
 }  // namespace hermes
