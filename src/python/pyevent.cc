@@ -72,12 +72,12 @@ void init_event(py::module &m) {
 
     event.def(
         "json",
-        [](const std::shared_ptr<hermes::Event> &event, bool pretty_print) {
+        [](const std::shared_ptr<hermes::Event> &event, bool pretty_print) -> std::string {
             rapidjson::MemoryPoolAllocator<> allocator;
             auto v = hermes::json::serialize(allocator, event);
-            return hermes::json::serialize(v, true);
+            return hermes::json::serialize(v, pretty_print);
         },
-        py::arg("pretty_print") = true);
+        py::arg("pretty_print") = false);
 
     // proxy through set item
     event.def("__setitem__",
@@ -103,12 +103,12 @@ void init_event(py::module &m) {
 
     event_batch.def(
         "json",
-        [](const std::shared_ptr<hermes::EventBatch> &events, bool pretty_print) {
+        [](const std::shared_ptr<hermes::EventBatch> &events, bool pretty_print) -> std::string {
             rapidjson::MemoryPoolAllocator<> allocator;
             auto v = hermes::json::serialize(allocator, events);
-            return hermes::json::serialize(v, true);
+            return hermes::json::serialize(v, pretty_print);
         },
-        py::arg("pretty_print") = true);
+        py::arg("pretty_print") = false);
 
     init_event_util(m);
 }

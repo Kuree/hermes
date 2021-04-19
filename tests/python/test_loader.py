@@ -1,5 +1,6 @@
 import pyhermes
 import tempfile
+import json
 
 
 class Tracker(pyhermes.Tracker):
@@ -55,7 +56,6 @@ def test_loader_stream():
 
 def test_transaction_group_stream():
     with tempfile.TemporaryDirectory() as temp:
-        temp = "temp"
         logger = pyhermes.Logger("test")
         dummy_serializer = pyhermes.DummyEventSerializer()
         serializer = pyhermes.Serializer(temp)
@@ -92,6 +92,11 @@ def test_transaction_group_stream():
             assert isinstance(e, pyhermes.Event)
             count += 1
         assert count == len(groups)
+        group_data = json.loads(groups.json())
+        assert len(group_data) == 100
+        group = group_data[0]
+        assert len(group) == 10
+        assert len(group[0]["events"]) == 5
 
 
 if __name__ == "__main__":

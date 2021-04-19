@@ -1,4 +1,5 @@
 import pyhermes
+import json
 
 
 def test_event():
@@ -23,6 +24,8 @@ def test_event():
         assert False
     except ValueError:
         pass
+    data_e = json.loads(e.json())
+    assert data_e["value"]["e"] == "e"
 
 
 def test_event_batch():
@@ -40,6 +43,9 @@ def test_event_batch():
     assert len(res) == 42 - 20
     new_batch = batch[0:-1:2]
     assert len(new_batch) == 21
+    batch_data = json.loads(batch.json())
+    assert len(batch_data) == 42
+    assert batch_data[20]["value"]["a"] == 21
 
 
 def test_transaction():

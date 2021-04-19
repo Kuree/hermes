@@ -25,8 +25,15 @@ void set_member(K &json_value, A &allocator, const char *name, const T &value) {
         }
         json_value.AddMember(key.Move(), v.Move(), allocator);
     } else {
-        throw std::runtime_error("Unable type for " + std::string(name));
+        throw std::runtime_error("Unable to determine type for " + std::string(name));
     }
+}
+
+template <typename K, typename A>
+void set_member(K &json_value, A &allocator, const char *name, const char *value) {
+    rapidjson::Value key(name, allocator);  // NOLINT
+    rapidjson::Value v(value, allocator);
+    json_value.AddMember(key, v, allocator);
 }
 
 template <typename T>
@@ -45,8 +52,6 @@ rapidjson::Value serialize(rapidjson::MemoryPoolAllocator<> &allocator,
                            const std::shared_ptr<TransactionStream> &stream);
 std::string serialize(const rapidjson::Document &document, bool pretty_print);
 std::string serialize(const rapidjson::Value &value, bool pretty_print);
-
-
 
 }  // namespace hermes::json
 

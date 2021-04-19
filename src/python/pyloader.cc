@@ -32,9 +32,9 @@ void init_stream(py::module &m) {
         [](const std::shared_ptr<hermes::TransactionStream> &s, bool pretty_print) {
             rapidjson::MemoryPoolAllocator<> allocator;
             auto v = hermes::json::serialize(allocator, s);
-            return hermes::json::serialize(v, true);
+            return hermes::json::serialize(v, pretty_print);
         },
-        py::arg("pretty_print") = true);
+        py::arg("pretty_print") = false);
 }
 
 uint64_t get_size(const hermes::TransactionData &t) {
@@ -108,9 +108,9 @@ void init_data(py::module &m) {
         [](const hermes::TransactionData &d, bool pretty_print) {
             rapidjson::MemoryPoolAllocator<> allocator;
             auto v = hermes::json::serialize(allocator, d);
-            return hermes::json::serialize(v, true);
+            return hermes::json::serialize(v, pretty_print);
         },
-        py::arg("pretty_print") = true);
+        py::arg("pretty_print") = false);
 }
 
 void init_loader(py::module &m) {
