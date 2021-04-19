@@ -2,6 +2,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "../json.hh"
 #include "../loader.hh"
 #include "../serializer.hh"
 
@@ -25,6 +26,15 @@ void init_stream(py::module &m) {
             return *pos;
         },
         py::arg("index"));
+
+    stream.def(
+        "json",
+        [](const std::shared_ptr<hermes::TransactionStream> &s, bool pretty_print) {
+            rapidjson::MemoryPoolAllocator<> allocator;
+            auto v = hermes::json::serialize(allocator, s);
+            return hermes::json::serialize(v, true);
+        },
+        py::arg("pretty_print") = true);
 }
 
 uint64_t get_size(const hermes::TransactionData &t) {
@@ -92,6 +102,15 @@ void init_data(py::module &m) {
             return t.transaction->name();
         }
     });
+
+    data.def(
+        "json",
+        [](const hermes::TransactionData &d, bool pretty_print) {
+            rapidjson::MemoryPoolAllocator<> allocator;
+            auto v = hermes::json::serialize(allocator, d);
+            return hermes::json::serialize(v, true);
+        },
+        py::arg("pretty_print") = true);
 }
 
 void init_loader(py::module &m) {

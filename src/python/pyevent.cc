@@ -1,4 +1,5 @@
 #include "../event.hh"
+#include "../json.hh"
 #include "../pubsub.hh"
 #include "pybatch.hh"
 
@@ -69,6 +70,15 @@ void init_event(py::module &m) {
     event.def("__setattr__", [](hermes::Event &event, const std::string &name,
                                 const std::string &value) { event.add_value(name, value); });
 
+    event.def(
+        "json",
+        [](const std::shared_ptr<hermes::Event> &event, bool pretty_print) {
+            rapidjson::MemoryPoolAllocator<> allocator;
+            auto v = hermes::json::serialize(allocator, event);
+            return hermes::json::serialize(v, true);
+        },
+        py::arg("pretty_print") = true);
+
     // proxy through set item
     event.def("__setitem__",
               [](hermes::Event &event, const std::string &name, const py::object &value) {
@@ -90,6 +100,15 @@ void init_event(py::module &m) {
     auto event_batch =
         py::class_<hermes::EventBatch, std::shared_ptr<hermes::EventBatch>>(m, "EventBatch");
     init_batch(event_batch);
+
+    event_batch.def(
+        "json",
+        [](const std::shared_ptr<hermes::EventBatch> &events, bool pretty_print) {
+            rapidjson::MemoryPoolAllocator<> allocator;
+            auto v = hermes::json::serialize(allocator, events);
+            return hermes::json::serialize(v, true);
+        },
+        py::arg("pretty_print") = true);
 
     init_event_util(m);
 }

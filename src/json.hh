@@ -1,6 +1,7 @@
 #ifndef HERMES_JSON_HH
 #define HERMES_JSON_HH
 
+#include "loader.hh"
 #include "rapidjson/document.h"
 #include "rapidjson/rapidjson.h"
 #include "transaction.hh"
@@ -36,6 +37,16 @@ void set_member(rapidjson::Document &document, const char *name, const T &value)
 
 rapidjson::Value serialize(rapidjson::MemoryPoolAllocator<> &allocator,
                            const std::shared_ptr<Event> &event);
+rapidjson::Value serialize(rapidjson::MemoryPoolAllocator<> &allocator,
+                           const std::shared_ptr<EventBatch> &batch);
+rapidjson::Value serialize(rapidjson::MemoryPoolAllocator<> &allocator,
+                           const TransactionData &data);
+rapidjson::Value serialize(rapidjson::MemoryPoolAllocator<> &allocator,
+                           const std::shared_ptr<TransactionStream> &stream);
+std::string serialize(const rapidjson::Document &document, bool pretty_print);
+std::string serialize(const rapidjson::Value &value, bool pretty_print);
+
+
 
 }  // namespace hermes::json
 
