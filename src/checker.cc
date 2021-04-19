@@ -29,7 +29,7 @@ void Checker::run(const std::string &transaction_name, const std::shared_ptr<Loa
                                     break;
                                 }
                             }
-                            check(it.transaction, query);
+                            check(it, query);
                         }
                     } catch (const CheckerAssertion &ex) {
                         std::lock_guard guard(assert_mutex_);
@@ -37,7 +37,7 @@ void Checker::run(const std::string &transaction_name, const std::shared_ptr<Loa
                     }
                 } else {
                     for (auto &&it : stream) {
-                        check(it.transaction, query);
+                        check(it, query);
                     }
                 }
             });
@@ -58,7 +58,7 @@ void Checker::run(const std::string &transaction_name, const std::shared_ptr<Loa
         }
         auto stream = TransactionStream(ts, loader.get());
         for (auto &&it : stream) {
-            check(it.transaction, query);
+            check(it, query);
         }
     }
 }

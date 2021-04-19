@@ -77,6 +77,12 @@ rapidjson::Value serialize(rapidjson::MemoryPoolAllocator<> &allocator,
         // array
         Value array(kArrayType);
         for (auto const &event : *data.events) {
+            if (!event) {
+                // push a null value. this actually indicates an internal error
+                // since we actually expect we've saved everything
+                array.PushBack(Value(), allocator);
+                continue;
+            }
             auto e = serialize(allocator, event);
             array.PushBack(std::move(e), allocator);
         }

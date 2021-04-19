@@ -13,7 +13,7 @@ namespace hermes {
 class Checker {
 public:
     Checker() = default;
-    virtual void check(const std::shared_ptr<Transaction> &transaction,
+    virtual void check(const hermes::TransactionData &transaction_data,
                        const std::shared_ptr<QueryHelper> &query) = 0;
 
     void run(const std::string &transaction_name, const std::shared_ptr<Loader> &loader);
@@ -35,7 +35,7 @@ protected:
 
 class CheckerAssertion : public std::runtime_error {
 public:
-    explicit CheckerAssertion(std::string msg) : std::runtime_error(std::move(msg)) {}
+    explicit CheckerAssertion(std::string msg) : std::runtime_error(std::move(msg)) {}  // NOLINT
 };
 
 }  // namespace hermes

@@ -1,6 +1,7 @@
 #include "../src/checker.hh"
 #include "gtest/gtest.h"
 #include "test_util.hh"
+#include <iostream>
 
 class CheckerTest : public ::testing::Test, public EventTransactionInitializer {
     void SetUp() override { setup(); }
@@ -8,8 +9,8 @@ class CheckerTest : public ::testing::Test, public EventTransactionInitializer {
 
 class Checker1 : public hermes::Checker {
 public:
-    void check(const std::shared_ptr<hermes::Transaction> &,
-               const std::shared_ptr<hermes::QueryHelper> &) override {
+    void check(const hermes::TransactionData &transaction_data,
+               const std::shared_ptr<hermes::QueryHelper> &) override{
         // do nothing, i.e. everything is correct
     }
 };
@@ -23,24 +24,28 @@ class Checker2 : public hermes::Checker {
 public:
     explicit Checker2(bool exception = false) { assert_exception_ = exception; }
 
-    void check(const std::shared_ptr<hermes::Transaction> &transaction,
+    void check(const hermes::TransactionData &transaction_data,
                const std::shared_ptr<hermes::QueryHelper> &) override {
         // do nothing, i.e. everything is correct
-        auto const &events = transaction->events();
-        assert_(events.size() != 10, "Events size mismatch");
+        auto const &events = transaction_data.events;
+        assert_(events->size() != 10, "Events size mismatch");
     }
 };
 
 TEST_F(CheckerTest, check2_cerr) {  // NOLINT
     Checker2 checker;
-    testing::internal::CaptureStderr();
+    std::stringstream buffer;
+    auto *buf = std::cerr.rdbuf();
+    std::cerr.rdbuf(buffer.rdbuf());
+
     checker.run(name, loader);
-    auto cerr = testing::internal::GetCapturedStderr();
-    EXPECT_NE(cerr.find("ERROR"), std::string::npos);
+    // restore
+    std::cerr.rdbuf(buf);
+    auto str = buffer.str();
+    EXPECT_NE(str.find("ERROR"), std::string::npos);
 }
 
 TEST_F(CheckerTest, check2_except) {  // NOLINT
     Checker2 checker(true);
-    testing::internal::CaptureStderr();
     EXPECT_THROW(checker.run(name, loader), hermes::CheckerAssertion);
 }
