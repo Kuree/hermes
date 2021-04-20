@@ -1,6 +1,7 @@
 import pyhermes
 import tempfile
 import json
+import os
 
 
 class Tracker(pyhermes.Tracker):
@@ -33,6 +34,7 @@ def setup_loader_test(temp):
 
     pyhermes.default_bus().flush()
     serializer.finalize()
+    return serializer
 
 
 def test_loader_stream():
@@ -107,5 +109,17 @@ def test_transaction_group_stream():
         assert len(groups) == 50
 
 
+def test_s3_fs():
+    # use localstack to test
+    path = "s3://test/test"
+    serializer = setup_loader_test(path)
+    # set credential
+    os.environ["AWS_ACCESS_KEY_ID"] = "test"
+    os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
+    loader = pyhermes.Loader(path)
+    stream = loader["stream"]
+    assert len(stream) > 0
+
+
 if __name__ == "__main__":
-    test_transaction_group_stream()
+    test_s3_fs()

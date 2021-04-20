@@ -1,6 +1,7 @@
 #include "serializer.hh"
 
 #include <filesystem>
+#include <iostream>
 #include <utility>
 
 #include "arrow/api.h"
@@ -36,7 +37,12 @@ Serializer::Serializer(std::string output_dir, bool override) : output_dir_(std:
     }
 
     auto fs_res = arrow::fs::FileSystemFromUriOrPath(output_dir_);
-    if (!fs_res.ok()) return;
+    if (!fs_res.ok()) {
+        // need to print out the filesystem error since it's critical
+        std::cerr << "[ERROR]: " << fs_res.status().ToString() << std::endl;
+        has_error_ = true;
+        return;
+    }
     fs_ = *fs_res;
 
     // need to find this directory
@@ -65,6 +71,7 @@ Serializer::Serializer(std::string output_dir, bool override) : output_dir_(std:
 }
 
 bool Serializer::serialize(EventBatch &batch) {
+    if (!ok()) return false;
     auto r = batch.validate();
     if (!r) return false;
     batch.sort();
@@ -82,6 +89,7 @@ bool Serializer::serialize(EventBatch &batch) {
 }
 
 bool Serializer::serialize(TransactionBatch &batch) {
+    if (!ok()) return false;
     batch.sort();
     // serialize
     auto [record, schema] = batch.serialize();
@@ -96,6 +104,7 @@ bool Serializer::serialize(TransactionBatch &batch) {
 }
 
 bool Serializer::serialize(TransactionGroupBatch &batch) {
+    if (!ok()) return false;
     batch.sort();
     // serialize
     auto [record, schema] = batch.serialize();
