@@ -14,6 +14,16 @@ class FileWriter;
 }
 }  // namespace parquet
 
+namespace arrow {
+namespace fs {
+class FileSystem;
+class FileInfo;
+}  // namespace fs
+namespace io {
+class RandomAccessFile;
+}
+}  // namespace arrow
+
 namespace hermes {
 
 struct SerializationStat {
@@ -36,6 +46,8 @@ public:
     bool serialize(TransactionGroupBatch &batch);
 
     void finalize();
+    // whether the serializer is in a good state
+    [[nodiscard]] bool ok() const;
 
     ~Serializer() { finalize(); }
 
@@ -46,6 +58,9 @@ private:
     std::shared_ptr<parquet::WriterProperties> writer_properties_;
     std::unordered_map<const void *, std::shared_ptr<parquet::arrow::FileWriter>> writers_;
     std::unordered_map<const void *, SerializationStat> stats_;
+    // file system implementation from arrow
+    std::shared_ptr<arrow::fs::FileSystem> fs_;
+    bool has_error_ = false;
 
     std::pair<std::string, std::string> get_next_filename();
     parquet::arrow::FileWriter *get_writer(const void *ptr,
@@ -54,11 +69,12 @@ private:
     void identify_batch_counter();
 
     static bool serialize(parquet::arrow::FileWriter *writer,
-                   const std::shared_ptr<arrow::RecordBatch> &record);
+                          const std::shared_ptr<arrow::RecordBatch> &record);
     static void update_stat(SerializationStat &stat, const EventBatch &batch);
     static void update_stat(SerializationStat &stat, const TransactionBatch &batch);
     static void update_stat(SerializationStat &stat, const TransactionGroupBatch &batch);
-    static void write_stat(const SerializationStat &stat);
+    static void write_stat(const std::shared_ptr<arrow::fs::FileSystem> &fs,
+                           const SerializationStat &stat);
 };
 
 }  // namespace hermes

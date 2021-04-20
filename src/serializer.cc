@@ -1,31 +1,54 @@
 #include "serializer.hh"
 
 #include <filesystem>
-#include <fstream>
 #include <utility>
 
 #include "arrow/api.h"
+#include "arrow/filesystem/localfs.h"
 #include "arrow/io/file.h"
 #include "arrow/ipc/reader.h"
 #include "fmt/format.h"
-#include "loader.hh"
+#include "json.hh"
 #include "parquet/arrow/writer.h"
 #include "parquet/metadata.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
-#include "json.hh"
 
 namespace fs = std::filesystem;
 
 namespace hermes {
 
+bool exists(const std::shared_ptr<arrow::fs::FileSystem> &fs, const std::string &path) {
+    auto exists_res = fs->GetFileInfo(path);
+    if (!exists_res.ok()) {
+        return false;
+    }
+    auto e = *exists_res;
+    return e.type() == arrow::fs::FileType::Directory || e.type() == arrow::fs::FileType::File;
+}
+
 Serializer::Serializer(std::string output_dir) : Serializer(std::move(output_dir), true) {}
 
 Serializer::Serializer(std::string output_dir, bool override) : output_dir_(std::move(output_dir)) {
-    if (!fs::exists(output_dir_)) {
-        fs::create_directories(output_dir_);
+    if (output_dir_.find("://") == std::string::npos) {
+        output_dir_ = fs::absolute(output_dir_);
     }
+
+    auto fs_res = arrow::fs::FileSystemFromUriOrPath(output_dir_);
+    if (!fs_res.ok()) return;
+    fs_ = *fs_res;
+
+    // need to find this directory
+    if (!exists(fs_, output_dir_)) {
+        // need to create directory recursively if possible
+        auto res = fs_->CreateDir(output_dir_, true);
+        if (!res.ok()) {
+            has_error_ = true;
+            return;
+        }
+    }
+
     // we use version 2.0
     auto builder = parquet::WriterProperties::Builder();
     builder.version(parquet::ParquetVersion::PARQUET_2_0);
@@ -92,12 +115,14 @@ void Serializer::finalize() {
         (void)writer->Close();
     }
     for (auto const &[ptr, stat] : stats_) {
-        write_stat(stat);
+        write_stat(fs_, stat);
     }
 
     writers_.clear();
     stats_.clear();
 }
+
+bool Serializer::ok() const { return fs_ != nullptr && !has_error_; }
 
 std::pair<std::string, std::string> Serializer::get_next_filename() {
     std::lock_guard guard(batch_mutex_);
@@ -117,7 +142,7 @@ parquet::arrow::FileWriter *Serializer::get_writer(const void *ptr,
     } else {
         // need to create a new set of files
         auto &stat = get_stat(ptr);
-        auto res_f = arrow::io::FileOutputStream::Open(stat.parquet_filename);
+        auto res_f = fs_->OpenOutputStream(stat.parquet_filename);
         if (!res_f.ok()) return nullptr;
         auto out_file = *res_f;
 
@@ -151,7 +176,7 @@ void Serializer::identify_batch_counter() {
         auto json_name = fmt::format("{0}.json", batch_counter_);
         auto dir = fs::path(output_dir_);
         json_name = dir / json_name;
-        if (fs::exists(json_name)) {
+        if (exists(fs_, json_name)) {
             batch_counter_++;
         } else {
             break;
@@ -176,15 +201,18 @@ bool Serializer::serialize(parquet::arrow::FileWriter *writer,
     return true;
 }
 
-void write_stat_to_file(rapidjson::Document &document, const std::string &filename) {
+void write_stat_to_file(const std::shared_ptr<arrow::fs::FileSystem> &fs,
+                        rapidjson::Document &document, const std::string &filename) {
     rapidjson::StringBuffer buffer;
     rapidjson::PrettyWriter w(buffer);
     document.Accept(w);
     auto const *s = buffer.GetString();
 
-    std::ofstream file(filename, std::ios_base::trunc);
-    file << s;
-    file.close();
+    auto file_res = fs->OpenOutputStream(filename);
+    if (!file_res.ok()) return;
+    auto file = *file_res;
+    (void)(file->Write(s));
+    (void)file->Close();
 }
 
 void Serializer::update_stat(SerializationStat &stat, const EventBatch &batch) {
@@ -208,14 +236,15 @@ void Serializer::update_stat(SerializationStat &stat, const TransactionGroupBatc
     }
 }
 
-void Serializer::write_stat(const SerializationStat &stat) {
+void Serializer::write_stat(const std::shared_ptr<arrow::fs::FileSystem> &fs,
+                            const SerializationStat &stat) {
     rapidjson::Document document(rapidjson::kObjectType);
     auto parquet_basename = std::string(fs::path(stat.parquet_filename).filename());
     json::set_member(document, "parquet", parquet_basename);
     json::set_member(document, "type", stat.type);
     json::set_member(document, "name", stat.name);
 
-    write_stat_to_file(document, stat.json_filename);
+    write_stat_to_file(fs, document, stat.json_filename);
 }
 
 }  // namespace hermes
