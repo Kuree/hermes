@@ -103,36 +103,22 @@ Loader::Loader(const std::string &dir) : Loader(std::vector<std::string>{dir}) {
 
 Loader::Loader(const std::vector<std::string> &dirs) {
     for (auto const &dir : dirs) {
-        open_dir(dir);
+        open_dir(FileSystemInfo(dir));
     }
 
     // compute stats. this should be very fast
     compute_stats();
-    // initialize the cache based on the stats
-    // get total memory
-    auto total_mem = os::get_total_system_memory();
-    // we expect the majority of the memory will be consumed by events
-    total_mem = total_mem / 6;
-    auto mem_events = total_mem * 3;
-    auto mem_transaction = total_mem;
-    auto mem_transaction_group = total_mem;
-    auto num_events =
-        stats_.average_event_chunk_size > 0 ? mem_events / stats_.average_event_chunk_size : 16;
-    auto num_transactions = stats_.average_transaction_chunk_size > 0
-                                ? mem_transaction / stats_.average_transaction_chunk_size
-                                : 16;
-    auto num_transaction_groups =
-        stats_.average_transaction_group_chunk_size > 0
-            ? mem_transaction_group / stats_.average_transaction_group_chunk_size
-            : 16;
-    event_cache_ =
-        std::make_unique<lru_cache<const arrow::Table *, std::shared_ptr<EventBatch>>>(num_events);
-    transaction_cache_ =
-        std::make_unique<lru_cache<const arrow::Table *, std::shared_ptr<TransactionBatch>>>(
-            num_transactions);
-    transaction_group_cache_ =
-        std::make_unique<lru_cache<const arrow::Table *, std::shared_ptr<TransactionGroupBatch>>>(
-            num_transaction_groups);
+    init_cache();
+}
+
+Loader::Loader(const std::vector<FileSystemInfo> &infos) {
+    for (auto const &info : infos) {
+        open_dir(info);
+    }
+
+    // compute stats. this should be very fast
+    compute_stats();
+    init_cache();
 }
 
 bool contains_value(const std::shared_ptr<parquet::Statistics> &stats, uint64_t value) {
@@ -477,22 +463,15 @@ static std::optional<T> get_member(rapidjson::Document &document, const char *me
     return std::nullopt;
 }
 
-void Loader::open_dir(const std::string &dir) {
+void Loader::open_dir(const FileSystemInfo &info) {
     // need to detect if it's a local file system or not
     // if it doesn't contain the uri ://, then it's local filesystem
-    std::string path;
-    if (dir.find("://") == std::string::npos) {
-        path = fs::absolute(dir);
-    } else {
-        path = dir;
-    }
-    auto fs_res = arrow::fs::FileSystemFromUriOrPath(path);
-    if (!fs_res.ok()) return;
-    auto fs = *fs_res;
+    auto fs = load_fs(info);
+    if (!fs) return;
 
     // do a LIST option
     auto selector = arrow::fs::FileSelector();
-    selector.base_dir = path;
+    selector.base_dir = info.path;
     auto res = fs->GetFileInfo(selector);
     if (!res.ok()) return;
     auto files = *res;
@@ -913,6 +892,34 @@ bool Loader::contains_time(const FileInfo *file, uint64_t chunk_id, uint64_t min
         auto const &max_s = max_time_stats[chunk_id];
         return contains_value(min_s, max_s, min_time, max_time);
     }
+}
+
+void Loader::init_cache() {
+    // initialize the cache based on the stats
+    // get total memory
+    auto total_mem = os::get_total_system_memory();
+    // we expect the majority of the memory will be consumed by events
+    total_mem = total_mem / 6;
+    auto mem_events = total_mem * 3;
+    auto mem_transaction = total_mem;
+    auto mem_transaction_group = total_mem;
+    auto num_events =
+        stats_.average_event_chunk_size > 0 ? mem_events / stats_.average_event_chunk_size : 16;
+    auto num_transactions = stats_.average_transaction_chunk_size > 0
+                                ? mem_transaction / stats_.average_transaction_chunk_size
+                                : 16;
+    auto num_transaction_groups =
+        stats_.average_transaction_group_chunk_size > 0
+            ? mem_transaction_group / stats_.average_transaction_group_chunk_size
+            : 16;
+    event_cache_ =
+        std::make_unique<lru_cache<const arrow::Table *, std::shared_ptr<EventBatch>>>(num_events);
+    transaction_cache_ =
+        std::make_unique<lru_cache<const arrow::Table *, std::shared_ptr<TransactionBatch>>>(
+            num_transactions);
+    transaction_group_cache_ =
+        std::make_unique<lru_cache<const arrow::Table *, std::shared_ptr<TransactionGroupBatch>>>(
+            num_transaction_groups);
 }
 
 }  // namespace hermes

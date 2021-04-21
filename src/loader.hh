@@ -5,6 +5,7 @@
 
 #include "cache.hh"
 #include "transaction.hh"
+#include "arrow.hh"
 
 namespace arrow {
 namespace fs {
@@ -156,6 +157,7 @@ class Loader {
 public:
     explicit Loader(const std::string &dir);
     explicit Loader(const std::vector<std::string> &dirs);
+    explicit Loader(const std::vector<FileSystemInfo> &infos);
     std::shared_ptr<Transaction> get_transaction(uint64_t id);
     std::shared_ptr<TransactionGroup> get_transaction_group(uint64_t id);
     std::vector<std::shared_ptr<TransactionBatch>> get_transactions(uint64_t min_time,
@@ -207,7 +209,7 @@ private:
     // stats about the folder we're reading
     LoaderStats stats_;
 
-    void open_dir(const std::string &dir);
+    void open_dir(const FileSystemInfo &info);
     void load_json(const arrow::fs::FileInfo &json_info,
                    const std::shared_ptr<arrow::fs::FileSystem> &fs);
     bool preload_table(const FileInfo *info,
@@ -231,6 +233,7 @@ private:
                                                uint64_t min_time, uint64_t max_time);
     bool contains_time(const FileInfo *file, uint64_t chunk_id, uint64_t min_time,
                        uint64_t max_time);
+    void init_cache();
 
     friend class Checker;
     friend class TransactionDataIter;

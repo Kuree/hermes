@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <memory>
+#include <string>
 
 namespace arrow {
 class Buffer;
@@ -10,6 +11,10 @@ class RecordBatch;
 class Schema;
 class Scalar;
 class Table;
+
+namespace fs {
+class FileSystem;
+}
 }  // namespace arrow
 
 namespace hermes {
@@ -32,6 +37,21 @@ bool get_bool(const std::shared_ptr<arrow::Scalar> &scalar);
 
 std::vector<uint64_t> get_uint64s(const std::shared_ptr<arrow::Scalar> &scalar);
 std::vector<bool> get_bools(const std::shared_ptr<arrow::Scalar> &scalar);
+
+struct FileSystemInfo {
+public:
+    explicit FileSystemInfo(const std::string& path);
+    std::string path;
+    std::string access_key;
+    std::string secret_key;
+    std::string end_point;
+    [[nodiscard]] bool is_s3() const;
+
+private:
+    bool is_local_ = false;
+};
+
+std::shared_ptr<arrow::fs::FileSystem> load_fs(const FileSystemInfo &info);
 
 }  // namespace hermes
 

@@ -6,6 +6,7 @@
 
 #include "event.hh"
 #include "transaction.hh"
+#include "arrow.hh"
 
 namespace parquet {
 class WriterProperties;
@@ -38,8 +39,9 @@ struct SerializationStat {
 
 class Serializer {
 public:
-    explicit Serializer(std::string output_dir);
-    Serializer(std::string output_dir, bool override);
+    explicit Serializer(const std::string& output_dir);
+    Serializer(const std::string& output_dir, bool override);
+    Serializer(FileSystemInfo info, bool override);
 
     bool serialize(EventBatch &batch);
     bool serialize(TransactionBatch &batch);
@@ -52,7 +54,7 @@ public:
     ~Serializer() { finalize(); }
 
 private:
-    std::string output_dir_;
+    FileSystemInfo output_dir_;
     uint64_t batch_counter_ = 0;
     std::mutex batch_mutex_;
     std::shared_ptr<parquet::WriterProperties> writer_properties_;

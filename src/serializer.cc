@@ -6,6 +6,7 @@
 
 #include "arrow/api.h"
 #include "arrow/filesystem/localfs.h"
+#include "arrow/filesystem/s3fs.h"
 #include "arrow/io/file.h"
 #include "arrow/ipc/reader.h"
 #include "fmt/format.h"
@@ -29,27 +30,24 @@ bool exists(const std::shared_ptr<arrow::fs::FileSystem> &fs, const std::string 
     return e.type() == arrow::fs::FileType::Directory || e.type() == arrow::fs::FileType::File;
 }
 
-Serializer::Serializer(std::string output_dir) : Serializer(std::move(output_dir), true) {}
+Serializer::Serializer(const std::string &output_dir) : Serializer(output_dir, true) {}
 
-Serializer::Serializer(std::string output_dir, bool override) : output_dir_(std::move(output_dir)) {
-    if (output_dir_.find("://") == std::string::npos) {
-        output_dir_ = fs::absolute(output_dir_);
-    }
+Serializer::Serializer(const std::string &output_dir, bool override)
+    : Serializer(FileSystemInfo(output_dir), override) {}
 
-    auto fs_res = arrow::fs::FileSystemFromUriOrPath(output_dir_);
-    if (!fs_res.ok()) {
-        // need to print out the filesystem error since it's critical
-        std::cerr << "[ERROR]: " << fs_res.status().ToString() << std::endl;
+Serializer::Serializer(FileSystemInfo info, bool override) : output_dir_(std::move(info)) {
+    fs_ = load_fs(output_dir_);
+    if (!fs_) {
         has_error_ = true;
         return;
     }
-    fs_ = *fs_res;
 
     // need to find this directory
-    if (!exists(fs_, output_dir_)) {
+    if (!exists(fs_, output_dir_.path)) {
         // need to create directory recursively if possible
-        auto res = fs_->CreateDir(output_dir_, true);
+        auto res = fs_->CreateDir(output_dir_.path, true);
         if (!res.ok()) {
+            std::cerr << "[ERROR]: " << res.ToString() << std::endl;
             has_error_ = true;
             return;
         }
@@ -138,7 +136,7 @@ std::pair<std::string, std::string> Serializer::get_next_filename() {
     uint64_t id = batch_counter_++;
     auto parquet_name = fmt::format("{0}.parquet", id);
     auto json_name = fmt::format("{0}.json", id);
-    auto dir = fs::path(output_dir_);
+    auto dir = fs::path(output_dir_.path);
     parquet_name = dir / parquet_name;
     json_name = dir / json_name;
     return {parquet_name, json_name};
@@ -183,7 +181,7 @@ SerializationStat &Serializer::get_stat(const void *ptr) {
 void Serializer::identify_batch_counter() {
     while (true) {
         auto json_name = fmt::format("{0}.json", batch_counter_);
-        auto dir = fs::path(output_dir_);
+        auto dir = fs::path(output_dir_.path);
         json_name = dir / json_name;
         if (exists(fs_, json_name)) {
             batch_counter_++;

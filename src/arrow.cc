@@ -1,13 +1,17 @@
 #include "arrow.hh"
 
+#include <filesystem>
+#include <iostream>
+
 #include "arrow/api.h"
-#include "arrow/io/file.h"
+#include "arrow/filesystem/localfs.h"
+#include "arrow/filesystem/s3fs.h"
 #include "arrow/io/memory.h"
 #include "arrow/ipc/reader.h"
 #include "arrow/ipc/writer.h"
+#include "arrow/util/uri.h"
 #include "parquet/arrow/reader.h"
 #include "parquet/file_reader.h"
-#include "parquet/stream_writer.h"
 
 namespace hermes {
 
@@ -129,6 +133,44 @@ std::vector<bool> get_bools(const std::shared_ptr<arrow::Scalar> &scalar) {
         result[j] = v;
     }
     return result;
+}
+
+FileSystemInfo::FileSystemInfo(const std::string &path) {
+    if (path.find("://") == std::string::npos) {
+        this->path = std::filesystem::absolute(path);
+        is_local_ = true;
+    }
+}
+
+bool FileSystemInfo::is_s3() const {
+    if (is_local_) return false;
+    arrow::internal::Uri uri;
+    auto res = uri.Parse(path);
+    if (!res.ok()) return false;
+    return uri.scheme() == "s3";
+}
+
+std::shared_ptr<arrow::fs::FileSystem> load_fs(const FileSystemInfo &info) {
+    if (info.is_s3()) {
+        // construct s3 filesystem
+        arrow::fs::S3Options options;
+        if (!info.access_key.empty()) {
+            options = arrow::fs::S3Options::FromAccessKey(info.access_key, info.secret_key);
+        }
+        if (!info.end_point.empty()) {
+            options.endpoint_override = info.end_point;
+        }
+        auto fs_res = arrow::fs::S3FileSystem::Make(options);
+        if (!fs_res.ok()) {
+            // need to print out the filesystem error since it's critical
+            std::cerr << "[ERROR]: " << fs_res.status().ToString() << std::endl;
+            return nullptr;
+        } else {
+            return *fs_res;
+        }
+    } else {
+        return std::make_shared<arrow::fs::LocalFileSystem>();
+    }
 }
 
 }  // namespace hermes
