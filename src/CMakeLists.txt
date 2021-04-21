@@ -2,7 +2,7 @@ add_library(hermes event.cc process.cc util.cc transaction.cc arrow.cc serialize
         pubsub.cc logger.cc query.cc checker.cc rtl.cc json.cc)
 # the ordering of linked libraries is very important! since the linker will discard unused functions in processing
 # order
-target_link_libraries(hermes PUBLIC arrow::parquet arrow::thrift arrow::arrow arrow::snappy aws::aws slangcompiler
+target_link_libraries(hermes arrow::parquet arrow::thrift arrow::arrow arrow::snappy aws::aws slangcompiler
         OpenSSL::Crypto ${CURL_LIBRARIES} ${ZLIB_LIBRARIES})
 target_include_directories(hermes PRIVATE ${ARROW_INCLUDE_DIR}
         ../extern/cpp-subprocess

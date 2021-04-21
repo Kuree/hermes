@@ -48,7 +48,7 @@ execute_process(
         WORKING_DIRECTORY ${ARROW_ROOT})
 
 execute_process(
-        COMMAND ${CMAKE_COMMAND} --build .. -- -j 4
+        COMMAND ${CMAKE_COMMAND} --build .. -- -j 8
         RESULT_VARIABLE ARROW_BUILD
         WORKING_DIRECTORY ${ARROW_ROOT}/build)
 unset(ENV{LDFLAGS})
