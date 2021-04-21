@@ -139,6 +139,8 @@ FileSystemInfo::FileSystemInfo(const std::string &path) {
     if (path.find("://") == std::string::npos) {
         this->path = std::filesystem::absolute(path);
         is_local_ = true;
+    } else {
+        this->path = path;
     }
 }
 
@@ -160,6 +162,7 @@ std::shared_ptr<arrow::fs::FileSystem> load_fs(const FileSystemInfo &info) {
         if (!info.end_point.empty()) {
             options.endpoint_override = info.end_point;
         }
+        (void)arrow::fs::InitializeS3({arrow::fs::S3LogLevel::Fatal});
         auto fs_res = arrow::fs::S3FileSystem::Make(options);
         if (!fs_res.ok()) {
             // need to print out the filesystem error since it's critical

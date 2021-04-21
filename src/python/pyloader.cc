@@ -112,11 +112,24 @@ void init_data(py::module &m) {
         },
         py::arg("pretty_print") = false);
 }
+void init_fs_info(py::module &m) {
+    auto fs = py::class_<hermes::FileSystemInfo>(m, "FileSystemInfo");
+    fs.def(py::init<const std::string &>());
+    fs.def_property_readonly("is_s3", &hermes::FileSystemInfo::is_s3);
+    fs.def_readwrite("path", &hermes::FileSystemInfo::path);
+    fs.def_readwrite("access_key", &hermes::FileSystemInfo::access_key);
+    fs.def_readwrite("secret_key", &hermes::FileSystemInfo::secret_key);
+    fs.def_readwrite("endpoint", &hermes::FileSystemInfo::end_point);
+}
 
 void init_loader(py::module &m) {
+    // init fs info first for the constructor
+    init_fs_info(m);
+
     auto loader = py::class_<hermes::Loader, std::shared_ptr<hermes::Loader>>(m, "Loader");
     loader.def(py::init<std::string>(), py::arg("data_dir"));
     loader.def(py::init<std::vector<std::string>>(), py::arg("data_dirs"));
+    loader.def(py::init<const std::vector<hermes::FileSystemInfo> &>(), py::arg("file_infos"));
     loader.def(py::init([](const py::args &args) {
         std::vector<std::string> dirs;
         dirs.reserve(args.size());

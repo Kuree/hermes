@@ -20,9 +20,10 @@ void init_rtl(py::module &m);
 void init_serializer(py::module &m) {
     auto serializer =
         py::class_<hermes::Serializer, std::shared_ptr<hermes::Serializer>>(m, "Serializer");
-    serializer.def(py::init<const std::string &>(), py::arg("output_dir"));
     serializer.def(py::init<const std::string &, bool>(), py::arg("output_dir"),
-                   py::arg("override"));
+                   py::arg("override") = true);
+    serializer.def(py::init<const hermes::FileSystemInfo &, bool>(), py::arg("output_dir"),
+                   py::arg("override") = true);
     serializer.def("finalize", &hermes::Serializer::finalize);
 }
 
@@ -84,11 +85,11 @@ void init_meta(py::module &m) {
 PYBIND11_MODULE(pyhermes, m) {
     init_event(m);
     init_transaction(m);
-    init_serializer(m);
     init_logger(m);
     init_message_bus(m);
     init_tracker(m);
     init_loader(m);
+    init_serializer(m);
     init_query(m);
     init_checker(m);
     init_rtl(m);
