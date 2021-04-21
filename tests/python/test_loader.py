@@ -2,6 +2,8 @@ import pyhermes
 import tempfile
 import json
 import os
+import socket
+import pytest
 
 
 class Tracker(pyhermes.Tracker):
@@ -109,7 +111,16 @@ def test_transaction_group_stream():
         assert len(groups) == 50
 
 
+def is_port_open(port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    result = sock.connect_ex(('localhost', port))
+    sock.close()
+    return result == 0
+
+
 def test_s3_fs():
+    if not is_port_open(4566):
+        pytest.skip("localstack not available")
     import localstack_client.session as boto3
     # use localstack to test
     path = "s3://test/test"

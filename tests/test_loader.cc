@@ -39,9 +39,14 @@ public:
     static constexpr auto chunk_size = 5;
     static constexpr auto num_events = 100;
     std::shared_ptr<hermes::Serializer> serializer;
+    std::unique_ptr<hermes::FileSystemInfo> info = nullptr;
 
     void SetUp() override {
-        serializer = std::make_shared<hermes::Serializer>(dir.path());
+        if (!info) {
+            serializer = std::make_shared<hermes::Serializer>(dir.path());
+        } else {
+            serializer = std::make_shared<hermes::Serializer>(*info, true);
+        }
 
         auto d = std::make_shared<hermes::DummyEventSerializer>();
         d->connect(serializer);
@@ -89,7 +94,32 @@ TEST_F(LoaderTest, stream_iter) {  // NOLINT
     hermes::Loader loader(dir.path());
     auto stream = loader.get_transaction_stream(event_name);
     uint64_t num_trans = 0;
-    for (auto const &[transaction, events, _]: *stream) {
+    for (auto const &[transaction, events, _] : *stream) {
+        EXPECT_EQ(transaction->id(), num_trans);
+        EXPECT_EQ(events->size(), chunk_size);
+        num_trans++;
+    }
+    EXPECT_EQ(num_trans, num_events * 2 / chunk_size);
+}
+
+class S3LoaderTest : public LoaderTest {
+    void SetUp() override {
+        // only if the port is open
+        bool localstack_running = is_port_open(4566);
+        if (!localstack_running) GTEST_SKIP_("localstack not running");
+        info = std::make_unique<hermes::FileSystemInfo>("s3://test/test");
+        info->end_point = "http://localhost:4566";
+        info->secret_key = "test";
+        info->access_key = "test";
+        LoaderTest::SetUp();
+    }
+};
+
+TEST_F(S3LoaderTest, stream) {  // NOLINT
+    hermes::Loader loader({*info});
+    auto stream = loader.get_transaction_stream(event_name);
+    uint64_t num_trans = 0;
+    for (auto const &[transaction, events, _] : *stream) {
         EXPECT_EQ(transaction->id(), num_trans);
         EXPECT_EQ(events->size(), chunk_size);
         num_trans++;

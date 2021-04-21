@@ -1,6 +1,12 @@
 #ifndef HERMES_TEST_UTIL_HH
 #define HERMES_TEST_UTIL_HH
 
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+
+#include <cstdio>
 #include <filesystem>
 #include <random>
 
@@ -88,5 +94,31 @@ public:
         loader = std::make_shared<hermes::Loader>(temp->path());
     }
 };
+
+// need to check if a port is open
+bool is_port_open(uint16_t port) {
+    int fd;
+    struct sockaddr_in serv_addr {};
+    struct hostent *server;
+
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) {
+        return false;
+    }
+    server = gethostbyname("localhost");
+
+    if (server == nullptr) {
+        return false;
+    }
+
+    memset(&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    memcpy(server->h_addr, &serv_addr.sin_addr.s_addr, server->h_length);
+
+    serv_addr.sin_port = htons(port);
+    bool result = connect(fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) >= 0;
+    close(fd);
+    return result;
+}
 
 #endif  // HERMES_TEST_UTIL_HH
