@@ -12,6 +12,7 @@
 #include "arrow/util/uri.h"
 #include "parquet/arrow/reader.h"
 #include "parquet/file_reader.h"
+#include "fmt/format.h"
 
 namespace hermes {
 
@@ -138,18 +139,17 @@ std::vector<bool> get_bools(const std::shared_ptr<arrow::Scalar> &scalar) {
 FileSystemInfo::FileSystemInfo(const std::string &path) {
     if (path.find("://") == std::string::npos) {
         this->path = std::filesystem::absolute(path);
-        is_local_ = true;
     } else {
-        this->path = path;
-    }
-}
+        arrow::internal::Uri uri;
+        auto res = uri.Parse(path);
+        if (!res.ok() || uri.scheme() != "s3") {
+            throw std::runtime_error("Invalid path " + path);
+        }
 
-bool FileSystemInfo::is_s3() const {
-    if (is_local_) return false;
-    arrow::internal::Uri uri;
-    auto res = uri.Parse(path);
-    if (!res.ok()) return false;
-    return uri.scheme() == "s3";
+        this->path = uri.host() + uri.path();
+
+        is_s3_ = true;
+    }
 }
 
 std::shared_ptr<arrow::fs::FileSystem> load_fs(const FileSystemInfo &info) {
@@ -162,7 +162,8 @@ std::shared_ptr<arrow::fs::FileSystem> load_fs(const FileSystemInfo &info) {
         if (!info.end_point.empty()) {
             options.endpoint_override = info.end_point;
         }
-        (void)arrow::fs::InitializeS3({arrow::fs::S3LogLevel::Fatal});
+        auto res = arrow::fs::InitializeS3({arrow::fs::S3LogLevel::Fatal});
+        if (!res.ok()) return nullptr;
         auto fs_res = arrow::fs::S3FileSystem::Make(options);
         if (!fs_res.ok()) {
             // need to print out the filesystem error since it's critical

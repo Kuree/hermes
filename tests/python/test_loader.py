@@ -110,7 +110,7 @@ def test_transaction_group_stream():
 
 
 def test_s3_fs():
-    import boto3
+    import localstack_client.session as boto3
     # use localstack to test
     path = "s3://test/test"
     endpoint = "http://localhost:4566"
@@ -119,15 +119,15 @@ def test_s3_fs():
     fs.secret_key = "test"
     fs.access_key = "test"
 
-    serializer = setup_loader_test(fs)
     # set credential
     os.environ["AWS_ACCESS_KEY_ID"] = "test"
     os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
-    s3_client = boto3.client('s3', endpoint_url=endpoint)
+    s3_client = boto3.client('s3', use_ssl=False)
     s3_client.create_bucket(Bucket="test")
 
-    loader = pyhermes.Loader(path)
-    stream = loader["stream"]
+    setup_loader_test(fs)
+    loader = pyhermes.Loader(fs)
+    stream = loader["test"]
     assert len(stream) > 0
 
 

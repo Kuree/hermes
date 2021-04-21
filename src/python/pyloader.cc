@@ -130,6 +130,10 @@ void init_loader(py::module &m) {
     loader.def(py::init<std::string>(), py::arg("data_dir"));
     loader.def(py::init<std::vector<std::string>>(), py::arg("data_dirs"));
     loader.def(py::init<const std::vector<hermes::FileSystemInfo> &>(), py::arg("file_infos"));
+    loader.def(py::init([](hermes::FileSystemInfo info) {
+        std::vector<hermes::FileSystemInfo> infos = {std::move(info)};
+        return std::make_unique<hermes::Loader>(infos);
+    }));
     loader.def(py::init([](const py::args &args) {
         std::vector<std::string> dirs;
         dirs.reserve(args.size());

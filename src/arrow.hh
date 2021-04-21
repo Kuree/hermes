@@ -45,10 +45,10 @@ public:
     std::string access_key;
     std::string secret_key;
     std::string end_point;
-    [[nodiscard]] bool is_s3() const;
+    [[nodiscard]] bool is_s3() const { return is_s3_; }
 
 private:
-    bool is_local_ = false;
+    bool is_s3_ = false;
 };
 
 std::shared_ptr<arrow::fs::FileSystem> load_fs(const FileSystemInfo &info);
