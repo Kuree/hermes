@@ -114,7 +114,7 @@ void init_data(py::module &m) {
 }
 void init_fs_info(py::module &m) {
     auto fs = py::class_<hermes::FileSystemInfo>(m, "FileSystemInfo");
-    fs.def(py::init<const std::string &>());
+    fs.def(py::init<const std::string &>(), py::arg("path"));
     fs.def_property_readonly("is_s3", &hermes::FileSystemInfo::is_s3);
     fs.def_readwrite("path", &hermes::FileSystemInfo::path);
     fs.def_readwrite("access_key", &hermes::FileSystemInfo::access_key);
