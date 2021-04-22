@@ -162,6 +162,8 @@ std::shared_ptr<arrow::fs::FileSystem> load_fs(const FileSystemInfo &info) {
         if (!info.end_point.empty()) {
             options.endpoint_override = info.end_point;
         }
+        // we hardcoded regions for now
+        options.region = "us-west-2";
         auto res = arrow::fs::InitializeS3({arrow::fs::S3LogLevel::Fatal});
         if (!res.ok()) return nullptr;
         auto fs_res = arrow::fs::S3FileSystem::Make(options);
