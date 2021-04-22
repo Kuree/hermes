@@ -120,6 +120,8 @@ void init_fs_info(py::module &m) {
     fs.def_readwrite("access_key", &hermes::FileSystemInfo::access_key);
     fs.def_readwrite("secret_key", &hermes::FileSystemInfo::secret_key);
     fs.def_readwrite("endpoint", &hermes::FileSystemInfo::end_point);
+
+    fs.def("clear", &hermes::FileSystemInfo::clear);
 }
 
 void init_enum(py::module &m) {
@@ -175,6 +177,7 @@ void init_loader(py::module &m) {
                                  &hermes::Loader::get_transaction_group_names);
 
     loader.def("get_event_schema", &hermes::Loader::get_event_schema, py::arg("event_name"));
+    loader.def("print_files", &hermes::Loader::print_files);
 
     init_stream(m);
     init_data(m);

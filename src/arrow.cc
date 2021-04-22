@@ -10,9 +10,9 @@
 #include "arrow/ipc/reader.h"
 #include "arrow/ipc/writer.h"
 #include "arrow/util/uri.h"
+#include "fmt/format.h"
 #include "parquet/arrow/reader.h"
 #include "parquet/file_reader.h"
-#include "fmt/format.h"
 
 namespace hermes {
 
@@ -150,6 +150,13 @@ FileSystemInfo::FileSystemInfo(const std::string &path) {
 
         is_s3_ = true;
     }
+}
+
+void FileSystemInfo::clear() const {
+    auto fs = load_fs(*this);
+    if (!fs) return;
+    // need to clear out the directory
+    (void)fs->DeleteDir(path);
 }
 
 std::shared_ptr<arrow::fs::FileSystem> load_fs(const FileSystemInfo &info) {

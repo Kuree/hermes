@@ -435,8 +435,10 @@ std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::str
 
 [[maybe_unused]] void Loader::print_files() const {
     for (auto const &file : files_) {
-        std::cout << "File: " << std::filesystem::absolute(file->filename) << std::endl
-                  << '\t' << "Type: " << FileInfo::type_str(file->type) << std::endl;
+        // get file size
+        std::cout << "File: " << file->filename << std::endl
+                  << '\t' << "Type: " << FileInfo::type_str(file->type) << std::endl
+                  << '\t' << "Size: " << file->size << std::endl;
     }
 }
 
@@ -550,6 +552,8 @@ void Loader::load_json(const arrow::fs::FileInfo &json_info,
     if (name_opt) {
         info->name = *name_opt;
     }
+    // size
+    info->size = file_size;
     // load table as well
     // notice that we don't actually load the entire table into memory, just
     // indices and references

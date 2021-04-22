@@ -47,6 +47,9 @@ public:
     std::string end_point;
     [[nodiscard]] bool is_s3() const { return is_s3_; }
 
+    // clear the directory
+    void clear() const;
+
 private:
     bool is_s3_ = false;
 };

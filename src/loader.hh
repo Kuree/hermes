@@ -30,6 +30,7 @@ public:
     FileInfo(FileType type, std::string filename) : type(type), filename(std::move(filename)) {}
     FileType type;
     std::string filename;
+    uint64_t size = 0;
 
     std::string name;
 
