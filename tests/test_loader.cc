@@ -90,7 +90,7 @@ TEST_F(LoaderTest, stream) {  // NOLINT
     EXPECT_EQ(sub->transactions.size(), num_events * 2 / chunk_size);
 }
 
-TEST_F(LoaderTest, names) { // NOLINT
+TEST_F(LoaderTest, names) {  // NOLINT
     hermes::Loader loader(dir.path());
     auto names = loader.get_event_names();
     EXPECT_EQ(names.size(), 1);
@@ -98,8 +98,12 @@ TEST_F(LoaderTest, names) { // NOLINT
     EXPECT_EQ(names.size(), 1);
     names = loader.get_transaction_group_names();
     EXPECT_EQ(names.size(), 0);
-}
 
+    // test schema as well
+    auto schema = loader.get_event_schema(event_name);
+    EXPECT_FALSE(schema.empty());
+    EXPECT_EQ(schema.at(hermes::Event::NAME_NAME), hermes::EventDataType::string);
+}
 
 TEST_F(LoaderTest, stream_iter) {  // NOLINT
     hermes::Loader loader(dir.path());

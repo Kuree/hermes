@@ -122,6 +122,16 @@ void init_fs_info(py::module &m) {
     fs.def_readwrite("endpoint", &hermes::FileSystemInfo::end_point);
 }
 
+void init_enum(py::module &m) {
+    auto type = py::enum_<hermes::EventDataType>(m, "EventDataType");
+    type.value("bool", hermes::EventDataType::bool_);
+    type.value("uint8", hermes::EventDataType::uint8_t_);
+    type.value("uint16", hermes::EventDataType::uint16_t_);
+    type.value("uint32", hermes::EventDataType::uint32_t_);
+    type.value("uint64", hermes::EventDataType::uint64_t_);
+    type.value("string", hermes::EventDataType::string);
+}
+
 void init_loader(py::module &m) {
     // init fs info first for the constructor
     init_fs_info(m);
@@ -164,6 +174,9 @@ void init_loader(py::module &m) {
     loader.def_property_readonly("transaction_group_names",
                                  &hermes::Loader::get_transaction_group_names);
 
+    loader.def("get_event_schema", &hermes::Loader::get_event_schema, py::arg("event_name"));
+
     init_stream(m);
     init_data(m);
+    init_enum(m);
 }

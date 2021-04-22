@@ -4,9 +4,9 @@
 #include <mutex>
 #include <set>
 
+#include "arrow.hh"
 #include "cache.hh"
 #include "transaction.hh"
-#include "arrow.hh"
 
 namespace arrow {
 namespace fs {
@@ -51,8 +51,7 @@ public:
 
     [[nodiscard]] const Value &at(const FileInfo *info) const { return data_.at(info); }
 
-    uint64_t size(const FileInfo *file) {
-        return data_.at(file).begin()->second.size(); }
+    uint64_t size(const FileInfo *file) { return data_.at(file).begin()->second.size(); }
 
 private:
     std::unordered_map<const FileInfo *,
@@ -152,6 +151,12 @@ struct LoaderStats {
     uint64_t average_transaction_group_chunk_size = 0;
 };
 
+// define table schema so that some downstream tools can directly
+// interact with the raw parquet files
+enum class EventDataType { bool_, uint8_t_, uint16_t_, uint32_t_, uint64_t_, string };
+
+using BatchSchema = std::map<std::string, EventDataType>;
+
 class MessageBus;
 class Checker;
 class Loader {
@@ -182,6 +187,8 @@ public:
                                                               uint64_t end_time);
 
     std::shared_ptr<EventBatch> get_events(const Transaction &transaction);
+
+    [[nodiscard]] BatchSchema get_event_schema(const std::string &name);
 
     [[nodiscard]] std::set<std::string> get_event_names() const;
     [[nodiscard]] std::set<std::string> get_transaction_names() const;

@@ -111,6 +111,14 @@ def test_transaction_group_stream():
         assert len(groups) == 50
 
 
+def test_event_schema():
+    with tempfile.TemporaryDirectory() as temp:
+        setup_loader_test(temp)
+        loader = pyhermes.Loader(temp)
+        schema = loader.get_event_schema("test")
+        assert len(schema) > 0
+
+
 def is_port_open(port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     result = sock.connect_ex(('localhost', port))
@@ -143,4 +151,4 @@ def test_s3_fs():
 
 
 if __name__ == "__main__":
-    test_s3_fs()
+    test_event_schema()

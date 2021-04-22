@@ -693,6 +693,42 @@ void Loader::stream(bool stream_transactions) {
     stream(MessageBus::default_bus(), stream_transactions);
 }
 
+BatchSchema Loader::get_event_schema(const std::string &name) {
+    // we put some good faith that the files with the same name will be
+    // consistent
+    BatchSchema result;
+    const FileInfo *file_ = nullptr;
+    for (auto const &file : files_) {
+        if (file->type == FileInfo::FileType::event && file->name == name) {
+            file_ = file.get();
+            break;
+        }
+    }
+    if (!file_) return result;
+    auto const &table = tables_.at(std::make_pair(file_, 0));
+    auto const &schema = table->schema();
+    auto const &names = schema->field_names();
+    for (auto const &n : names) {
+        auto field = schema->GetFieldByName(n);
+        // based on the field type
+        if (field->type()->Equals(arrow::boolean())) {
+            result.emplace(n, EventDataType::bool_);
+        } else if (field->type()->Equals(arrow::uint8())) {
+            result.emplace(n, EventDataType::uint8_t_);
+        } else if (field->type()->Equals(arrow::uint16())) {
+            result.emplace(n, EventDataType::uint16_t_);
+        } else if (field->type()->Equals(arrow::uint32())) {
+            result.emplace(n, EventDataType::uint32_t_);
+        } else if (field->type()->Equals(arrow::uint64())) {
+            result.emplace(n, EventDataType::uint64_t_);
+        } else if (field->type()->Equals(arrow::utf8())) {
+            result.emplace(n, EventDataType::string);
+        }
+    }
+
+    return result;
+}
+
 std::set<std::string> get_names(const std::vector<std::unique_ptr<FileInfo>> &files,
                                 FileInfo::FileType type) {
     std::set<std::string> result;
