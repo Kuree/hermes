@@ -693,6 +693,29 @@ void Loader::stream(bool stream_transactions) {
     stream(MessageBus::default_bus(), stream_transactions);
 }
 
+std::set<std::string> get_names(const std::vector<std::unique_ptr<FileInfo>> &files,
+                                FileInfo::FileType type) {
+    std::set<std::string> result;
+    for (auto const &info : files) {
+        if (info->type == type) {
+            result.emplace(info->name);
+        }
+    }
+    return result;
+}
+
+std::set<std::string> Loader::get_event_names() const {
+    return get_names(files_, FileInfo::FileType::event);
+}
+
+std::set<std::string> Loader::get_transaction_names() const {
+    return get_names(files_, FileInfo::FileType::transaction);
+}
+
+std::set<std::string> Loader::get_transaction_group_names() const {
+    return get_names(files_, FileInfo::FileType::transaction_group);
+}
+
 template <typename T>
 void should_stop(const std::vector<std::shared_ptr<T>> &values,
                  const std::vector<uint64_t> &indices, bool &stop) {

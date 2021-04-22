@@ -2,6 +2,7 @@
 #define HERMES_LOADER_HH
 
 #include <mutex>
+#include <set>
 
 #include "cache.hh"
 #include "transaction.hh"
@@ -181,6 +182,10 @@ public:
                                                               uint64_t end_time);
 
     std::shared_ptr<EventBatch> get_events(const Transaction &transaction);
+
+    [[nodiscard]] std::set<std::string> get_event_names() const;
+    [[nodiscard]] std::set<std::string> get_transaction_names() const;
+    [[nodiscard]] std::set<std::string> get_transaction_group_names() const;
 
     void stream(bool stream_transactions = true);
     void stream(MessageBus *bus, bool stream_transactions = true);

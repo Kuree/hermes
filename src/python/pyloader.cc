@@ -159,6 +159,11 @@ void init_loader(py::module &m) {
     loader.def("stream", [](hermes::Loader &loader) { loader.stream(); });
     loader.def("stream", py::overload_cast<bool>(&hermes::Loader::stream));
 
+    loader.def_property_readonly("event_names", &hermes::Loader::get_event_names);
+    loader.def_property_readonly("transaction_names", &hermes::Loader::get_transaction_names);
+    loader.def_property_readonly("transaction_group_names",
+                                 &hermes::Loader::get_transaction_group_names);
+
     init_stream(m);
     init_data(m);
 }

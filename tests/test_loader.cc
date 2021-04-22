@@ -90,6 +90,17 @@ TEST_F(LoaderTest, stream) {  // NOLINT
     EXPECT_EQ(sub->transactions.size(), num_events * 2 / chunk_size);
 }
 
+TEST_F(LoaderTest, names) { // NOLINT
+    hermes::Loader loader(dir.path());
+    auto names = loader.get_event_names();
+    EXPECT_EQ(names.size(), 1);
+    names = loader.get_transaction_names();
+    EXPECT_EQ(names.size(), 1);
+    names = loader.get_transaction_group_names();
+    EXPECT_EQ(names.size(), 0);
+}
+
+
 TEST_F(LoaderTest, stream_iter) {  // NOLINT
     hermes::Loader loader(dir.path());
     auto stream = loader.get_transaction_stream(event_name);
