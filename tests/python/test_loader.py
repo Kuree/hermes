@@ -129,7 +129,6 @@ def is_port_open(port):
 def test_s3_fs():
     if not is_port_open(4566):
         pytest.skip("localstack not available")
-    import localstack_client.session as boto3
     # use localstack to test
     path = "s3://test/test"
     endpoint = "http://localhost:4566"
@@ -141,8 +140,6 @@ def test_s3_fs():
     # set credential
     os.environ["AWS_ACCESS_KEY_ID"] = "test"
     os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
-    s3_client = boto3.client('s3', use_ssl=False)
-    s3_client.create_bucket(Bucket="test")
 
     setup_loader_test(fs)
     loader = pyhermes.Loader(fs)
@@ -151,4 +148,4 @@ def test_s3_fs():
 
 
 if __name__ == "__main__":
-    test_event_schema()
+    test_s3_fs()
