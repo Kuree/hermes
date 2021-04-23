@@ -109,6 +109,7 @@ Loader::Loader(const std::vector<std::string> &dirs) {
     // compute stats. this should be very fast
     compute_stats();
     init_cache();
+    compute_event_id_index();
 }
 
 Loader::Loader(const std::vector<FileSystemInfo> &infos) {
@@ -119,6 +120,7 @@ Loader::Loader(const std::vector<FileSystemInfo> &infos) {
     // compute stats. this should be very fast
     compute_stats();
     init_cache();
+    compute_event_id_index();
 }
 
 bool contains_value(const std::shared_ptr<parquet::Statistics> &stats, uint64_t value) {
@@ -343,54 +345,28 @@ std::shared_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t
     return result;
 }
 
-inline std::unordered_map<const FileInfo *, std::vector<uint64_t>> compute_search_space(
-    const std::vector<const FileInfo *> &events_, const FileMetadata &file_metadata_,
-    const std::vector<uint64_t> &ids) {
-    std::unordered_map<const FileInfo *, std::vector<uint64_t>> files;
-    for (auto const &file : events_) {
-        auto stats = file_metadata_.at(file);
-        auto id_stats = stats.at("id");
-        for (uint64_t chunk_idx = 0; chunk_idx < id_stats.size(); chunk_idx++) {
-            auto const &id_stat = id_stats[chunk_idx];
-            for (auto id : ids) {
-                if (contains_value(id_stat, id)) {
-                    files[file].emplace_back(chunk_idx);
-                }
-            }
-        }
-    }
-    return files;
-}
-
 std::shared_ptr<EventBatch> Loader::get_events(const Transaction &transaction) {
     auto const &ids = transaction.events();
-    auto files = compute_search_space(events_, file_metadata_, ids);
-
-    std::unordered_map<uint64_t, Event *> id_mapping;
-    for (auto const &[file, chunk_ids] : files) {
-        for (auto const &chunk_id : chunk_ids) {
-            auto table = tables_.at(std::make_pair(file, chunk_id));
-            auto events = load_events(table);
-            for (auto const id : ids) {
-                if (id_mapping.find(id) != id_mapping.end()) {
-                    // we already found it
-                    continue;
-                }
-                auto *e = events->get_event(id);
-                if (e) {
-                    // we found it
-                    id_mapping.emplace(id, e);
-                }
-            }
-        }
-    }
-
     auto result = std::make_shared<EventBatch>();
     result->resize(transaction.events().size(), nullptr);
     for (auto i = 0; i < result->size(); i++) {
         auto const id = transaction.events()[i];
-        if (id_mapping.find(id) != id_mapping.end()) {
-            (*result)[i] = id_mapping.at(id)->shared_from_this();
+        // need to search for the correct able
+        auto iter = event_id_index_.lower_bound(id);
+        if (iter == event_id_index_.end()) iter--;
+
+        while (iter != event_id_index_.end()) {
+            auto temp = iter;
+            auto target_iter = iter->first > id? --temp: iter;
+            // we expect this loop only run once for a well-formed table
+            auto table = tables_.at(target_iter->second);
+            auto events = load_events(table);
+            auto *e = events->get_event(id);
+            if (e) {
+                (*result)[i] = e->shared_from_this();
+                break;
+            }
+            iter++;
         }
     }
 
@@ -983,6 +959,21 @@ void Loader::init_cache() {
     transaction_group_cache_ =
         std::make_unique<lru_cache<const arrow::Table *, std::shared_ptr<TransactionGroupBatch>>>(
             num_transaction_groups);
+}
+
+void Loader::compute_event_id_index() {
+    for (auto const *file : events_) {
+            auto stats = file_metadata_.at(file);
+            auto id_stats = stats.at("id");
+            for (uint64_t chunk_id = 0; chunk_id < id_stats.size(); chunk_id++) {
+                auto typed =
+                    std::reinterpret_pointer_cast<parquet::TypedStatistics<arrow::UInt64Type>>(
+                        id_stats[chunk_id]);
+                auto min = typed->min();
+                event_id_index_.emplace(min, std::make_pair(file, chunk_id));
+            }
+        }
+
 }
 
 }  // namespace hermes

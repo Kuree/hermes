@@ -221,6 +221,9 @@ private:
         transaction_group_cache_;
     // stats about the folder we're reading
     LoaderStats stats_;
+    // lookup table for event id lists
+    // this will be read-only so no mutex protection
+    std::map<uint64_t, std::pair<const FileInfo *, uint64_t>> event_id_index_;
 
     void open_dir(const FileSystemInfo &info);
     void load_json(const arrow::fs::FileInfo &json_info,
@@ -247,6 +250,7 @@ private:
     bool contains_time(const FileInfo *file, uint64_t chunk_id, uint64_t min_time,
                        uint64_t max_time);
     void init_cache();
+    void compute_event_id_index();
 
     friend class Checker;
     friend class TransactionDataIter;

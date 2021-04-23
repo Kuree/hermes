@@ -67,10 +67,12 @@ public:
         }
 
         // we don't even track it, just directly use transactions
+        auto id = 0u;
         for (auto i = 0; i < num_events * 2 / chunk_size; i++) {
             auto t = std::make_shared<hermes::Transaction>();
             for (auto j = 0; j < chunk_size; j++) {
-                hermes::Event e(i * j);
+                hermes::Event e(id);
+                e.set_id(id++);
                 t->add_event(&e);
             }
             publisher.publish(event_name, t);
@@ -112,6 +114,9 @@ TEST_F(LoaderTest, stream_iter) {  // NOLINT
     for (auto const &[transaction, events, _] : *stream) {
         EXPECT_EQ(transaction->id(), num_trans);
         EXPECT_EQ(events->size(), chunk_size);
+        for (auto const &event : *events) {
+            EXPECT_NE(event, nullptr);
+        }
         num_trans++;
     }
     EXPECT_EQ(num_trans, num_events * 2 / chunk_size);
@@ -137,11 +142,13 @@ TEST_F(S3LoaderTest, stream) {  // NOLINT
     for (auto const &[transaction, events, _] : *stream) {
         EXPECT_EQ(transaction->id(), num_trans);
         EXPECT_EQ(events->size(), chunk_size);
+        for (auto const &event : *events) {
+            EXPECT_NE(event, nullptr);
+        }
         num_trans++;
     }
     EXPECT_EQ(num_trans, num_events * 2 / chunk_size);
 }
-
 
 #ifdef PERFORMANCE_TEST
 
@@ -158,7 +165,9 @@ TEST_F(LoaderPerformanceTest, events_stream) {  // NOLINT
     uint64_t num_trans = 0;
     for (auto const &[transaction, events, _] : *stream) {
         (void)transaction;
-        (void)events;
+        for (auto const &event : *events) {
+            EXPECT_NE(event, nullptr);
+        }
         num_trans++;
     }
     EXPECT_GT(num_trans, 0);
