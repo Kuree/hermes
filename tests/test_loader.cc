@@ -37,7 +37,7 @@ public:
     // need to create s set of events and transactions
     static constexpr auto event_name = "dummy1";
     static constexpr auto chunk_size = 5;
-    static constexpr auto num_events = 100;
+    uint64_t num_events = 100;
     std::shared_ptr<hermes::Serializer> serializer;
     std::unique_ptr<hermes::FileSystemInfo> info = nullptr;
 
@@ -141,3 +141,27 @@ TEST_F(S3LoaderTest, stream) {  // NOLINT
     }
     EXPECT_EQ(num_trans, num_events * 2 / chunk_size);
 }
+
+
+#ifdef PERFORMANCE_TEST
+
+class LoaderPerformanceTest : public LoaderTest {
+    void SetUp() override {
+        num_events = 100000;
+        LoaderTest::SetUp();
+    }
+};
+
+TEST_F(LoaderPerformanceTest, events_stream) {  // NOLINT
+    hermes::Loader loader(dir.path());
+    auto stream = loader.get_transaction_stream(event_name);
+    uint64_t num_trans = 0;
+    for (auto const &[transaction, events, _] : *stream) {
+        (void)transaction;
+        (void)events;
+        num_trans++;
+    }
+    EXPECT_GT(num_trans, 0);
+}
+
+#endif

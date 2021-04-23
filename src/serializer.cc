@@ -6,11 +6,10 @@
 
 #include "arrow/api.h"
 #include "arrow/filesystem/localfs.h"
-#include "arrow/filesystem/s3fs.h"
-#include "arrow/io/file.h"
 #include "arrow/ipc/reader.h"
 #include "fmt/format.h"
 #include "json.hh"
+#include "logger.hh"
 #include "parquet/arrow/writer.h"
 #include "parquet/metadata.h"
 #include "rapidjson/prettywriter.h"
@@ -72,7 +71,8 @@ bool Serializer::serialize(EventBatch &batch) {
     if (!ok()) return false;
     auto r = batch.validate();
     if (!r) return false;
-    batch.sort();
+    // if it's ordered, we don't need to sort
+    if (!event_in_order()) batch.sort();
     // serialize
     auto [record, schema] = batch.serialize();
     auto *writer = get_writer(&batch, schema);
@@ -88,6 +88,8 @@ bool Serializer::serialize(EventBatch &batch) {
 
 bool Serializer::serialize(TransactionBatch &batch) {
     if (!ok()) return false;
+    // we have to sort the transaction because of the way that
+    // each transaction retires
     batch.sort();
     // serialize
     auto [record, schema] = batch.serialize();

@@ -32,3 +32,8 @@ setup_test_target(test_pubsub)
 # add as a library
 add_library(test_tracker_lib SHARED test_tracker_lib.cc)
 add_link_include_static(test_tracker_lib)
+
+# only enabled when we're interested in performance test
+if (PERFORMANCE_TEST)
+    add_compile_definitions("PERFORMANCE_TEST")
+endif()

@@ -50,12 +50,17 @@ public:
 private:
     std::string topic_;
     std::shared_ptr<Serializer> serializer_;
-    static constexpr uint64_t event_dump_threshold = 1 << 15;
+    static constexpr uint64_t dump_threshold = 1 << 15;
 
     std::map<std::string, EventBatch> events_;
     std::map<std::string, TransactionBatch> transactions_;
     std::map<std::string, TransactionGroupBatch> transaction_groups_;
 };
+
+// whether the events will be send to the message bus in order
+// by default it is true
+void set_event_in_order(bool value);
+bool event_in_order();
 
 }  // namespace hermes
 

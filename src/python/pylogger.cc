@@ -45,4 +45,7 @@ void init_logger(py::module &m) {
                                  &hermes::DummyEventSerializer::connect),
                              py::arg("serializer"));
     dummy_log_serializer.def("flush", &hermes::DummyEventSerializer::flush);
+
+    m.def("event_in_order", &hermes::event_in_order);
+    m.def("set_event_in_order", &hermes::set_event_in_order, py::arg("value"));
 }

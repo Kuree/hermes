@@ -20,9 +20,7 @@ void DummyEventSerializer::on_message(const std::string &topic,
         events_.at(topic).set_name(topic);
     }
 
-    if (serializer_ && events_.at(topic).size() >= event_dump_threshold) {
-        // sort them first
-        events_.at(topic).sort();
+    if (serializer_ && events_.at(topic).size() >= dump_threshold) {
         serializer_->serialize(events_.at(topic));
         events_[topic].clear();
     }
@@ -35,6 +33,11 @@ void DummyEventSerializer::on_message(const std::string &topic,
     if (transactions_.at(topic).name().empty()) {
         transactions_.at(topic).set_name(topic);
     }
+
+    if (serializer_ && transactions_.at(topic).size() >= dump_threshold) {
+        serializer_->serialize(transactions_.at(topic));
+        transactions_[topic].clear();
+    }
 }
 
 void DummyEventSerializer::on_message(const std::string &topic,
@@ -43,6 +46,11 @@ void DummyEventSerializer::on_message(const std::string &topic,
 
     if (transaction_groups_.at(topic).name().empty()) {
         transaction_groups_.at(topic).set_name(topic);
+    }
+
+    if (serializer_ && transaction_groups_.at(topic).size() >= dump_threshold) {
+        serializer_->serialize(transaction_groups_.at(topic));
+        transaction_groups_[topic].clear();
     }
 }
 
@@ -76,5 +84,10 @@ void DummyEventSerializer::stop() {
     flush();
     Subscriber::stop();
 }
+
+static bool event_in_order_ = true;
+void set_event_in_order(bool value) { event_in_order_ = value; }
+
+bool event_in_order() { return event_in_order_; }
 
 }  // namespace hermes
