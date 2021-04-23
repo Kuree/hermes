@@ -27,9 +27,6 @@ void init_event(py::module &m) {
     auto event = py::class_<hermes::Event, std::shared_ptr<hermes::Event>>(m, "Event");
     event.def(py::init<uint64_t>(), py::arg("time"));
     event.def("add_value", &hermes::Event::add_value<bool>, py::arg("name"), py::arg("value"));
-    event.def("add_value", &hermes::Event::add_value<uint8_t>, py::arg("name"), py::arg("value"));
-    event.def("add_value", &hermes::Event::add_value<uint16_t>, py::arg("name"), py::arg("value"));
-    event.def("add_value", &hermes::Event::add_value<uint32_t>, py::arg("name"), py::arg("value"));
     event.def("add_value", &hermes::Event::add_value<uint64_t>, py::arg("name"), py::arg("value"));
     event.def("add_value", &hermes::Event::add_value<std::string>, py::arg("name"),
               py::arg("value"));
@@ -53,15 +50,6 @@ void init_event(py::module &m) {
 
     // set attribute as well
     event.def("__setattr__", [](hermes::Event &event, const std::string &name, bool value) {
-        event.add_value(name, value);
-    });
-    event.def("__setattr__", [](hermes::Event &event, const std::string &name, uint8_t value) {
-        event.add_value(name, value);
-    });
-    event.def("__setattr__", [](hermes::Event &event, const std::string &name, uint16_t value) {
-        event.add_value(name, value);
-    });
-    event.def("__setattr__", [](hermes::Event &event, const std::string &name, uint32_t value) {
         event.add_value(name, value);
     });
     event.def("__setattr__", [](hermes::Event &event, const std::string &name, uint64_t value) {

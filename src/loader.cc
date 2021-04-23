@@ -349,6 +349,8 @@ std::shared_ptr<EventBatch> Loader::get_events(const Transaction &transaction) {
     auto const &ids = transaction.events();
     auto result = std::make_shared<EventBatch>();
     result->resize(transaction.events().size(), nullptr);
+    if (event_id_index_.empty()) return result;
+
     for (auto i = 0; i < result->size(); i++) {
         auto const id = transaction.events()[i];
         // need to search for the correct able
@@ -357,7 +359,7 @@ std::shared_ptr<EventBatch> Loader::get_events(const Transaction &transaction) {
 
         while (iter != event_id_index_.end()) {
             auto temp = iter;
-            auto target_iter = iter->first > id? --temp: iter;
+            auto target_iter = iter->first > id ? --temp : iter;
             // we expect this loop only run once for a well-formed table
             auto table = tables_.at(target_iter->second);
             auto events = load_events(table);
@@ -963,17 +965,15 @@ void Loader::init_cache() {
 
 void Loader::compute_event_id_index() {
     for (auto const *file : events_) {
-            auto stats = file_metadata_.at(file);
-            auto id_stats = stats.at("id");
-            for (uint64_t chunk_id = 0; chunk_id < id_stats.size(); chunk_id++) {
-                auto typed =
-                    std::reinterpret_pointer_cast<parquet::TypedStatistics<arrow::UInt64Type>>(
-                        id_stats[chunk_id]);
-                auto min = typed->min();
-                event_id_index_.emplace(min, std::make_pair(file, chunk_id));
-            }
+        auto stats = file_metadata_.at(file);
+        auto id_stats = stats.at("id");
+        for (uint64_t chunk_id = 0; chunk_id < id_stats.size(); chunk_id++) {
+            auto typed = std::reinterpret_pointer_cast<parquet::TypedStatistics<arrow::UInt64Type>>(
+                id_stats[chunk_id]);
+            auto min = typed->min();
+            event_id_index_.emplace(min, std::make_pair(file, chunk_id));
         }
-
+    }
 }
 
 }  // namespace hermes
