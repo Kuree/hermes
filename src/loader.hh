@@ -252,6 +252,8 @@ private:
     void init_cache();
     void compute_event_id_index();
 
+    static uint64_t compute_table_size_in_memory(const std::shared_ptr<arrow::Table> &table);
+
     friend class Checker;
     friend class TransactionDataIter;
 };

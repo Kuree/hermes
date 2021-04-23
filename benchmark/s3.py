@@ -60,7 +60,10 @@ def main():
     writing_speed = end - start
 
     # test out reading speed
+    start = time.time()
     loader = pyhermes.Loader(fs)
+    end = time.time()
+    meta_loading = end - start
     loader.print_files()
     print("-" * 40)
     start = time.time()
@@ -75,6 +78,7 @@ def main():
     assert count == num_transaction
     print("Write:", "{0:.2f} ms/t".format(writing_speed / num_transaction * 1000), "Total:", f"{writing_speed:.2f}s")
     print("Read:", "{0:.2f} ms/t".format(reading_speed / num_transaction * 1000), "Total:", f"{reading_speed:.2f}s")
+    print("Loading:", f"{meta_loading:.2f}s")
 
     # clean up
     fs.clear()

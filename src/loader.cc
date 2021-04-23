@@ -417,6 +417,16 @@ std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::str
         std::cout << "File: " << file->filename << std::endl
                   << '\t' << "Type: " << FileInfo::type_str(file->type) << std::endl
                   << '\t' << "Size: " << file->size << std::endl;
+        // compute the in memory size
+        // we don't store it since it's unnecessary for normal use
+        // we don't expect print_files will be called often
+        uint64_t total_size = 0;
+        for (auto const &[info, table] : tables_) {
+            if (info.first == file.get()) {
+                total_size += compute_table_size_in_memory(table);
+            }
+        }
+        std::cout << '\t' << "Estimated size in memory: " << total_size << std::endl;
     }
 }
 
@@ -512,17 +522,13 @@ void Loader::load_json(const arrow::fs::FileInfo &json_info,
     switch (file_type) {
         case FileInfo::FileType::event: {
             events_.emplace_back(info.get());
-            // also add to the stats
-            stats_.average_event_chunk_size += file_size;
             break;
         }
         case FileInfo::FileType::transaction: {
             transactions_.emplace_back(info.get());
-            stats_.average_transaction_chunk_size += file_size;
         }
         case FileInfo::FileType::transaction_group: {
             transaction_groups_.emplace_back(info.get());
-            stats_.average_transaction_group_chunk_size += file_size;
         }
     }
     // get name
@@ -642,16 +648,19 @@ void Loader::compute_stats() {
                 if (max > stats_.max_event_time) {
                     stats_.max_event_time = max;
                 }
+                stats_.average_event_chunk_size += compute_table_size_in_memory(table);
                 break;
             }
             case FileInfo::FileType::transaction: {
                 stats_.num_transaction_files++;
                 stats_.num_transactions += table->num_rows();
+                stats_.average_transaction_chunk_size += compute_table_size_in_memory(table);
                 break;
             }
             case FileInfo::FileType::transaction_group: {
                 stats_.num_transaction_group_files++;
                 stats_.num_transaction_groups += table->num_rows();
+                stats_.average_transaction_group_chunk_size += compute_table_size_in_memory(table);
                 break;
             }
         }
@@ -974,6 +983,39 @@ void Loader::compute_event_id_index() {
             event_id_index_.emplace(min, std::make_pair(file, chunk_id));
         }
     }
+}
+
+uint64_t Loader::compute_table_size_in_memory(const std::shared_ptr<arrow::Table> &table) {
+    // this is just estimate how much memory it will occupy the memory
+    auto const schema = table->schema();
+    uint64_t num_row = table->num_rows();
+    uint64_t row_size = 0;
+    auto const &names = schema->field_names();
+    for (auto const &name : names) {
+        row_size += name.size();
+        auto const &field = schema->GetFieldByName(name);
+        if (field->type()->Equals(arrow::boolean())) {
+            row_size += sizeof(bool);
+        } else if (field->type()->Equals(arrow::uint8())) {
+            row_size += sizeof(uint8_t);
+        } else if (field->type()->Equals(arrow::uint16())) {
+            row_size += sizeof(uint16_t);
+        } else if (field->type()->Equals(arrow::uint32())) {
+            row_size += sizeof(uint32_t);
+        } else if (field->type()->Equals(arrow::uint64())) {
+            row_size += sizeof(uint64_t);
+        } else if (field->type()->Equals(arrow::utf8())) {
+            row_size += 16;
+        } else if (field->type()->Equals(arrow::list(arrow::uint64()))) {
+            row_size += 4 * sizeof(uint64_t);
+        }
+    }
+    // we also consider other data structures the batch uses
+    row_size += sizeof(uint64_t) + sizeof(void *) +
+                sizeof(std::unordered_map<std::string, Event::EventValue>);
+    auto total = row_size * num_row;
+    total += sizeof(std::unordered_map<uint64_t, void *>);
+    return total;
 }
 
 }  // namespace hermes
