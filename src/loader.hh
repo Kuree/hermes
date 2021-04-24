@@ -226,8 +226,7 @@ private:
     std::map<uint64_t, std::pair<const FileInfo *, uint64_t>> event_id_index_;
 
     void open_dir(const FileSystemInfo &info);
-    void load_json(const arrow::fs::FileInfo &json_info,
-                   const std::shared_ptr<arrow::fs::FileSystem> &fs);
+    void load_json(const std::string &json_info, const std::shared_ptr<arrow::fs::FileSystem> &fs);
     bool preload_table(const FileInfo *info,
                        const std::shared_ptr<arrow::io::RandomAccessFile> &file);
     std::vector<LoaderResult> load_tables(
@@ -253,6 +252,8 @@ private:
     void compute_event_id_index();
 
     static uint64_t compute_table_size_in_memory(const std::shared_ptr<arrow::Table> &table);
+    static std::vector<std::string> load_checkpoint_info(
+        const std::shared_ptr<arrow::io::RandomAccessFile> &file);
 
     friend class Checker;
     friend class TransactionDataIter;

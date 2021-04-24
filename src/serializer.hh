@@ -53,6 +53,8 @@ public:
 
     ~Serializer() { finalize(); }
 
+    static std::string get_checkpoint_filename(const std::string &dir);
+
 private:
     FileSystemInfo output_dir_;
     uint64_t batch_counter_ = 0;
@@ -77,6 +79,7 @@ private:
     static void update_stat(SerializationStat &stat, const TransactionGroupBatch &batch);
     static void write_stat(const std::shared_ptr<arrow::fs::FileSystem> &fs,
                            const SerializationStat &stat);
+    void write_checkpoint_file();
 };
 
 }  // namespace hermes

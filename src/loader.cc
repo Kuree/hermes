@@ -3,14 +3,17 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <thread>
 
 #include "arrow/api.h"
 #include "arrow/filesystem/localfs.h"
+#include "fmt/format.h"
 #include "parquet/arrow/reader.h"
 #include "parquet/statistics.h"
 #include "pubsub.hh"
 #include "rapidjson/document.h"
 #include "rapidjson/rapidjson.h"
+#include "serializer.hh"
 #include "util.hh"
 
 namespace fs = std::filesystem;
@@ -459,21 +462,29 @@ void Loader::open_dir(const FileSystemInfo &info) {
     auto fs = load_fs(info);
     if (!fs) return;
 
-    // do a LIST option
-    auto selector = arrow::fs::FileSelector();
-    selector.base_dir = info.path;
-    auto res = fs->GetFileInfo(selector);
-    if (!res.ok()) return;
-    auto files = *res;
-    for (auto const &file_info : files) {
-        // notice that arrow's fs doesn't include .
-        if (file_info.extension() == "json") {
-            load_json(file_info, fs);
-        }
+    // load the checkpoint files
+    auto checkpoint_filename = Serializer::get_checkpoint_filename(info.path);
+    auto fs_res = fs->OpenInputFile(checkpoint_filename);
+    if (!fs_res.ok()) return;
+
+    // load into string
+    auto files = load_checkpoint_info(*fs_res);
+    // multi-thread loading
+    std::vector<std::thread> threads;
+    threads.reserve(files.size());
+    for (auto const &filename : files) {
+        auto json_filename = fmt::format("{0}/{1}", info.path, filename);
+        threads.emplace_back(
+            std::thread([json_filename, fs, this]() { load_json(json_filename, fs); }));
+    }
+
+    // join
+    for (auto &t : threads) {
+        t.join();
     }
 }
 
-void Loader::load_json(const arrow::fs::FileInfo &json_info,
+void Loader::load_json(const std::string &json_info,
                        const std::shared_ptr<arrow::fs::FileSystem> &fs) {
     auto file_res = fs->OpenInputFile(json_info);
     if (!file_res.ok()) return;
@@ -499,7 +510,7 @@ void Loader::load_json(const arrow::fs::FileInfo &json_info,
     if (!opt_type) return;
     auto const &type = *opt_type;
 
-    parquet_file = fs::path(json_info.path()).parent_path() / parquet_file;
+    parquet_file = fs::path(json_info).parent_path() / parquet_file;
     // make sure we can actually open this file
     auto table_file_res = fs->OpenInputFile(parquet_file);
     if (!table_file_res.ok()) return;
@@ -1016,6 +1027,28 @@ uint64_t Loader::compute_table_size_in_memory(const std::shared_ptr<arrow::Table
     auto total = row_size * num_row;
     total += sizeof(std::unordered_map<uint64_t, void *>);
     return total;
+}
+
+std::vector<std::string> Loader::load_checkpoint_info(
+    const std::shared_ptr<arrow::io::RandomAccessFile> &file) {
+    auto size_res = file->GetSize();
+    if (!size_res.ok()) return {};
+    auto file_size = *size_res;
+    auto buffer_res = file->Read(file_size);
+    if (!buffer_res.ok()) return {};
+    auto buffer = *buffer_res;
+    auto content = buffer->ToString();
+
+    std::vector<std::string> result;
+    rapidjson::Document document;
+    document.Parse(content.c_str());
+    if (document.HasParseError()) return {};
+    auto const &array = document["files"].GetArray();
+    for (auto const &fn : array) {
+        const auto *filename = fn.GetString();
+        result.emplace_back(filename);
+    }
+    return result;
 }
 
 }  // namespace hermes

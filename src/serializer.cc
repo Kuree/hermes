@@ -127,11 +127,18 @@ void Serializer::finalize() {
         write_stat(fs_, stat);
     }
 
+    // write out checkpoint file
+    write_checkpoint_file();
+
     writers_.clear();
     stats_.clear();
 }
 
 bool Serializer::ok() const { return fs_ != nullptr && !has_error_; }
+
+std::string Serializer::get_checkpoint_filename(const std::string &dir) {
+    return fmt::format("{0}/{1}", dir, "checkpoint.json");
+}
 
 std::pair<std::string, std::string> Serializer::get_next_filename() {
     std::lock_guard guard(batch_mutex_);
@@ -210,7 +217,7 @@ bool Serializer::serialize(parquet::arrow::FileWriter *writer,
     return true;
 }
 
-void write_stat_to_file(const std::shared_ptr<arrow::fs::FileSystem> &fs,
+void write_json_to_file(const std::shared_ptr<arrow::fs::FileSystem> &fs,
                         rapidjson::Document &document, const std::string &filename) {
     rapidjson::StringBuffer buffer;
     rapidjson::PrettyWriter w(buffer);
@@ -253,7 +260,24 @@ void Serializer::write_stat(const std::shared_ptr<arrow::fs::FileSystem> &fs,
     json::set_member(document, "type", stat.type);
     json::set_member(document, "name", stat.name);
 
-    write_stat_to_file(fs, document, stat.json_filename);
+    write_json_to_file(fs, document, stat.json_filename);
+}
+
+void Serializer::write_checkpoint_file() {
+    if (batch_counter_ == 0) return;
+
+    rapidjson::Document document(rapidjson::kObjectType);
+    rapidjson::Value array(rapidjson::kArrayType);
+    // write out all the json files we have
+    // we use batch counter as a way to do stuff
+    auto filename = get_checkpoint_filename(output_dir_.path);
+    for (uint64_t i = 0; i < batch_counter_; i++) {
+        rapidjson::Value v(fmt::format("{0}.json", i).c_str(), document.GetAllocator());
+        array.PushBack(std::move(v), document.GetAllocator());
+    }
+    document.AddMember("files", array, document.GetAllocator());
+
+    write_json_to_file(fs_, document, filename);
 }
 
 }  // namespace hermes
