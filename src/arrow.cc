@@ -160,6 +160,12 @@ void FileSystemInfo::clear() const {
 }
 
 std::shared_ptr<arrow::fs::FileSystem> load_fs(const FileSystemInfo &info) {
+    static std::unordered_map<std::string, std::shared_ptr<arrow::fs::FileSystem>> fs_map_;
+    std::shared_ptr<arrow::fs::FileSystem> result;
+    if (fs_map_.find(info.path) != fs_map_.end()) {
+        return fs_map_.at(info.path);
+    }
+
     if (info.is_s3()) {
         // construct s3 filesystem
         arrow::fs::S3Options options;
@@ -179,11 +185,13 @@ std::shared_ptr<arrow::fs::FileSystem> load_fs(const FileSystemInfo &info) {
             std::cerr << "[ERROR]: " << fs_res.status().ToString() << std::endl;
             return nullptr;
         } else {
-            return *fs_res;
+            result = *fs_res;
         }
     } else {
-        return std::make_shared<arrow::fs::LocalFileSystem>();
+        result = std::make_shared<arrow::fs::LocalFileSystem>();
     }
+    fs_map_.emplace(info.path, result);
+    return result;
 }
 
 }  // namespace hermes
