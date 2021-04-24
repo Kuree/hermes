@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
+#include <atomic>
 
 namespace arrow {
 class RecordBatch;
@@ -69,7 +70,7 @@ public:
 private:
     std::map<std::string, EventValue> values_;
 
-    static uint64_t event_id_count_;
+    static std::atomic<uint64_t> event_id_count_;
 };
 
 // template class to visit event values

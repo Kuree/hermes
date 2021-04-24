@@ -32,7 +32,7 @@ private:
     bool finished_ = false;
     std::vector<uint64_t> events_ids_;
 
-    static uint64_t id_allocator_;
+    static std::atomic<uint64_t> id_allocator_;
 
     friend TransactionBatch;
 };
@@ -96,7 +96,7 @@ private:
     std::string name_;
     bool finished_ = false;
 
-    static uint64_t id_allocator_;
+    static std::atomic<uint64_t> id_allocator_;
 
     friend class TransactionGroupBatch;
 };

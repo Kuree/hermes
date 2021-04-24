@@ -7,7 +7,7 @@
 
 namespace hermes {
 
-uint64_t Transaction::id_allocator_ = 0;
+std::atomic<uint64_t> Transaction::id_allocator_ = 0;
 
 Transaction::Transaction() noexcept : id_(id_allocator_++) {}
 
@@ -176,7 +176,7 @@ void TransactionBatch::sort() {
                      [](const auto &a, const auto &b) { return a->end_time() < b->end_time(); });
 }
 
-uint64_t TransactionGroup::id_allocator_ = 0;
+std::atomic<uint64_t> TransactionGroup::id_allocator_ = 0;
 
 TransactionGroup::TransactionGroup(uint64_t id) : id_(id) {}
 

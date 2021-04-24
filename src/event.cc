@@ -13,7 +13,7 @@
 
 namespace hermes {
 
-uint64_t Event::event_id_count_ = 0;
+std::atomic<uint64_t> Event::event_id_count_ = 0;
 
 Event::Event(uint64_t time) noexcept : Event("", time) {}
 
