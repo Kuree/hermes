@@ -424,11 +424,14 @@ std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::str
         // we don't store it since it's unnecessary for normal use
         // we don't expect print_files will be called often
         uint64_t total_size = 0;
+        uint64_t num_chunks = 0;
         for (auto const &[info, table] : tables_) {
             if (info.first == file.get()) {
                 total_size += compute_table_size_in_memory(table);
+                num_chunks++;
             }
         }
+        std::cout << '\t' << "Num. of Chunks: " << num_chunks << std::endl;
         std::cout << '\t' << "Estimated size in memory: " << total_size << std::endl;
     }
 }
@@ -609,6 +612,7 @@ std::shared_ptr<EventBatch> Loader::load_events(const std::shared_ptr<arrow::Tab
     std::lock_guard guard(event_cache_mutex_);
     if (!event_cache_->exists(table.get())) {
         auto events = EventBatch::deserialize(table);
+        events->build_id_index();
         // put it into cache
         event_cache_->put(table.get(), std::move(events));
     }

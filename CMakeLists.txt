@@ -24,6 +24,11 @@ find_package(Arrow REQUIRED)
 find_package(Threads REQUIRED)
 find_package(ZLIB REQUIRED)#
 
+# only enabled when we're interested in performance test
+if (PERFORMANCE_TEST)
+    add_compile_definitions("PERFORMANCE_TEST")
+endif()
+
 add_subdirectory(src)
 
 # tests

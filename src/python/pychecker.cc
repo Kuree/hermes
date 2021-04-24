@@ -6,24 +6,30 @@
 
 namespace py = pybind11;
 
-void init_checker(py::module &m) {
-    class Checker_ : public hermes::Checker {
-    public:
-        void check(const hermes::TransactionData &data,
-                   const std::shared_ptr<hermes::QueryHelper> &query) override {
-            try {
-                check(data, *query);
-            } catch (pybind11::error_already_set &e) {
-                // a little hack to bypass pybind exception conversion
-                std::lock_guard guard(assert_mutex_);
-                auto ex = hermes::CheckerAssertion(std::string(e.what()));
-                throw ex;
-            }
+class Checker_ : public hermes::Checker {
+public:
+    void check(const hermes::TransactionData &data,
+               const std::shared_ptr<hermes::QueryHelper> &query) override {
+        try {
+            check(data, *query);
+        } catch (pybind11::error_already_set &e) {
+            // a little hack to bypass pybind exception conversion
+            std::lock_guard guard(assert_mutex_);
+            auto ex = hermes::CheckerAssertion(std::string(e.what()));
+            throw ex;
         }
+    }
 
-        virtual void check(const hermes::TransactionData &data, hermes::QueryHelper &query) = 0;
-    };
+    virtual void check(const hermes::TransactionData &data, hermes::QueryHelper &query) = 0;
+};
 
+class DummyChecker : public Checker_ {
+    void check(const hermes::TransactionData &, hermes::QueryHelper &) override {
+        // noop, just for performance measurement
+    }
+};
+
+void init_checker(py::module &m) {
     class PyChecker : public Checker_ {
         using Checker_::Checker_;
 
@@ -63,4 +69,8 @@ void init_checker(py::module &m) {
     checker.def_property("stateless", &Checker_::stateless, &Checker_::set_stateless);
 
     py::register_exception<hermes::CheckerAssertion>(m, "CheckerAssertion");
+
+    // for performance measurement
+    py::class_<DummyChecker, Checker_, std::shared_ptr<DummyChecker>>(m, "DummyChecker")
+        .def(py::init<>());
 }

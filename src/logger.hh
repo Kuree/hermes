@@ -50,7 +50,9 @@ public:
 private:
     std::string topic_;
     std::shared_ptr<Serializer> serializer_;
-    static constexpr uint64_t dump_threshold = 1 << 15;
+    static constexpr uint64_t event_dump_threshold = 1 << 15;
+    // more transaction tables for parallel speed up
+    static constexpr uint64_t transaction_dump_threshold = 1 << 12;
 
     std::map<std::string, EventBatch> events_;
     std::map<std::string, TransactionBatch> transactions_;

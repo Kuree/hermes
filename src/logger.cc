@@ -20,7 +20,7 @@ void DummyEventSerializer::on_message(const std::string &topic,
         events_.at(topic).set_name(topic);
     }
 
-    if (serializer_ && events_.at(topic).size() >= dump_threshold) {
+    if (serializer_ && events_.at(topic).size() >= event_dump_threshold) {
         serializer_->serialize(events_.at(topic));
         events_[topic].clear();
     }
@@ -34,7 +34,7 @@ void DummyEventSerializer::on_message(const std::string &topic,
         transactions_.at(topic).set_name(topic);
     }
 
-    if (serializer_ && transactions_.at(topic).size() >= dump_threshold) {
+    if (serializer_ && transactions_.at(topic).size() >= transaction_dump_threshold) {
         serializer_->serialize(transactions_.at(topic));
         transactions_[topic].clear();
     }
@@ -48,7 +48,7 @@ void DummyEventSerializer::on_message(const std::string &topic,
         transaction_groups_.at(topic).set_name(topic);
     }
 
-    if (serializer_ && transaction_groups_.at(topic).size() >= dump_threshold) {
+    if (serializer_ && transaction_groups_.at(topic).size() >= transaction_dump_threshold) {
         serializer_->serialize(transaction_groups_.at(topic));
         transaction_groups_[topic].clear();
     }

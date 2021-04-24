@@ -6,9 +6,9 @@ import pyhermes
 
 
 def parse_args():
-    parser = argparse.ArgumentParser("Benchmark for sequential streaming")
+    parser = argparse.ArgumentParser("Benchmark for parallel checking logic")
     parser.add_argument("-n", help="number of events", default=100000, type=int, dest="num_events")
-    parser.add_argument("--transaction-size", help="average transaction size", default=10, type=int,
+    parser.add_argument("--transaction-size", help="average transaction size", default=5, type=int,
                         dest="transaction_size")
     parser.add_argument("-s", "--s3", help="s3 folder name", type=str, required=True, dest="s3")
     parser.add_argument("--endpoint", help="s3 endpoint", type=str, default="", required=False, dest="endpoint")
@@ -67,16 +67,12 @@ def main():
     meta_loading = end - start
     loader.print_files()
     print("-" * 40)
+    checker = pyhermes.DummyChecker()
     start = time.time()
-    stream = loader["test"]
-    count = 0
-    for e in stream:
-        count += 1
-        assert e.id >= 0
+    checker.run("test", loader)
     end = time.time()
     reading_speed = end - start
     num_transaction = args.num_events / args.transaction_size
-    assert count == num_transaction
     print("Write:", "{0:.2f} ms/t".format(writing_speed / num_transaction * 1000), "Total:", f"{writing_speed:.2f}s")
     print("Read:", "{0:.2f} ms/t".format(reading_speed / num_transaction * 1000), "Total:", f"{reading_speed:.2f}s")
     print("Loading:", f"{meta_loading:.2f}s")

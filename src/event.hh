@@ -156,12 +156,14 @@ public:
 
     bool contains(uint64_t id) override;
 
+    void build_id_index();
+
 private:
     std::unordered_map<uint64_t, Event *> id_index_;
     std::map<uint64_t, EventBatch::iterator> lower_bound_index_;
     std::map<uint64_t, EventBatch::iterator> upper_bounder_index_;
 
-    void build_id_index();
+
     void build_time_index();
 };
 
