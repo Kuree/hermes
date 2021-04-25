@@ -615,15 +615,14 @@ std::shared_ptr<EventBatch> Loader::load_events(const std::shared_ptr<arrow::Tab
         event_cache_mutex_.unlock();
 
         // time consuming section
-        auto events = EventBatch::deserialize(table);
+        std::shared_ptr<EventBatch> events = EventBatch::deserialize(table);
         events->build_id_index();
 
         // put it into cache
         event_cache_mutex_.lock();
-        event_cache_->put(table.get(), std::move(events));
-        auto r = event_cache_->get(table.get());
+        event_cache_->put(table.get(), events);
         event_cache_mutex_.unlock();
-        return r;
+        return events;
     } else {
         auto r = event_cache_->get(table.get());
         event_cache_mutex_.unlock();
@@ -633,22 +632,51 @@ std::shared_ptr<EventBatch> Loader::load_events(const std::shared_ptr<arrow::Tab
 
 std::shared_ptr<TransactionBatch> Loader::load_transactions(
     const std::shared_ptr<arrow::Table> &table) {
-    std::lock_guard guard(transaction_cache_mutex_);
+    // similar logic to transaction cache as the load events
+    transaction_cache_mutex_.lock();
     if (!transaction_cache_->exists(table.get())) {
-        auto transactions = TransactionBatch::deserialize(table);
-        transaction_cache_->put(table.get(), std::move(transactions));
+        transaction_cache_mutex_.unlock();
+
+        // time consuming section
+        std::shared_ptr<TransactionBatch> transactions = TransactionBatch::deserialize(table);
+        transactions->build_id_index();
+
+        // put it into the cache
+        transaction_cache_mutex_.lock();
+        transaction_cache_->put(table.get(), transactions);
+        transaction_cache_mutex_.unlock();
+
+        return transactions;
+    } else {
+        auto r = transaction_cache_->get(table.get());
+        transaction_cache_mutex_.unlock();
+
+        return r;
     }
-    return transaction_cache_->get(table.get());
 }
 
 std::shared_ptr<TransactionGroupBatch> Loader::load_transaction_groups(
     const std::shared_ptr<arrow::Table> &table) {
-    std::lock_guard guard(transaction_group_cache_mutex_);
+    // same logic
+    transaction_group_cache_mutex_.lock();
     if (!transaction_group_cache_->exists(table.get())) {
-        auto group = TransactionGroupBatch::deserialize(table);
-        transaction_group_cache_->put(table.get(), std::move(group));
+        transaction_group_cache_mutex_.unlock();
+
+        // time consuming section
+        std::shared_ptr<TransactionGroupBatch> group = TransactionGroupBatch::deserialize(table);
+        group->build_index();
+
+        transaction_group_cache_mutex_.lock();
+        transaction_group_cache_->put(table.get(), group);
+        transaction_group_cache_mutex_.unlock();
+
+        return group;
+    } else {
+        auto r = transaction_group_cache_->get(table.get());
+        transaction_group_cache_mutex_.unlock();
+
+        return r;
     }
-    return transaction_group_cache_->get(table.get());
 }
 
 void Loader::compute_stats() {

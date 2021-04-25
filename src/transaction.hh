@@ -53,12 +53,12 @@ public:
     bool contains(uint64_t id) override;
     std::shared_ptr<Transaction> at(uint64_t id) const;
 
+    void build_time_index();
+    void build_id_index();
+
 private:
     std::unordered_map<uint64_t, Transaction *> id_index_;
     std::map<uint64_t, TransactionBatch::iterator> time_lower_bound_;
-
-    void build_time_index();
-    void build_id_index();
 };
 
 class TransactionGroupBatch;
@@ -114,10 +114,10 @@ public:
     bool contains(uint64_t id) override;
     std::shared_ptr<TransactionGroup> at(uint64_t id);
 
+    void build_index();
+
 private:
     std::unordered_map<uint64_t, TransactionGroup *> id_index_;
-
-    void build_index();
 };
 
 }  // namespace hermes
