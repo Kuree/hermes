@@ -1,16 +1,20 @@
+#include <iostream>
+
 #include "../src/checker.hh"
 #include "gtest/gtest.h"
 #include "test_util.hh"
-#include <iostream>
 
 class CheckerTest : public ::testing::Test, public EventTransactionInitializer {
-    void SetUp() override { setup(); }
+    void SetUp() override {
+        num_transaction_batch = 16;
+        setup();
+    }
 };
 
 class Checker1 : public hermes::Checker {
 public:
     void check(const hermes::TransactionData &transaction_data,
-               const std::shared_ptr<hermes::QueryHelper> &) override{
+               const std::shared_ptr<hermes::QueryHelper> &) override {
         // do nothing, i.e. everything is correct
     }
 };

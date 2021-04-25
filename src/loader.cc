@@ -609,14 +609,26 @@ std::vector<LoaderResult> Loader::load_tables(
 }
 
 std::shared_ptr<EventBatch> Loader::load_events(const std::shared_ptr<arrow::Table> &table) {
-    std::lock_guard guard(event_cache_mutex_);
+    // we need to be very careful about locking and unlocking and also achieve high-performance
+    event_cache_mutex_.lock();
     if (!event_cache_->exists(table.get())) {
+        event_cache_mutex_.unlock();
+
+        // time consuming section
         auto events = EventBatch::deserialize(table);
         events->build_id_index();
+
         // put it into cache
+        event_cache_mutex_.lock();
         event_cache_->put(table.get(), std::move(events));
+        auto r = event_cache_->get(table.get());
+        event_cache_mutex_.unlock();
+        return r;
+    } else {
+        auto r = event_cache_->get(table.get());
+        event_cache_mutex_.unlock();
+        return r;
     }
-    return event_cache_->get(table.get());
 }
 
 std::shared_ptr<TransactionBatch> Loader::load_transactions(

@@ -59,6 +59,8 @@ public:
     std::shared_ptr<hermes::Loader> loader;
     std::shared_ptr<TempDirectory> temp;
     static constexpr auto name = "test";
+    uint64_t num_events = 1000;
+    uint64_t num_transaction_batch = 4;
 
     void setup() {
         temp = std::make_shared<TempDirectory>();
@@ -71,9 +73,9 @@ public:
 
         uint64_t time = 0;
         // couple batches
-        for (auto b = 0; b < 4; b++) {
+        for (auto b = 0; b < num_transaction_batch; b++) {
             std::shared_ptr<hermes::Transaction> transaction;
-            for (auto i = 0; i < 1000; i++) {
+            for (auto i = 0; i < num_events; i++) {
                 auto event = std::make_shared<hermes::Event>(time++);
                 event->add_value<uint64_t>("value", i);
                 logger->log(event);
