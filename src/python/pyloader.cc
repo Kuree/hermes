@@ -3,7 +3,6 @@
 #include <pybind11/stl.h>
 
 #include "../json.hh"
-#include "../loader.hh"
 #include "../serializer.hh"
 
 namespace py = pybind11;
@@ -35,6 +34,14 @@ void init_stream(py::module &m) {
             return hermes::json::serialize(v, pretty_print);
         },
         py::arg("pretty_print") = false);
+
+    stream.def("where", [](const hermes::TransactionStream &stream,
+                           const std::function<bool(const hermes::TransactionData &)> &filter) {
+        pybind11::gil_scoped_release release;
+        auto res = stream.where(filter);
+        pybind11::gil_scoped_acquire acquire;
+        return res;
+    });
 }
 
 uint64_t get_size(const hermes::TransactionData &t) {
@@ -121,11 +128,11 @@ void init_data(py::module &m) {
     });
 
     data.def_property_readonly("end_time", [](const hermes::TransactionData &d) {
-      if (d.is_group()) {
-          return (*d.group).group->end_time();
-      } else {
-          return d.transaction->end_time();
-      }
+        if (d.is_group()) {
+            return (*d.group).group->end_time();
+        } else {
+            return d.transaction->end_time();
+        }
     });
 }
 void init_fs_info(py::module &m) {

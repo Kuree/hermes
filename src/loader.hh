@@ -131,8 +131,7 @@ public:
 
     [[nodiscard]] uint64_t size() const { return num_entries_; }
 
-    TransactionStream where(
-        const std::function<bool(const TransactionData &data)> &filter);
+    TransactionStream where(const std::function<bool(const TransactionData &data)> &filter) const;
 
 private:
     std::map<uint64_t, std::pair<bool, std::shared_ptr<arrow::Table>>> tables_;

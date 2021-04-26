@@ -128,7 +128,7 @@ TransactionStream::TransactionStream(
 }
 
 TransactionStream TransactionStream::where(
-    const std::function<bool(const TransactionData &)> &filter) {
+    const std::function<bool(const TransactionData &)> &filter) const {
     // we split jobs on the tables.
     std::vector<std::vector<uint64_t>> row_mapping;
     // get original tables

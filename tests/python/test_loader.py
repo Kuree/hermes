@@ -119,6 +119,15 @@ def test_event_schema():
         assert len(schema) > 0
 
 
+def test_stream_filter():
+    with tempfile.TemporaryDirectory() as temp:
+        setup_loader_test(temp)
+        loader = pyhermes.Loader(temp)
+        stream = loader["test"]
+        stream = stream.where(lambda x: x.id % 2 == 0)
+        assert len(stream) == 5
+
+
 def is_port_open(port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     result = sock.connect_ex(('localhost', port))
@@ -148,4 +157,4 @@ def test_s3_fs():
 
 
 if __name__ == "__main__":
-    test_s3_fs()
+    test_stream_filter()
