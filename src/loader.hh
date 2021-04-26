@@ -141,13 +141,15 @@ public:
 private:
     std::map<uint64_t, std::pair<bool, std::shared_ptr<arrow::Table>>> tables_;
     uint64_t num_entries_ = 0;
-    Loader *loader_;
+    Loader *loader_ = nullptr;
 
     // row mapping, used for filtering
     std::optional<std::vector<std::vector<uint64_t>>> row_mapping_;
 
     TransactionStream(const std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> &tables,
                       Loader *loader, std::vector<std::vector<uint64_t>> row_mapping);
+
+    TransactionStream() = default;
 
     friend class TransactionDataIter;
 };

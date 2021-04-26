@@ -145,6 +145,28 @@ TEST_F(LoaderTest, filter_stream_iter) {  // NOLINT
     }
 }
 
+TEST_F(LoaderTest, filter_stream_iter_cascade) { // NOLINT
+    hermes::Loader loader(dir.path());
+    auto stream = loader.get_transaction_stream(event_name);
+    auto filtered_stream = stream->where([](const hermes::TransactionData &data) -> bool {
+      return data.transaction->id() % 2 == 0;
+    });
+    EXPECT_EQ(filtered_stream.size(), stream->size() / 2);
+    auto second_filtered_stream = filtered_stream.where([](const hermes::TransactionData &data) -> bool {
+        return data.transaction->id() % 4 == 0;
+    });
+    EXPECT_EQ(second_filtered_stream.size(), stream->size() / 4);
+    // check ordering as well
+    std::vector<uint64_t> ids;
+    ids.reserve(second_filtered_stream.size());
+    for (auto const &data: second_filtered_stream) {
+        ids.emplace_back(data.transaction->id());
+    }
+    for (uint64_t i = 0; i < ids.size(); i++) {
+        EXPECT_EQ(ids[i], i * 4);
+    }
+}
+
 class S3LoaderTest : public LoaderTest {
     void SetUp() override {
         // only if the port is open

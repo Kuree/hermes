@@ -152,17 +152,26 @@ TransactionStream TransactionStream::where(
 
     std::vector<std::thread> threads;
     threads.reserve(tables.size());
-    for (uint64_t idx = 0; idx < tables.size(); idx++) {
+    for (uint64_t idx = 0; idx < tables.size(); idx++) {  // NOLINT
         auto const &table_entry = tables[idx];
         // assume the result will be 1/3 or the original size for each
         // table
         row_mapping.reserve(table_entry.second->num_rows() / 3);
         threads.emplace_back(std::thread([idx, table_entry, filter, &row_mapping, this]() {
             uint64_t i = 0;
-            TransactionStream stream({table_entry}, loader_);
+            TransactionStream stream;
+            if (row_mapping_) {
+                stream = TransactionStream({table_entry}, loader_, {(*row_mapping_)[idx]});
+            } else {
+                stream = TransactionStream({table_entry}, loader_);
+            }
             for (auto const &data : stream) {
                 if (filter(data)) {
-                    row_mapping[idx].emplace_back(i);
+                    if (row_mapping_) {
+                        row_mapping[idx].emplace_back((*row_mapping_)[idx][i]);
+                    } else {
+                        row_mapping[idx].emplace_back(i);
+                    }
                 }
                 i++;
             }
