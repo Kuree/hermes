@@ -87,12 +87,12 @@ public:
 class TransactionStream;
 struct TransactionDataIter {
 public:
-    TransactionDataIter(TransactionStream *stream, uint64_t current_row)
-        : stream_(stream), current_row_(current_row) {}
+    TransactionDataIter(TransactionStream *stream, uint64_t current_row);
     TransactionData operator*() const;
 
     inline TransactionDataIter &operator++() {
         current_row_++;
+        compute_index();
         return *this;
     }
 
@@ -115,6 +115,11 @@ public:
 private:
     TransactionStream *stream_;
     uint64_t current_row_ = 0;
+
+    uint64_t table_index_;
+    std::pair<bool, std::shared_ptr<arrow::Table>> table_entry_;
+
+    void compute_index();
 };
 
 class Loader;

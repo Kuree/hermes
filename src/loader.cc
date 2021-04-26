@@ -63,54 +63,65 @@ void load_transaction_group(TransactionData::TransactionGroupData &data, Loader 
     }
 }
 
-TransactionData TransactionDataIter::operator*() const {
-    TransactionData data;
+TransactionDataIter::TransactionDataIter(TransactionStream *stream, uint64_t current_row)
+    : stream_(stream), current_row_(current_row) {
+    // compute the index
+    compute_index();
+}
+
+void TransactionDataIter::compute_index() {
     if (current_row_ >= stream_->size()) {
-        return data;
+        return;
     }
     // need to load transactions
     // figure out which table to load
     // depends this is a index-mapped tables or not, we need to compute the table
     // differently
-    bool is_group;
-    std::shared_ptr<arrow::Table> table;
-    uint64_t idx;
     if (stream_->row_mapping_) {
         // compute the table and index
         // maybe a slightly more optimized way to compute this
         auto const &mapping = *stream_->row_mapping_;
         uint64_t table_index = 0;
-        idx = current_row_;
+        table_index_ = current_row_;
         for (table_index = 0; table_index < mapping.size(); table_index++) {
-            if (idx >= mapping[table_index].size()) {
-                idx -= mapping[table_index].size();
+            if (table_index_ >= mapping[table_index].size()) {
+                table_index_ -= mapping[table_index].size();
             } else {
                 break;
             }
         }
         auto it = stream_->tables_.begin();
         std::advance(it, table_index);
-        std::tie(is_group, table) = it->second;
+        table_entry_ = it->second;
         // use the mapping
-        idx = mapping[table_index][idx];
+        table_index_ = mapping[table_index][table_index_];
     } else {
         auto table_iter = stream_->tables_.upper_bound(current_row_);
-        std::tie(is_group, table) = table_iter->second;
+        table_entry_ = table_iter->second;
         // compute the index
         auto offset = table_iter->first - current_row_;
-        idx = table->num_rows() - offset;
+        table_index_ = table_entry_.second->num_rows() - offset;
     }
+}
+
+TransactionData TransactionDataIter::operator*() const {
+    TransactionData data;
+    if (current_row_ >= stream_->size()) {
+        return data;
+    }
+
+    auto const &[is_group, table] = table_entry_;
 
     if (is_group) {
         auto groups = stream_->loader_->load_transaction_groups(table);
         data.group = TransactionData::TransactionGroupData();
-        data.group->group = (*groups)[idx];
+        data.group->group = (*groups)[table_index_];
 
         // recursively construct the values
         load_transaction_group(*data.group, stream_->loader_);
     } else {
         auto transactions = stream_->loader_->load_transactions(table);
-        data.transaction = (*transactions)[idx];
+        data.transaction = (*transactions)[table_index_];
         load_transaction(data, stream_->loader_);
     }
 
