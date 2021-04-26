@@ -76,6 +76,11 @@ public:
                 t->add_event(&e);
             }
             publisher.publish(event_name, t);
+
+            if (id == num_events) {
+                // create second batch of transaction
+                d->flush();
+            }
         }
 
         hermes::MessageBus::default_bus()->stop();
@@ -120,6 +125,24 @@ TEST_F(LoaderTest, stream_iter) {  // NOLINT
         num_trans++;
     }
     EXPECT_EQ(num_trans, num_events * 2 / chunk_size);
+}
+
+TEST_F(LoaderTest, filter_stream_iter) {  // NOLINT
+    hermes::Loader loader(dir.path());
+    auto stream = loader.get_transaction_stream(event_name);
+    auto filtered_stream = stream->where([](const hermes::TransactionData &data) -> bool {
+        return data.transaction->id() % 2 == 0;
+    });
+    EXPECT_EQ(filtered_stream.size(), stream->size() / 2);
+    // check ordering as well
+    std::vector<uint64_t> ids;
+    ids.reserve(filtered_stream.size());
+    for (auto const &data: filtered_stream) {
+        ids.emplace_back(data.transaction->id());
+    }
+    for (uint64_t i = 0; i < ids.size(); i++) {
+        EXPECT_EQ(ids[i], i * 2);
+    }
 }
 
 class S3LoaderTest : public LoaderTest {

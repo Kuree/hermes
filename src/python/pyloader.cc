@@ -111,6 +111,22 @@ void init_data(py::module &m) {
             return hermes::json::serialize(v, pretty_print);
         },
         py::arg("pretty_print") = false);
+
+    data.def_property_readonly("start_time", [](const hermes::TransactionData &d) {
+        if (d.is_group()) {
+            return (*d.group).group->start_time();
+        } else {
+            return d.transaction->start_time();
+        }
+    });
+
+    data.def_property_readonly("end_time", [](const hermes::TransactionData &d) {
+      if (d.is_group()) {
+          return (*d.group).group->end_time();
+      } else {
+          return d.transaction->end_time();
+      }
+    });
 }
 void init_fs_info(py::module &m) {
     auto fs = py::class_<hermes::FileSystemInfo>(m, "FileSystemInfo");

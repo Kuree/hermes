@@ -70,11 +70,36 @@ TransactionData TransactionDataIter::operator*() const {
     }
     // need to load transactions
     // figure out which table to load
-    auto table_iter = stream_->tables_.upper_bound(current_row_);
-    auto const &[is_group, table] = table_iter->second;
-    // compute the index
-    auto offset = table_iter->first - current_row_;
-    auto idx = table->num_rows() - offset;
+    // depends this is a index-mapped tables or not, we need to compute the table
+    // differently
+    bool is_group;
+    std::shared_ptr<arrow::Table> table;
+    uint64_t idx;
+    if (stream_->row_mapping_) {
+        // compute the table and index
+        // maybe a slightly more optimized way to compute this
+        auto const &mapping = *stream_->row_mapping_;
+        uint64_t table_index = 0;
+        idx = current_row_;
+        for (table_index = 0; table_index < mapping.size(); table_index++) {
+            if (idx >= mapping[table_index].size()) {
+                idx -= mapping[table_index].size();
+            } else {
+                break;
+            }
+        }
+        auto it = stream_->tables_.begin();
+        std::advance(it, table_index);
+        std::tie(is_group, table) = it->second;
+        // use the mapping
+        idx = mapping[table_index][idx];
+    } else {
+        auto table_iter = stream_->tables_.upper_bound(current_row_);
+        std::tie(is_group, table) = table_iter->second;
+        // compute the index
+        auto offset = table_iter->first - current_row_;
+        idx = table->num_rows() - offset;
+    }
 
     if (is_group) {
         auto groups = stream_->loader_->load_transaction_groups(table);
@@ -99,6 +124,54 @@ TransactionStream::TransactionStream(
     for (auto const &[group, table] : tables) {
         num_entries_ += table->num_rows();
         tables_.emplace(num_entries_, std::make_pair(group, table));
+    }
+}
+
+TransactionStream TransactionStream::where(
+    const std::function<bool(const TransactionData &)> &filter) {
+    // we split jobs on the tables.
+    std::vector<std::vector<uint64_t>> row_mapping;
+    // get original tables
+    std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> tables;
+    tables.reserve(tables_.size());
+    for (auto const &iter : tables_) {
+        tables.emplace_back(iter.second);
+    }
+    row_mapping.resize(tables_.size());
+
+    std::vector<std::thread> threads;
+    threads.reserve(tables.size());
+    for (uint64_t idx = 0; idx < tables.size(); idx++) {
+        auto const &table_entry = tables[idx];
+        // assume the result will be 1/3 or the original size for each
+        // table
+        row_mapping.reserve(table_entry.second->num_rows() / 3);
+        threads.emplace_back(std::thread([idx, table_entry, filter, &row_mapping, this]() {
+            uint64_t i = 0;
+            TransactionStream stream({table_entry}, loader_);
+            for (auto const &data : stream) {
+                if (filter(data)) {
+                    row_mapping[idx].emplace_back(i);
+                }
+                i++;
+            }
+        }));
+    }
+
+    for (auto &thread : threads) thread.join();
+
+    return TransactionStream(tables, loader_, row_mapping);
+}
+
+TransactionStream::TransactionStream(
+    const std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> &tables, Loader *loader,
+    std::vector<std::vector<uint64_t>> row_mapping)
+    : loader_(loader), row_mapping_(std::move(row_mapping)) {
+    num_entries_ = 0;
+    for (uint64_t i = 0; i < tables.size(); i++) {
+        auto const &maps = (*row_mapping_)[i];
+        num_entries_ += maps.size();
+        tables_.emplace(num_entries_, tables[i]);
     }
 }
 

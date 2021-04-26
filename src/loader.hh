@@ -120,6 +120,7 @@ private:
 class Loader;
 class TransactionStream {
 public:
+    // <is_group, table>
     TransactionStream(const std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> &tables,
                       Loader *loader);
 
@@ -130,10 +131,19 @@ public:
 
     [[nodiscard]] uint64_t size() const { return num_entries_; }
 
+    TransactionStream where(
+        const std::function<bool(const TransactionData &data)> &filter);
+
 private:
     std::map<uint64_t, std::pair<bool, std::shared_ptr<arrow::Table>>> tables_;
     uint64_t num_entries_ = 0;
     Loader *loader_;
+
+    // row mapping, used for filtering
+    std::optional<std::vector<std::vector<uint64_t>>> row_mapping_;
+
+    TransactionStream(const std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> &tables,
+                      Loader *loader, std::vector<std::vector<uint64_t>> row_mapping);
 
     friend class TransactionDataIter;
 };
