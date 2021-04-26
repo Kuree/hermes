@@ -10,6 +10,7 @@
 #include "fmt/format.h"
 #include "parquet/arrow/reader.h"
 #include "parquet/statistics.h"
+#include "process.hh"
 #include "pubsub.hh"
 #include "rapidjson/document.h"
 #include "rapidjson/rapidjson.h"
@@ -526,6 +527,39 @@ std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::str
         }
         std::cout << '\t' << "Num. of Chunks: " << num_chunks << std::endl;
         std::cout << '\t' << "Estimated size in memory: " << total_size << std::endl;
+    }
+}
+
+void Loader::preload() {
+    // preload until the cache is full
+    // use thread pool implementation
+    // maximize the load speed
+    auto pool = ThreadPool(std::thread::hardware_concurrency());
+    std::vector<std::future<void>> results;
+    for (auto const &iter : tables_) {
+        auto func = [iter, this]() {
+            auto const &[file_info, table] = iter;
+            auto const &[file, blk] = file_info;
+            switch (file->type) {
+                case FileInfo::FileType::event: {
+                    load_events(table);
+                    break;
+                }
+                case FileInfo::FileType::transaction: {
+                    load_transactions(table);
+                    break;
+                }
+                case FileInfo::FileType::transaction_group: {
+                    load_transaction_groups(table);
+                    break;
+                }
+            }
+        };
+        auto entry = pool.enqueue(func);
+        results.emplace_back(std::move(entry));
+    }
+    for (auto &&r : results) {
+        r.get();
     }
 }
 

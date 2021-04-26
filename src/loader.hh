@@ -216,6 +216,7 @@ public:
 
     // debug information
     [[maybe_unused]] void print_files() const;
+    void preload();
 
 private:
     std::vector<std::unique_ptr<FileInfo>> files_;
