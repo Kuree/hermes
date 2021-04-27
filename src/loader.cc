@@ -456,10 +456,10 @@ std::shared_ptr<EventBatch> Loader::get_events(const Transaction &transaction) {
 
         while (iter != event_id_index_.end()) {
             auto temp = iter;
-            auto target_iter = iter->first > id ? --temp : iter;
+            auto const &target_iter = iter->first > id ? --temp : iter;
             // we expect this loop only run once for a well-formed table
-            auto table = tables_.at(target_iter->second);
-            auto events = load_events(table);
+            auto const &table = tables_.at(target_iter->second);
+            auto const &events = load_events(table);
             auto *e = events->get_event(id);
             if (e) {
                 (*result)[i] = e->shared_from_this();
@@ -561,6 +561,10 @@ void Loader::preload() {
     for (auto &&r : results) {
         r.get();
     }
+    // only if all the tables are in memory
+    uint64_t num_cache_entry =
+        event_cache_->size() + transaction_cache_->size() + transaction_group_cache_->size();
+    preloaded_ = num_cache_entry == tables_.size();
 }
 
 static bool check_member(rapidjson::Document &document, const char *member_name) {
@@ -736,6 +740,10 @@ std::vector<LoaderResult> Loader::load_tables(
 }
 
 std::shared_ptr<EventBatch> Loader::load_events(const std::shared_ptr<arrow::Table> &table) {
+    // if everything is preloaded, go ahead and directly return the values
+    if (preloaded_) {
+        return event_cache_->get(table.get());
+    }
     // we need to be very careful about locking and unlocking and also achieve high-performance
     event_cache_mutex_.lock();
     if (!event_cache_->exists(table.get())) {

@@ -241,6 +241,8 @@ private:
     // lookup table for event id lists
     // this will be read-only so no mutex protection
     std::map<uint64_t, std::pair<const FileInfo *, uint64_t>> event_id_index_;
+    // only if we have preloaded everything
+    bool preloaded_ = false;
 
     void open_dir(const FileSystemInfo &info);
     void load_json(const std::string &json_info, const std::shared_ptr<arrow::fs::FileSystem> &fs);

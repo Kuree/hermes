@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "arrow.hh"
 #include "gtest/gtest.h"
 #include "loader.hh"
@@ -38,6 +40,7 @@ public:
     static constexpr auto event_name = "dummy1";
     static constexpr auto chunk_size = 5;
     uint64_t num_events = 100;
+    uint64_t total_num_events = 0;
     std::shared_ptr<hermes::Serializer> serializer;
     std::unique_ptr<hermes::FileSystemInfo> info = nullptr;
 
@@ -55,6 +58,7 @@ public:
             auto e = std::make_shared<hermes::Event>(i);
             e->add_value<uint32_t>("value", i);
             publisher.publish(event_name, e);
+            total_num_events++;
         }
 
         // flush it here since we're creating a new batch
@@ -64,6 +68,7 @@ public:
             auto e = std::make_shared<hermes::Event>(i);
             e->add_value<uint32_t>("value", i);
             publisher.publish(event_name, e);
+            total_num_events++;
         }
 
         // we don't even track it, just directly use transactions
@@ -137,7 +142,7 @@ TEST_F(LoaderTest, filter_stream_iter) {  // NOLINT
     // check ordering as well
     std::vector<uint64_t> ids;
     ids.reserve(filtered_stream.size());
-    for (auto const &data: filtered_stream) {
+    for (auto const &data : filtered_stream) {
         ids.emplace_back(data.transaction->id());
     }
     for (uint64_t i = 0; i < ids.size(); i++) {
@@ -145,21 +150,22 @@ TEST_F(LoaderTest, filter_stream_iter) {  // NOLINT
     }
 }
 
-TEST_F(LoaderTest, filter_stream_iter_cascade) { // NOLINT
+TEST_F(LoaderTest, filter_stream_iter_cascade) {  // NOLINT
     hermes::Loader loader(dir.path());
     auto stream = loader.get_transaction_stream(event_name);
     auto filtered_stream = stream->where([](const hermes::TransactionData &data) -> bool {
-      return data.transaction->id() % 2 == 0;
+        return data.transaction->id() % 2 == 0;
     });
     EXPECT_EQ(filtered_stream.size(), stream->size() / 2);
-    auto second_filtered_stream = filtered_stream.where([](const hermes::TransactionData &data) -> bool {
-        return data.transaction->id() % 4 == 0;
-    });
+    auto second_filtered_stream =
+        filtered_stream.where([](const hermes::TransactionData &data) -> bool {
+            return data.transaction->id() % 4 == 0;
+        });
     EXPECT_EQ(second_filtered_stream.size(), stream->size() / 4);
     // check ordering as well
     std::vector<uint64_t> ids;
     ids.reserve(second_filtered_stream.size());
-    for (auto const &data: second_filtered_stream) {
+    for (auto const &data : second_filtered_stream) {
         ids.emplace_back(data.transaction->id());
     }
     for (uint64_t i = 0; i < ids.size(); i++) {
@@ -208,6 +214,7 @@ TEST_F(LoaderPerformanceTest, events_stream) {  // NOLINT
     hermes::Loader loader(dir.path());
     auto stream = loader.get_transaction_stream(event_name);
     uint64_t num_trans = 0;
+    auto start = std::chrono::system_clock::now();
     for (auto const &[transaction, events, _] : *stream) {
         (void)transaction;
         for (auto const &event : *events) {
@@ -215,7 +222,38 @@ TEST_F(LoaderPerformanceTest, events_stream) {  // NOLINT
         }
         num_trans++;
     }
+    auto end = std::chrono::system_clock::now();
+    auto us = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    auto sec = static_cast<double>(us.count()) / 1000.0 / 1000.0;
+    auto speed = static_cast<double>(total_num_events) / sec;
+    std::cout << "Reading speed " << speed << " events/s" << std::endl;
     EXPECT_GT(num_trans, 0);
+}
+
+void load_test(std::shared_ptr<hermes::TransactionStream> &stream, uint64_t num_events) {
+    // separated function so that the profiler can pick this function easily
+    uint64_t num_trans = 0;
+    auto start = std::chrono::system_clock::now();
+    for (auto const &[transaction, events, _] : *stream) {
+        (void)transaction;
+        for (auto const &event : *events) {
+            EXPECT_NE(event, nullptr);
+        }
+        num_trans++;
+    }
+    auto end = std::chrono::system_clock::now();
+    auto us = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    auto sec = static_cast<double>(us.count()) / 1000.0 / 1000.0;
+    auto speed = static_cast<double>(num_events) / sec;
+    std::cout << "Reading speed " << speed << " events/s: " << sec << std::endl;
+    EXPECT_GT(num_trans, 0);
+}
+
+TEST_F(LoaderPerformanceTest, events_stream_preload) {  // NOLINT
+    hermes::Loader loader(dir.path());
+    loader.preload();
+    auto stream = loader.get_transaction_stream(event_name);
+    load_test(stream, total_num_events);
 }
 
 #endif
