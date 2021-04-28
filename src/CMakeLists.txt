@@ -15,3 +15,4 @@ set_property(TARGET hermes PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(dpi)
 add_subdirectory(python)
+add_subdirectory(tools)
