@@ -664,18 +664,23 @@ void Loader::load_json(const std::string &json_info,
         return;
 
     auto info = std::make_unique<FileInfo>(file_type, parquet_file);
-    switch (file_type) {
-        case FileInfo::FileType::event: {
-            events_.emplace_back(info.get());
-            break;
-        }
-        case FileInfo::FileType::transaction: {
-            transactions_.emplace_back(info.get());
-        }
-        case FileInfo::FileType::transaction_group: {
-            transaction_groups_.emplace_back(info.get());
+    {
+        std::lock_guard guard(files_mutex_);
+
+        switch (file_type) {
+            case FileInfo::FileType::event: {
+                events_.emplace_back(info.get());
+                break;
+            }
+            case FileInfo::FileType::transaction: {
+                transactions_.emplace_back(info.get());
+            }
+            case FileInfo::FileType::transaction_group: {
+                transaction_groups_.emplace_back(info.get());
+            }
         }
     }
+
     // get name
     auto name_opt = get_member<std::string>(document, "name");
     if (name_opt) {
