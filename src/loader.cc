@@ -674,9 +674,11 @@ void Loader::load_json(const std::string &json_info,
             }
             case FileInfo::FileType::transaction: {
                 transactions_.emplace_back(info.get());
+                break;
             }
             case FileInfo::FileType::transaction_group: {
                 transaction_groups_.emplace_back(info.get());
+                break;
             }
         }
     }
@@ -994,15 +996,9 @@ void stream_values(std::vector<std::shared_ptr<T>> &values, std::vector<uint64_t
 template <typename T>
 void load_values(
     const std::vector<LoaderResult> &load_results, std::vector<std::shared_ptr<T>> &values,
-    const std::function<std::shared_ptr<T>(const std::shared_ptr<arrow::Table> &)> &load_func,
-    std::unordered_set<arrow::Table *> &loaded_table_) {
+    const std::function<std::shared_ptr<T>(const std::shared_ptr<arrow::Table> &)> &load_func) {
     for (auto const &res : load_results) {
         auto const &table = res.table;
-        if (loaded_table_.find(table.get()) != loaded_table_.end()) {
-            // we already streamed this one
-            continue;
-        }
-        loaded_table_.emplace(table.get());
 
         // load the table
         auto event_batch = load_func(table);
@@ -1016,68 +1012,59 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
     // because each table is a chunk, as long as the cache doesn't
     // take much memory, we're good
 
-    // we assume the event batch is sorted by time within
-    std::unordered_set<arrow::Table *> loaded_table_;
     // we load them in approximation of time, it won't be perfect but should be good
     // enough
-    uint64_t interval = (stats_.max_event_time - stats_.min_event_time) / stats_.num_event_files;
-    for (uint64_t start_time = stats_.min_event_time; start_time <= stats_.max_event_time;
-         start_time += interval) {
-        auto load_results = load_events_table(start_time, start_time + interval);
-        std::vector<std::shared_ptr<EventBatch>> events;
-        std::vector<std::shared_ptr<TransactionBatch>> transactions;
-        std::vector<std::shared_ptr<TransactionGroupBatch>> transaction_groups;
 
-        // gcc failed to induce the template type
-        load_values<EventBatch>(
-            load_results, events,
-            [this](const std::shared_ptr<arrow::Table> &table) { return load_events(table); },
-            loaded_table_);
+    auto load_results = load_events_table(0, std::numeric_limits<uint64_t>::max());
+    std::vector<std::shared_ptr<EventBatch>> events;
+    std::vector<std::shared_ptr<TransactionBatch>> transactions;
+    std::vector<std::shared_ptr<TransactionGroupBatch>> transaction_groups;
 
-        // decide whether to stream transactions or not
-        if (stream_transactions) {
-            load_results = load_transaction_table(std::nullopt, start_time, start_time + interval);
+    // gcc failed to induce the template type
+    load_values<EventBatch>(
+        load_results, events,
+        [this](const std::shared_ptr<arrow::Table> &table) { return load_events(table); });
 
-            load_values<TransactionBatch>(
-                load_results, transactions,
-                [this](const std::shared_ptr<arrow::Table> &table) {
-                    return load_transactions(table);
-                },
-                loaded_table_);
+    // decide whether to stream transactions or not
+    if (stream_transactions) {
+        load_results =
+            load_transaction_table(std::nullopt, 0, std::numeric_limits<uint64_t>::max());
 
-            // groups as well
-            load_results =
-                load_transaction_group_table(std::nullopt, start_time, start_time + interval);
-            load_values<TransactionGroupBatch>(
-                load_results, transaction_groups,
-                [this](const std::shared_ptr<arrow::Table> &table) {
-                    return load_transaction_groups(table);
-                },
-                loaded_table_);
-        }
+        load_values<TransactionBatch>(load_results, transactions,
+                                      [this](const std::shared_ptr<arrow::Table> &table) {
+                                          return load_transactions(table);
+                                      });
 
-        std::vector<uint64_t> event_indices;
-        event_indices.resize(events.size(), 0);
-        std::vector<uint64_t> transaction_indices;
-        transaction_indices.resize(transactions.size(), 0);
-        std::vector<uint64_t> transaction_group_indices;
-        transaction_group_indices.resize(transactions.size(), 0);
+        // groups as well
+        load_results =
+            load_transaction_group_table(std::nullopt, 0, std::numeric_limits<uint64_t>::max());
+        load_values<TransactionGroupBatch>(load_results, transaction_groups,
+                                           [this](const std::shared_ptr<arrow::Table> &table) {
+                                               return load_transaction_groups(table);
+                                           });
+    }
 
-        // stream out the events and transactions
+    std::vector<uint64_t> event_indices;
+    event_indices.resize(events.size(), 0);
+    std::vector<uint64_t> transaction_indices;
+    transaction_indices.resize(transactions.size(), 0);
+    std::vector<uint64_t> transaction_group_indices;
+    transaction_group_indices.resize(transactions.size(), 0);
 
-        while (true) {
-            bool stop = true;
-            should_stop(events, event_indices, stop);
-            should_stop(transactions, transaction_indices, stop);
-            should_stop(transaction_groups, transaction_group_indices, stop);
+    // stream out the events and transactions
 
-            if (stop) break;
+    while (true) {
+        bool stop = true;
+        should_stop(events, event_indices, stop);
+        should_stop(transactions, transaction_indices, stop);
+        should_stop(transaction_groups, transaction_group_indices, stop);
 
-            // stream events
-            stream_values(events, event_indices, bus);
-            stream_values(transactions, transaction_indices, bus);
-            stream_values(transaction_groups, transaction_group_indices, bus);
-        }
+        if (stop) break;
+
+        // stream events
+        stream_values(events, event_indices, bus);
+        stream_values(transactions, transaction_indices, bus);
+        stream_values(transaction_groups, transaction_group_indices, bus);
     }
 }
 
