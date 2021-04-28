@@ -19,3 +19,6 @@
 [submodule "extern/slang"]
 	path = extern/slang
 	url = https://github.com/MikePopoloski/slang
+[submodule "extern/cpp-httplib"]
+	path = extern/cpp-httplib
+	url = https://github.com/yhirose/cpp-httplib
