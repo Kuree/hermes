@@ -13,10 +13,43 @@ namespace fs = std::filesystem;
 
 std::string get_filename(const fs::path &path, std::string name) {
     // trying to do some simple escape
-    for (auto &c: name) {
+    for (auto &c : name) {
         if (c == '/') c = '_';
     }
     return path / fmt::format("{0}.csv", name);
+}
+
+void write_table(const std::vector<std::string> &header, std::ofstream &stream,
+                 const std::shared_ptr<arrow::Table> &table) {
+    auto const &column_chunks = table->column(0);
+    for (auto chunk_idx = 0; chunk_idx < column_chunks->num_chunks(); chunk_idx++) {
+        // for each row
+        auto row_size = column_chunks->chunk(chunk_idx)->length();
+        for (int j = 0; j < row_size; j++) {
+            std::vector<std::string> row;
+            row.reserve(table->num_columns());
+            for (int i = 0; i < table->num_columns(); i++) {
+                auto const name = header[i];
+                auto const &column = table->GetColumnByName(name)->chunk(chunk_idx);
+                auto r_ = column->GetScalar(j);
+                std::string str;
+                if (r_.ok()) {
+                    // depends on the type
+                    auto const &v = *r_;
+                    auto type = v->type;
+                    if (type->Equals(arrow::list(arrow::uint64()))) {
+                        // list cannot have ','
+                        auto list = hermes::get_uint64s(v);
+                        str = fmt::format("{0}", fmt::join(list, " "));
+                    } else {
+                        str = v->ToString();
+                    }
+                }
+                row.emplace_back(str);
+            }
+            stream << fmt::format("{0}", fmt::join(row, ",")) << std::endl;
+        }
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -43,44 +76,22 @@ int main(int argc, char *argv[]) {
     std::unordered_map<std::string, std::vector<std::string>> headers;
     for (auto const &[info, table] : tables) {
         auto const *file = info.first;
-        if (file->type != hermes::FileInfo::FileType::event) continue;
-        auto event_name = file->name;
-        if (writers.find(event_name) == writers.end()) {
-            // out to this file
-
+        auto name = file->name;
+        if (writers.find(name) == writers.end()) {
             auto filename = get_filename(output_dir, file->name);
             auto stream = std::make_unique<std::ofstream>(filename);
             // write out the headers as well
             auto schema = table->schema();
             *stream << fmt::format("{0}", fmt::join(schema->field_names(), ",")) << std::endl;
-            headers.emplace(event_name, schema->field_names());
+            headers.emplace(name, schema->field_names());
             // put it into the writers
-            writers.emplace(event_name, std::move(stream));
+            writers.emplace(name, std::move(stream));
         }
         // load the events with raw arrow format
-        auto const &fields = headers.at(event_name);
-        auto &stream = *writers.at(event_name);
+        auto const &fields = headers.at(name);
+        auto &stream = *writers.at(name);
 
-        auto const &column_chunks = table->column(0);
-        for (auto chunk_idx = 0; chunk_idx < column_chunks->num_chunks(); chunk_idx++) {
-            // for each row
-            auto row_size = column_chunks->chunk(chunk_idx)->length();
-            for (int j = 0; j < row_size; j++) {
-                std::vector<std::string> row;
-                row.reserve(table->num_columns());
-                for (int i = 0; i < table->num_columns(); i++) {
-                    auto const name = fields[i];
-                    auto const &column = table->GetColumnByName(name)->chunk(chunk_idx);
-                    auto r_ = column->GetScalar(j);
-                    std::string str;
-                    if (r_.ok()) {
-                        str = (*r_)->ToString();
-                    }
-                    row.emplace_back(str);
-                }
-                stream << fmt::format("{0}", fmt::join(row, ",")) << std::endl;
-            }
-        }
+        write_table(fields, stream, table);
     }
 
     for (auto &iter : writers) iter.second->close();
