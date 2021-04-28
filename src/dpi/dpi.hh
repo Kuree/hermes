@@ -84,6 +84,7 @@ extern "C" {
 
 // helper functions
 [[maybe_unused]] void hermes_add_dummy_serializer(const char *topic);
+[[maybe_unused]] void hermes_set_serializer_dir(const char *topic);
 }
 
 #endif  // HERMES_DPI_HH

@@ -4,9 +4,9 @@
 #include <mutex>
 #include <unordered_set>
 
+#include "arrow.hh"
 #include "event.hh"
 #include "transaction.hh"
-#include "arrow.hh"
 
 namespace parquet {
 class WriterProperties;
@@ -39,8 +39,8 @@ struct SerializationStat {
 
 class Serializer {
 public:
-    explicit Serializer(const std::string& output_dir);
-    Serializer(const std::string& output_dir, bool override);
+    explicit Serializer(const std::string &output_dir);
+    Serializer(const std::string &output_dir, bool override);
     Serializer(FileSystemInfo info, bool override);
 
     bool serialize(EventBatch &batch);
@@ -50,6 +50,8 @@ public:
     void finalize();
     // whether the serializer is in a good state
     [[nodiscard]] bool ok() const;
+    bool set_output_dir(const FileSystemInfo &info);
+    bool set_output_dir(const std::string &path) { return set_output_dir(FileSystemInfo(path)); }
 
     ~Serializer() { finalize(); }
 

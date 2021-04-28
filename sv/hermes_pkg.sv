@@ -33,6 +33,7 @@ import "DPI-C" function void hermes_add_event_transaction(input chandle transact
 import "DPI-C" function void hermes_final();
 // help functions
 import "DPI-C" function void hermes_add_dummy_serializer(input string topic);
+import "DPI-C" function void hermes_set_serializer_dir(input string path);
 
 
 // class wrapper
@@ -207,6 +208,11 @@ class Logger;
         string            string_name_batch[];
         // event ids. we only use this if there is tracker attached
         chandle           event_handles[];
+
+        if (num_events == 0) begin
+            // no events
+            return;
+        end
 
         times_batch = new[num_events];
         foreach (times[i]) begin

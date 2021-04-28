@@ -211,6 +211,11 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
     p->connect(serializer);
 }
 
+[[maybe_unused]] void hermes_set_serializer_dir(const char *topic) {
+    auto serializer = get_serializer();
+    serializer->set_output_dir(topic);
+}
+
 [[maybe_unused]] void *hermes_create_tracker(const char *name) {
     auto tracker = std::make_shared<DPITracker>(name);
     trackers.emplace_back(tracker);

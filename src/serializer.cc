@@ -35,21 +35,8 @@ Serializer::Serializer(const std::string &output_dir, bool override)
     : Serializer(FileSystemInfo(output_dir), override) {}
 
 Serializer::Serializer(FileSystemInfo info, bool override) : output_dir_(std::move(info)) {
-    fs_ = load_fs(output_dir_);
-    if (!fs_) {
-        has_error_ = true;
+    if (!set_output_dir(output_dir_)) {
         return;
-    }
-
-    // need to find this directory
-    if (!exists(fs_, output_dir_.path)) {
-        // need to create directory recursively if possible
-        auto res = fs_->CreateDir(output_dir_.path, true);
-        if (!res.ok()) {
-            std::cerr << "[ERROR]: " << res.ToString() << std::endl;
-            has_error_ = true;
-            return;
-        }
     }
 
     // we use version 2.0
@@ -135,6 +122,27 @@ void Serializer::finalize() {
 }
 
 bool Serializer::ok() const { return fs_ != nullptr && !has_error_; }
+
+bool Serializer::set_output_dir(const FileSystemInfo &info) {
+    output_dir_ = info;
+    fs_ = load_fs(output_dir_);
+    if (!fs_) {
+        has_error_ = true;
+        return false;
+    }
+
+    // need to find this directory
+    if (!exists(fs_, output_dir_.path)) {
+        // need to create directory recursively if possible
+        auto res = fs_->CreateDir(output_dir_.path, true);
+        if (!res.ok()) {
+            std::cerr << "[ERROR]: " << res.ToString() << std::endl;
+            has_error_ = true;
+            return false;
+        }
+    }
+    return true;
+}
 
 std::string Serializer::get_checkpoint_filename(const std::string &dir) {
     return fmt::format("{0}/{1}", dir, "checkpoint.json");
