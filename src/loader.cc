@@ -966,13 +966,13 @@ void stream_values(std::vector<std::shared_ptr<T>> &values, std::vector<uint64_t
         uint32_t min_index = 0;
         auto value = (*values[min_index])[indices[min_index]];
         for (uint64_t i = 1; i < values.size(); i++) {
-            if constexpr (std::is_same<T, Event>::value) {
+            if constexpr (std::is_same<T, EventBatch>::value) {
                 if ((*values[i])[indices[i]]->time() < value->time()) {
                     min_index = i;
                     value = (*values[i])[indices[i]];
                 }
-            } else if constexpr (std::is_same<T, Transaction>::value ||
-                                 std::is_same<T, TransactionGroup>::value) {
+            } else if constexpr (std::is_same<T, TransactionBatch>::value ||
+                                 std::is_same<T, TransactionGroupBatch>::value) {
                 if ((*values[i])[indices[i]]->start_time() < value->start_time()) {
                     min_index = i;
                     value = (*values[i])[indices[i]];
