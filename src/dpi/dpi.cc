@@ -19,6 +19,8 @@ void DPILogger::send_events() {
     dispatcher->dispatch([this]() {
         std::lock_guard guard(events_lock_);
         for (auto const &event : events_) {
+            // set event name
+            event->set_name(topic_);
             log(event);
         }
         events_.clear();

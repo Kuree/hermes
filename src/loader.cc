@@ -688,7 +688,10 @@ void Loader::load_json(const std::string &json_info,
     // indices and references
     preload_table(info.get(), table_file);
 
-    files_.emplace_back(std::move(info));
+    {
+        std::lock_guard guard(files_mutex_);
+        files_.emplace_back(std::move(info));
+    }
 }
 
 bool Loader::preload_table(const FileInfo *file,
@@ -703,7 +706,10 @@ bool Loader::preload_table(const FileInfo *file,
         std::shared_ptr<arrow::Table> table;
         auto res_t = file_reader->ReadRowGroup(row_group_id, &table);
         if (!res_t.ok()) return false;
-        tables_.emplace(std::make_pair(file, row_group_id), table);
+        {
+            std::lock_guard guard(files_mutex_);
+            tables_.emplace(std::make_pair(file, row_group_id), table);
+        }
     }
 
     // also load statistic
@@ -718,7 +724,10 @@ bool Loader::preload_table(const FileInfo *file,
             auto column_name = schema->Column(column_idx)->name();
             auto column_meta = group_metadata->ColumnChunk(column_idx);
             auto stats = column_meta->statistics();
-            file_metadata_[file][column_name].emplace_back(stats);
+            {
+                std::lock_guard guard(files_mutex_);
+                file_metadata_[file][column_name].emplace_back(stats);
+            }
         }
     }
 

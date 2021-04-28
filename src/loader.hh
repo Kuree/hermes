@@ -211,6 +211,13 @@ public:
     [[nodiscard]] std::set<std::string> get_transaction_names() const;
     [[nodiscard]] std::set<std::string> get_transaction_group_names() const;
 
+    // access to raw data
+    [[nodiscard]] const std::map<std::pair<const FileInfo *, uint64_t>,
+                                 std::shared_ptr<arrow::Table>>
+        &tables() const {
+        return tables_;
+    }
+
     void stream(bool stream_transactions = true);
     void stream(MessageBus *bus, bool stream_transactions = true);
 
@@ -219,6 +226,7 @@ public:
     void preload();
 
 private:
+    std::mutex files_mutex_;
     std::vector<std::unique_ptr<FileInfo>> files_;
     // indices
     std::vector<const FileInfo *> events_;
