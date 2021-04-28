@@ -24,6 +24,13 @@ bool Transaction::add_event(const Event *event) {
     return true;
 }
 
+void Transaction::finish() {
+    finished_ = true;
+    if (on_finished_) {
+        (*on_finished_)(this);
+    }
+}
+
 std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>>
 TransactionBatch::serialize() const noexcept {
     auto error_return = std::make_pair(nullptr, nullptr);
@@ -201,6 +208,13 @@ void TransactionGroup::add_transaction(const std::shared_ptr<Transaction> &trans
     }
     if (start_time_ > transaction->start_time()) {
         start_time_ = transaction->start_time();
+    }
+}
+
+void TransactionGroup::finish() {
+    finished_ = true;
+    if (on_finished_) {
+        (*on_finished_)(this);
     }
 }
 

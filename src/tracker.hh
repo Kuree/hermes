@@ -52,6 +52,8 @@ public:
         auto *ptr = t.get();
         inflight_transactions.emplace(t);
         t->set_name(transaction_name_);
+        t->set_on_finished(
+            [this](TransactionObject *obj) { retire_transaction(obj->shared_from_this()); });
         return ptr;
     }
 
@@ -65,7 +67,7 @@ public:
     [[nodiscard]] bool publish_transaction() const { return publish_transaction_; }
     void set_publish_transaction(bool value) { publish_transaction_ = value; }
 
-    virtual TransactionObject *track(TargetObject *event) = 0;
+    virtual void track(TargetObject *event) = 0;
 
     void retire_transaction(const std::shared_ptr<TransactionObject> &transaction) {
         inflight_transactions.erase(transaction);

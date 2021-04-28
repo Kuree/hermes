@@ -9,10 +9,10 @@ public:
     DummyTracker(const std::string& name, uint64_t chunks)
         : hermes::Tracker(name), chunks_(chunks) {}
 
-    hermes::Transaction* track(hermes::Event* event) override {
+    void track(hermes::Event* event) override {
         auto r = event->id() % chunks_;
         if (r == 0) {
-            return nullptr;
+            return;
         } else {
             if (r == 1) {
                 // new transaction
@@ -26,7 +26,6 @@ public:
             } else {
                 current_transaction_->add_event(event);
             }
-            return current_transaction_;
         }
     }
 

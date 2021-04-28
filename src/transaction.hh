@@ -13,7 +13,7 @@ public:
     explicit Transaction(uint64_t id) noexcept : id_(id) {}
     bool add_event(const std::shared_ptr<Event> &event) { return add_event(event.get()); }
     bool add_event(const Event *event);
-    void finish() { finished_ = true; }
+    void finish();
     [[nodiscard]] bool finished() const { return finished_; }
     [[nodiscard]] uint64_t id() const { return id_; }
     [[nodiscard]] const std::vector<uint64_t> &events() const { return events_ids_; }
@@ -21,6 +21,7 @@ public:
     [[nodiscard]] uint64_t end_time() const { return end_time_; }
     [[nodiscard]] const std::string &name() const { return name_; }
     void set_name(const std::string &name) { name_ = name; }
+    void set_on_finished(const std::function<void(Transaction *)> &func) { on_finished_ = func; }
 
     void static reset_id() { id_allocator_ = 0; }
 
@@ -33,6 +34,9 @@ private:
     std::vector<uint64_t> events_ids_;
 
     static std::atomic<uint64_t> id_allocator_;
+
+    // callback for trackers
+    std::optional<std::function<void(Transaction *)>> on_finished_;
 
     friend TransactionBatch;
 };
@@ -81,8 +85,11 @@ public:
     [[nodiscard]] auto const &name() const { return name_; }
 
     void set_name(const std::string &name) { name_ = name; }
-    void finish() { finished_ = true; }
+    void finish();
     [[nodiscard]] auto finished() const { return finished_; }
+    void set_on_finished(const std::function<void(TransactionGroup *)> &func) {
+        on_finished_ = func;
+    }
 
     void static reset_id() { id_allocator_ = 0; }
 
@@ -95,6 +102,9 @@ private:
     uint64_t end_time_ = 0;
     std::string name_;
     bool finished_ = false;
+
+    // callback for trackers
+    std::optional<std::function<void(TransactionGroup *)>> on_finished_;
 
     static std::atomic<uint64_t> id_allocator_;
 

@@ -18,7 +18,6 @@ class Tracker(pyhermes.Tracker):
         self.current_transaction.add_event(event)
         if event.id % 10 == 9:
             self.current_transaction.finish()
-        return self.current_transaction
 
 
 def setup_loader_test(temp):

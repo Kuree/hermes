@@ -31,8 +31,8 @@ class PyTracker : public hermes::Tracker {
 public:
     using hermes::Tracker::Tracker;
 
-    hermes::Transaction *track(hermes::Event *event) override {
-        PYBIND11_OVERRIDE_PURE(hermes::Transaction *, hermes::Tracker, track, event);
+    void track(hermes::Event *event) override {
+        PYBIND11_OVERRIDE_PURE(void, hermes::Tracker, track, event);
     }
 };
 
@@ -40,9 +40,8 @@ class PyGroupTracker : public hermes::GroupTracker {
 public:
     using hermes::GroupTracker::GroupTracker;
 
-    hermes::TransactionGroup *track(hermes::Transaction *transaction) override {
-        PYBIND11_OVERRIDE_PURE(hermes::TransactionGroup *, hermes::GroupTracker, track,
-                               transaction);
+    void track(hermes::Transaction *transaction) override {
+        PYBIND11_OVERRIDE_PURE(void, hermes::GroupTracker, track, transaction);
     }
 };
 

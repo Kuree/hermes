@@ -48,7 +48,7 @@ public:
         set_transaction_name(name);
     }
 
-    hermes::Transaction *track(hermes::Event *event) override { return nullptr; }
+    void track(hermes::Event *event) override {}
 };
 
 // DPI part

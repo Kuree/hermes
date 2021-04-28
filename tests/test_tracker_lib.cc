@@ -4,7 +4,7 @@ class DummyTracker : public hermes::Tracker {
 public:
     explicit DummyTracker(const std::string &topic) : hermes::Tracker(topic) {}
 
-    hermes::Transaction *track(hermes::Event *event) override {
+    void track(hermes::Event *event) override {
         if (event->id() % 10 == 0) {
             current_transaction_ = get_new_transaction();
         }
@@ -13,7 +13,6 @@ public:
         if ((event->id() % 10) == 9) {
             current_transaction_->finish();
         }
-        return current_transaction_;
     }
 
 private:
