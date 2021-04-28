@@ -78,4 +78,14 @@ std::vector<std::string> split(const std::string &str, const std::string &delimi
 }
 }  // namespace string
 
+namespace parse {
+std::optional<uint64_t> parse_uint64(const std::string &value) {
+    try {
+        return std::stoull(value);
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+}  // namespace parse
+
 }  // namespace hermes

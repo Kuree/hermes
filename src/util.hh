@@ -44,6 +44,10 @@ namespace string {
 std::vector<std::string> split(const std::string &str, const std::string &delimiter);
 }  // namespace string
 
+namespace parse {
+std::optional<uint64_t> parse_uint64(const std::string &value);
+}
+
 #define ENUM(name, ...)              \
     enum class name { __VA_ARGS__ }; \
     template <>                      \
