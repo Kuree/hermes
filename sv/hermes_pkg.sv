@@ -80,6 +80,31 @@ class LogEvent;
         string_[name] = value;
     endfunction
 
+    // have shortened names as well
+    function void add_bool(string name, bit value);
+        bool[name] = value;
+    endfunction
+
+    function void add_uint8(string name, byte unsigned value);
+        uint8[name] = value;
+    endfunction
+
+    function void add_uint16(string name, shortint unsigned value);
+        uint16[name] = value;
+    endfunction
+
+    function void add_uint32(string name, int unsigned value);
+        uint32[name] = value;
+    endfunction
+
+    function void add_uint64(string name, longint unsigned value);
+        uint64[name] = value;
+    endfunction
+
+    function void add_string(string name, string value);
+        string_[name] = value;
+    endfunction
+
     function static LogEvent copy();
         automatic LogEvent e = new();
         e.time_ = time_;
