@@ -194,6 +194,7 @@ rapidjson::Value get_json_value(const TransactionData &data,
         json::set_member(value, allocator, "end", data.group->group->end_time());
         json::set_member(value, allocator, "finished", data.group->group->finished());
         json::set_member(value, allocator, "type", "transaction-group");
+        json::set_member(value, allocator, "id", data.group->group->id());
 
         rapidjson::Value members(rapidjson::kArrayType);
         for (auto const &d : data.group->values) {
@@ -207,6 +208,7 @@ rapidjson::Value get_json_value(const TransactionData &data,
         json::set_member(value, allocator, "end", data.transaction->end_time());
         json::set_member(value, allocator, "finished", data.transaction->finished());
         json::set_member(value, allocator, "type", "transaction");
+        json::set_member(value, allocator, "id", data.transaction->id());
         // serialize events
         rapidjson::Value member = json::serialize(allocator, data.events);
         json::set_member(value, allocator, "events", member);
