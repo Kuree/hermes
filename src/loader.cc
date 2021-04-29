@@ -8,6 +8,7 @@
 #include "arrow/api.h"
 #include "arrow/filesystem/localfs.h"
 #include "fmt/format.h"
+#include "json.hh"
 #include "parquet/arrow/reader.h"
 #include "parquet/statistics.h"
 #include "process.hh"
@@ -64,7 +65,7 @@ void load_transaction_group(TransactionData::TransactionGroupData &data, Loader 
     }
 }
 
-TransactionDataIter::TransactionDataIter(TransactionStream *stream, uint64_t current_row)
+TransactionDataIter::TransactionDataIter(const TransactionStream *stream, uint64_t current_row)
     : stream_(stream), current_row_(current_row) {
     // compute the index
     compute_index();
@@ -182,6 +183,46 @@ TransactionStream TransactionStream::where(
     for (auto &thread : threads) thread.join();
 
     return TransactionStream(tables, loader_, row_mapping);
+}
+
+rapidjson::Value get_json_value(const TransactionData &data,
+                                rapidjson::MemoryPoolAllocator<> &allocator) {
+    rapidjson::Value value(rapidjson::kObjectType);
+    if (data.is_group()) {
+        json::set_member(value, allocator, "name", data.group->group->name());
+        json::set_member(value, allocator, "start", data.group->group->start_time());
+        json::set_member(value, allocator, "end", data.group->group->end_time());
+        json::set_member(value, allocator, "finished", data.group->group->finished());
+        json::set_member(value, allocator, "type", "transaction-group");
+
+        rapidjson::Value members(rapidjson::kArrayType);
+        for (auto const &d : data.group->values) {
+            auto v = get_json_value(d, allocator);
+            members.PushBack(std::move(v), allocator);
+        }
+        json::set_member(value, allocator, "group", members);
+    } else {
+        json::set_member(value, allocator, "name", data.transaction->name());
+        json::set_member(value, allocator, "start", data.transaction->start_time());
+        json::set_member(value, allocator, "end", data.transaction->end_time());
+        json::set_member(value, allocator, "finished", data.transaction->finished());
+        json::set_member(value, allocator, "type", "transaction");
+        // serialize events
+        rapidjson::Value member = json::serialize(allocator, data.events);
+        json::set_member(value, allocator, "events", member);
+    }
+    return value;
+}
+
+std::string TransactionStream::json() const {
+    rapidjson::Value value(rapidjson::kArrayType);
+    auto allocator = rapidjson::MemoryPoolAllocator<>();
+    for (auto &&data : *this) {
+        auto v = get_json_value(data, allocator);
+        value.PushBack(v, allocator);
+    }
+
+    return json::serialize(value, false);
 }
 
 TransactionStream::TransactionStream(
@@ -567,29 +608,6 @@ void Loader::preload() {
     preloaded_ = num_cache_entry == tables_.size();
 }
 
-static bool check_member(rapidjson::Document &document, const char *member_name) {
-    return document.HasMember(member_name);
-}
-
-template <typename T>
-static std::optional<T> get_member(rapidjson::Document &document, const char *member_name) {
-    if (!check_member(document, member_name)) return std::nullopt;
-    if constexpr (std::is_same<T, std::string>::value) {
-        if (document[member_name].IsString()) {
-            return std::string(document[member_name].GetString());
-        }
-    } else if constexpr (std::is_integral<T>::value && !std::is_same<T, bool>::value) {
-        if (document[member_name].IsNumber()) {
-            return document[member_name].template Get<T>();
-        }
-    } else if constexpr (std::is_same<T, bool>::value) {
-        if (document[member_name].IsBool()) {
-            return document[member_name].GetBool();
-        }
-    }
-    return std::nullopt;
-}
-
 void Loader::open_dir(const FileSystemInfo &info) {
     // need to detect if it's a local file system or not
     // if it doesn't contain the uri ://, then it's local filesystem
@@ -636,11 +654,11 @@ void Loader::load_json(const std::string &json_info,
     document.Parse(content.c_str());
     if (document.HasParseError()) return;
     // get indexed value
-    auto opt_parquet_file = get_member<std::string>(document, "parquet");
+    auto opt_parquet_file = json::get_member<std::string>(document, "parquet");
     if (!opt_parquet_file) return;
     auto parquet_file = *opt_parquet_file;
 
-    auto opt_type = get_member<std::string>(document, "type");
+    auto opt_type = json::get_member<std::string>(document, "type");
     if (!opt_type) return;
     auto const &type = *opt_type;
 
@@ -684,7 +702,7 @@ void Loader::load_json(const std::string &json_info,
     }
 
     // get name
-    auto name_opt = get_member<std::string>(document, "name");
+    auto name_opt = json::get_member<std::string>(document, "name");
     if (name_opt) {
         info->name = *name_opt;
     }

@@ -42,6 +42,29 @@ void set_member(rapidjson::Document &document, const char *name, const T &value)
     set_member(document, allocator, name, value);
 }
 
+static bool check_member(rapidjson::Document &document, const char *member_name) {
+    return document.HasMember(member_name);
+}
+
+template <typename T>
+static std::optional<T> get_member(rapidjson::Document &document, const char *member_name) {
+    if (!check_member(document, member_name)) return std::nullopt;
+    if constexpr (std::is_same<T, std::string>::value) {
+        if (document[member_name].IsString()) {
+            return std::string(document[member_name].GetString());
+        }
+    } else if constexpr (std::is_integral<T>::value && !std::is_same<T, bool>::value) {
+        if (document[member_name].IsNumber()) {
+            return document[member_name].template Get<T>();
+        }
+    } else if constexpr (std::is_same<T, bool>::value) {
+        if (document[member_name].IsBool()) {
+            return document[member_name].GetBool();
+        }
+    }
+    return std::nullopt;
+}
+
 rapidjson::Value serialize(rapidjson::MemoryPoolAllocator<> &allocator,
                            const std::shared_ptr<Event> &event);
 rapidjson::Value serialize(rapidjson::MemoryPoolAllocator<> &allocator,

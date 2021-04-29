@@ -87,7 +87,7 @@ public:
 class TransactionStream;
 struct TransactionDataIter {
 public:
-    TransactionDataIter(TransactionStream *stream, uint64_t current_row);
+    TransactionDataIter(const TransactionStream *stream, uint64_t current_row);
     TransactionData operator*() const;
 
     inline TransactionDataIter &operator++() {
@@ -113,7 +113,7 @@ public:
     }
 
 private:
-    TransactionStream *stream_;
+    const TransactionStream *stream_;
     uint64_t current_row_ = 0;
 
     uint64_t table_index_;
@@ -129,14 +129,16 @@ public:
     TransactionStream(const std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> &tables,
                       Loader *loader);
 
-    [[nodiscard]] inline TransactionDataIter begin() { return TransactionDataIter(this, 0); }
-    [[nodiscard]] inline TransactionDataIter end() {
+    [[nodiscard]] inline TransactionDataIter begin() const { return TransactionDataIter(this, 0); }
+    [[nodiscard]] inline TransactionDataIter end()  const {
         return TransactionDataIter(this, num_entries_);
     }
 
     [[nodiscard]] uint64_t size() const { return num_entries_; }
 
     TransactionStream where(const std::function<bool(const TransactionData &data)> &filter) const;
+
+    [[nodiscard]] std::string json() const;
 
 private:
     std::map<uint64_t, std::pair<bool, std::shared_ptr<arrow::Table>>> tables_;
