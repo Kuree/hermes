@@ -1,6 +1,7 @@
 #ifndef HERMES_EVENT_HH
 #define HERMES_EVENT_HH
 
+#include <atomic>
 #include <functional>
 #include <map>
 #include <memory>
@@ -8,7 +9,6 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
-#include <atomic>
 
 namespace arrow {
 class RecordBatch;
@@ -148,7 +148,7 @@ public:
     void sort() override;
 
     // factory method to construct event batch
-    static std::unique_ptr<EventBatch> deserialize(const std::shared_ptr<arrow::Table> &table);
+    static std::unique_ptr<EventBatch> deserialize(const arrow::Table *table);
 
     Event *get_event(uint64_t id);
     EventBatch::iterator lower_bound(uint64_t time);
@@ -162,7 +162,6 @@ private:
     std::unordered_map<uint64_t, Event *> id_index_;
     std::map<uint64_t, EventBatch::iterator> lower_bound_index_;
     std::map<uint64_t, EventBatch::iterator> upper_bounder_index_;
-
 
     void build_time_index();
 };

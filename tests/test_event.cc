@@ -44,7 +44,7 @@ TEST(event_batch, serilizattion) {  // NOLINT
     EXPECT_TRUE(r);
 
     auto table = hermes::deserialize(r);
-    auto new_batch_ = hermes::EventBatch::deserialize(table);
+    auto new_batch_ = hermes::EventBatch::deserialize(table.get());
     auto const &new_batch = *new_batch_;
     EXPECT_EQ(new_batch.size(), batch.size());
     auto const &event = new_batch[42];

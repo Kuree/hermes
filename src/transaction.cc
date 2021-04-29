@@ -94,8 +94,7 @@ TransactionBatch::serialize() const noexcept {
     return {batch, schema};
 }
 
-std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(
-    const std::shared_ptr<arrow::Table> &table) {
+std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(const arrow::Table *table) {
     uint64_t num_rows = table->num_rows();
     auto transactions = std::make_unique<TransactionBatch>();
     transactions->reserve(num_rows);
@@ -291,8 +290,8 @@ TransactionGroupBatch::serialize() const noexcept {
     return {batch, schema};
 }
 
-std::unique_ptr<TransactionGroupBatch> TransactionGroupBatch::deserialize(
-    const std::shared_ptr<arrow::Table> &table) {
+std::unique_ptr<TransactionGroupBatch> TransactionGroupBatch::deserialize( // NOLINT
+    const arrow::Table *table) {
     uint64_t num_rows = table->num_rows();
     auto transactions = std::make_unique<TransactionGroupBatch>();
     transactions->reserve(num_rows);

@@ -131,7 +131,7 @@ TransactionData TransactionDataIter::operator*() const {
 }
 
 TransactionStream::TransactionStream(
-    const std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> &tables, Loader *loader)
+    const std::vector<std::pair<bool, const arrow::Table *>> &tables, Loader *loader)
     : loader_(loader) {
     num_entries_ = 0;
     for (auto const &[group, table] : tables) {
@@ -145,7 +145,7 @@ TransactionStream TransactionStream::where(
     // we split jobs on the tables.
     std::vector<std::vector<uint64_t>> row_mapping;
     // get original tables
-    std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> tables;
+    std::vector<std::pair<bool, const arrow::Table *>> tables;
     tables.reserve(tables_.size());
     for (auto const &iter : tables_) {
         tables.emplace_back(iter.second);
@@ -228,7 +228,7 @@ std::string TransactionStream::json() const {
 }
 
 TransactionStream::TransactionStream(
-    const std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> &tables, Loader *loader,
+    const std::vector<std::pair<bool, const arrow::Table *>> &tables, Loader *loader,
     std::vector<std::vector<uint64_t>> row_mapping)
     : loader_(loader), row_mapping_(std::move(row_mapping)) {
     num_entries_ = 0;
@@ -501,7 +501,7 @@ std::shared_ptr<EventBatch> Loader::get_events(const Transaction &transaction) {
             auto temp = iter;
             auto const &target_iter = iter->first > id ? --temp : iter;
             // we expect this loop only run once for a well-formed table
-            auto const &table = tables_.at(target_iter->second);
+            auto const *table = tables_.at(target_iter->second).get();
             auto const &events = load_events(table);
             auto *e = events->get_event(id);
             if (e) {
@@ -533,14 +533,14 @@ std::shared_ptr<TransactionStream> Loader::get_transaction_stream(const std::str
     }
     if (files.empty()) return nullptr;
     // need to gather all the tables given the info
-    std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> tables;
+    std::vector<std::pair<bool, const arrow::Table *>> tables;
     for (auto const &[entry, table] : tables_) {
         auto const &[f, c_id] = entry;
         // need to make sure we have that range
         if (!contains_time(f, c_id, start_time, end_time)) continue;
         if (files.find(f) != files.end()) {
             tables.emplace_back(
-                std::make_pair(f->type == FileInfo::FileType::transaction_group, table));
+                std::make_pair(f->type == FileInfo::FileType::transaction_group, table.get()));
         }
     }
 
@@ -585,15 +585,15 @@ void Loader::preload() {
             auto const &[file, blk] = file_info;
             switch (file->type) {
                 case FileInfo::FileType::event: {
-                    load_events(table);
+                    load_events(table.get());
                     break;
                 }
                 case FileInfo::FileType::transaction: {
-                    load_transactions(table);
+                    load_transactions(table.get());
                     break;
                 }
                 case FileInfo::FileType::transaction_group: {
-                    load_transaction_groups(table);
+                    load_transaction_groups(table.get());
                     break;
                 }
             }
@@ -767,7 +767,7 @@ std::vector<LoaderResult> Loader::load_tables(
     result.reserve(files.size());
     for (auto const &[file, groups] : files) {
         for (auto const &group_id : groups) {
-            auto entry = tables_.at(std::make_pair(file, group_id));
+            auto const *entry = tables_.at(std::make_pair(file, group_id)).get();
             result.emplace_back(LoaderResult{entry, file->name});
         }
     }
@@ -775,14 +775,14 @@ std::vector<LoaderResult> Loader::load_tables(
     return result;
 }
 
-std::shared_ptr<EventBatch> Loader::load_events(const std::shared_ptr<arrow::Table> &table) {
+std::shared_ptr<EventBatch> Loader::load_events(const arrow::Table *table) {
     // if everything is preloaded, go ahead and directly return the values
     if (preloaded_) {
-        return event_cache_->get(table.get());
+        return event_cache_->get(table);
     }
     // we need to be very careful about locking and unlocking and also achieve high-performance
     event_cache_mutex_.lock();
-    if (!event_cache_->exists(table.get())) {
+    if (!event_cache_->exists(table)) {
         event_cache_mutex_.unlock();
 
         // time consuming section
@@ -791,21 +791,20 @@ std::shared_ptr<EventBatch> Loader::load_events(const std::shared_ptr<arrow::Tab
 
         // put it into cache
         event_cache_mutex_.lock();
-        event_cache_->put(table.get(), events);
+        event_cache_->put(table, events);
         event_cache_mutex_.unlock();
         return events;
     } else {
-        auto r = event_cache_->get(table.get());
+        auto r = event_cache_->get(table);
         event_cache_mutex_.unlock();
         return r;
     }
 }
 
-std::shared_ptr<TransactionBatch> Loader::load_transactions(
-    const std::shared_ptr<arrow::Table> &table) {
+std::shared_ptr<TransactionBatch> Loader::load_transactions(const arrow::Table *table) {
     // similar logic to transaction cache as the load events
     transaction_cache_mutex_.lock();
-    if (!transaction_cache_->exists(table.get())) {
+    if (!transaction_cache_->exists(table)) {
         transaction_cache_mutex_.unlock();
 
         // time consuming section
@@ -814,23 +813,22 @@ std::shared_ptr<TransactionBatch> Loader::load_transactions(
 
         // put it into the cache
         transaction_cache_mutex_.lock();
-        transaction_cache_->put(table.get(), transactions);
+        transaction_cache_->put(table, transactions);
         transaction_cache_mutex_.unlock();
 
         return transactions;
     } else {
-        auto r = transaction_cache_->get(table.get());
+        auto r = transaction_cache_->get(table);
         transaction_cache_mutex_.unlock();
 
         return r;
     }
 }
 
-std::shared_ptr<TransactionGroupBatch> Loader::load_transaction_groups(
-    const std::shared_ptr<arrow::Table> &table) {
+std::shared_ptr<TransactionGroupBatch> Loader::load_transaction_groups(const arrow::Table *table) {
     // same logic
     transaction_group_cache_mutex_.lock();
-    if (!transaction_group_cache_->exists(table.get())) {
+    if (!transaction_group_cache_->exists(table)) {
         transaction_group_cache_mutex_.unlock();
 
         // time consuming section
@@ -838,12 +836,12 @@ std::shared_ptr<TransactionGroupBatch> Loader::load_transaction_groups(
         group->build_index();
 
         transaction_group_cache_mutex_.lock();
-        transaction_group_cache_->put(table.get(), group);
+        transaction_group_cache_->put(table, group);
         transaction_group_cache_mutex_.unlock();
 
         return group;
     } else {
-        auto r = transaction_group_cache_->get(table.get());
+        auto r = transaction_group_cache_->get(table);
         transaction_group_cache_mutex_.unlock();
 
         return r;
@@ -1014,9 +1012,9 @@ void stream_values(std::vector<std::shared_ptr<T>> &values, std::vector<uint64_t
 }
 
 template <typename T>
-void load_values(
-    const std::vector<LoaderResult> &load_results, std::vector<std::shared_ptr<T>> &values,
-    const std::function<std::shared_ptr<T>(const std::shared_ptr<arrow::Table> &)> &load_func) {
+void load_values(const std::vector<LoaderResult> &load_results,
+                 std::vector<std::shared_ptr<T>> &values,
+                 const std::function<std::shared_ptr<T>(const arrow::Table *)> &load_func) {
     for (auto const &res : load_results) {
         auto const &table = res.table;
 
@@ -1041,27 +1039,24 @@ void Loader::stream(MessageBus *bus, bool stream_transactions) {
     std::vector<std::shared_ptr<TransactionGroupBatch>> transaction_groups;
 
     // gcc failed to induce the template type
-    load_values<EventBatch>(
-        load_results, events,
-        [this](const std::shared_ptr<arrow::Table> &table) { return load_events(table); });
+    load_values<EventBatch>(load_results, events,
+                            [this](const arrow::Table *table) { return load_events(table); });
 
     // decide whether to stream transactions or not
     if (stream_transactions) {
         load_results =
             load_transaction_table(std::nullopt, 0, std::numeric_limits<uint64_t>::max());
 
-        load_values<TransactionBatch>(load_results, transactions,
-                                      [this](const std::shared_ptr<arrow::Table> &table) {
-                                          return load_transactions(table);
-                                      });
+        load_values<TransactionBatch>(
+            load_results, transactions,
+            [this](const arrow::Table *table) { return load_transactions(table); });
 
         // groups as well
         load_results =
             load_transaction_group_table(std::nullopt, 0, std::numeric_limits<uint64_t>::max());
-        load_values<TransactionGroupBatch>(load_results, transaction_groups,
-                                           [this](const std::shared_ptr<arrow::Table> &table) {
-                                               return load_transaction_groups(table);
-                                           });
+        load_values<TransactionGroupBatch>(
+            load_results, transaction_groups,
+            [this](const arrow::Table *table) { return load_transaction_groups(table); });
     }
 
     std::vector<uint64_t> event_indices;

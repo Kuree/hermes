@@ -142,8 +142,7 @@ EventBatch::serialize() const noexcept {
     return {batch, schema};
 }
 
-std::unique_ptr<EventBatch> EventBatch::deserialize(
-    const std::shared_ptr<arrow::Table> &table) {  // NOLINT
+std::unique_ptr<EventBatch> EventBatch::deserialize(const arrow::Table *table) {  // NOLINT
     // construct the event batch
     auto event_batch = std::make_unique<EventBatch>();
     uint64_t num_rows = table->num_rows();

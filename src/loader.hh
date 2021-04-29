@@ -38,7 +38,7 @@ public:
 };
 
 struct LoaderResult {
-    std::shared_ptr<arrow::Table> table;
+    const arrow::Table *table;
     std::string name;
 };
 
@@ -117,7 +117,7 @@ private:
     uint64_t current_row_ = 0;
 
     uint64_t table_index_;
-    std::pair<bool, std::shared_ptr<arrow::Table>> table_entry_;
+    std::pair<bool, const arrow::Table *> table_entry_;
 
     void compute_index();
 };
@@ -126,11 +126,11 @@ class Loader;
 class TransactionStream {
 public:
     // <is_group, table>
-    TransactionStream(const std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> &tables,
+    TransactionStream(const std::vector<std::pair<bool, const arrow::Table *>> &tables,
                       Loader *loader);
 
     [[nodiscard]] inline TransactionDataIter begin() const { return TransactionDataIter(this, 0); }
-    [[nodiscard]] inline TransactionDataIter end()  const {
+    [[nodiscard]] inline TransactionDataIter end() const {
         return TransactionDataIter(this, num_entries_);
     }
 
@@ -141,14 +141,14 @@ public:
     [[nodiscard]] std::string json() const;
 
 private:
-    std::map<uint64_t, std::pair<bool, std::shared_ptr<arrow::Table>>> tables_;
+    std::map<uint64_t, std::pair<bool, const arrow::Table *>> tables_;
     uint64_t num_entries_ = 0;
     Loader *loader_ = nullptr;
 
     // row mapping, used for filtering
     std::optional<std::vector<std::vector<uint64_t>>> row_mapping_;
 
-    TransactionStream(const std::vector<std::pair<bool, std::shared_ptr<arrow::Table>>> &tables,
+    TransactionStream(const std::vector<std::pair<bool, const arrow::Table *>> &tables,
                       Loader *loader, std::vector<std::vector<uint64_t>> row_mapping);
 
     TransactionStream() = default;
@@ -260,10 +260,9 @@ private:
                        const std::shared_ptr<arrow::io::RandomAccessFile> &file);
     std::vector<LoaderResult> load_tables(
         const std::vector<std::pair<const FileInfo *, std::vector<uint64_t>>> &files);
-    std::shared_ptr<EventBatch> load_events(const std::shared_ptr<arrow::Table> &table);
-    std::shared_ptr<TransactionBatch> load_transactions(const std::shared_ptr<arrow::Table> &table);
-    std::shared_ptr<TransactionGroupBatch> load_transaction_groups(
-        const std::shared_ptr<arrow::Table> &table);
+    std::shared_ptr<EventBatch> load_events(const arrow::Table *table);
+    std::shared_ptr<TransactionBatch> load_transactions(const arrow::Table *table);
+    std::shared_ptr<TransactionGroupBatch> load_transaction_groups(const arrow::Table *table);
     void compute_stats();
 
     // only return the table

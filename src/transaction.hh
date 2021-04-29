@@ -46,8 +46,7 @@ public:
     [[nodiscard]] std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>>
     serialize() const noexcept override;
     // factory method to construct transaction batch
-    static std::unique_ptr<TransactionBatch> deserialize(
-        const std::shared_ptr<arrow::Table> &table);
+    static std::unique_ptr<TransactionBatch> deserialize(const arrow::Table *table);
 
     TransactionBatch::iterator lower_bound(uint64_t time);
 
@@ -116,8 +115,7 @@ public:
     [[nodiscard]] std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>>
     serialize() const noexcept override;
     // factory method to construct transaction group batch
-    static std::unique_ptr<TransactionGroupBatch> deserialize(
-        const std::shared_ptr<arrow::Table> &table);
+    static std::unique_ptr<TransactionGroupBatch> deserialize(const arrow::Table *table);
 
     void sort() override;
 

@@ -24,7 +24,7 @@ TEST(transaction, serialization) {  // NOLINT
 
     auto table = hermes::deserialize(buffer);
 
-    auto new_batch_ptr = hermes::TransactionBatch::deserialize(table);
+    auto new_batch_ptr = hermes::TransactionBatch::deserialize(table.get());
     auto &new_batch = *new_batch_ptr;
     EXPECT_EQ(new_batch.size(), batch.size());
     auto const &ref_t = batch[42];
@@ -87,7 +87,7 @@ TEST(transaction_group, serilization) { // NOLINT
     EXPECT_TRUE(buffer);
 
     auto table = hermes::deserialize(buffer);
-    auto new_batch_ptr = hermes::TransactionGroupBatch::deserialize(table);
+    auto new_batch_ptr = hermes::TransactionGroupBatch::deserialize(table.get());
     auto &new_batch = *new_batch_ptr;
     EXPECT_EQ(new_batch.size(), num_group);
     auto group1 = new_batch[42];
