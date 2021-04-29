@@ -5,4 +5,5 @@ endfunction()
 
 add_tools_target(log2csv)
 add_tools_target(server)
+add_tools_target(log2spark)
 target_include_directories(server PRIVATE ../../extern/cpp-httplib/)

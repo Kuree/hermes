@@ -103,6 +103,21 @@ uint64_t get_uint64(const std::shared_ptr<arrow::Scalar> &scalar) {
     return int_val_->value;
 }
 
+int16_t get_int16(const std::shared_ptr<arrow::Scalar> &scalar) {
+    auto int_val_ = std::reinterpret_pointer_cast<arrow::Int16Scalar>(scalar);
+    return int_val_->value;
+}
+
+int32_t get_int32(const std::shared_ptr<arrow::Scalar> &scalar) {
+    auto int_val_ = std::reinterpret_pointer_cast<arrow::Int32Scalar>(scalar);
+    return int_val_->value;
+}
+
+int64_t get_int64(const std::shared_ptr<arrow::Scalar> &scalar) {
+    auto int_val_ = std::reinterpret_pointer_cast<arrow::Int64Scalar>(scalar);
+    return int_val_->value;
+}
+
 std::string get_string(const std::shared_ptr<arrow::Scalar> &scalar) {
     auto str_val_ = std::reinterpret_pointer_cast<arrow::StringScalar>(scalar);
     auto str_val = std::string(reinterpret_cast<const char *>(str_val_->value->data()));

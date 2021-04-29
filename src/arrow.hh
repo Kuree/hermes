@@ -30,8 +30,11 @@ std::shared_ptr<arrow::Table> load_table(const std::string &filename);
 
 uint8_t get_uint8(const std::shared_ptr<arrow::Scalar> &scalar);
 uint16_t get_uint16(const std::shared_ptr<arrow::Scalar> &scalar);
+int16_t get_int16(const std::shared_ptr<arrow::Scalar> &scalar);
 uint32_t get_uint32(const std::shared_ptr<arrow::Scalar> &scalar);
+int32_t get_int32(const std::shared_ptr<arrow::Scalar> &scalar);
 uint64_t get_uint64(const std::shared_ptr<arrow::Scalar> &scalar);
+int64_t get_int64(const std::shared_ptr<arrow::Scalar> &scalar);
 std::string get_string(const std::shared_ptr<arrow::Scalar> &scalar);
 bool get_bool(const std::shared_ptr<arrow::Scalar> &scalar);
 

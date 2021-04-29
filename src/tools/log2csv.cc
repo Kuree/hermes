@@ -53,7 +53,7 @@ void write_table(const std::vector<std::string> &header, std::ofstream &stream,
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
+    if (argc < 3) {
         std::cerr << "Usage: " << argv[0] << " [log-dir...] output-dir" << std::endl;
         return EXIT_FAILURE;
     }
