@@ -15,17 +15,17 @@ initial begin
 
     for (int i = 0; i < 2000; i++) begin
         e.reset();
-        e.add_value_bool("bool", i % 2);
-        e.add_value_uint8("uint8_1", i % 256);
-        e.add_value_uint8("uint8_2", i % 256 + 1);
-        e.add_value_uint16("uint16_1", i);
-        e.add_value_uint16("uint16_2", i + 1);
-        e.add_value_uint32("uint32_1", i);
-        e.add_value_uint32("uint32_2", i + 1);
-        e.add_value_uint64("uint64_1", i);
-        e.add_value_uint64("uint64_2", i + 1);
-        e.add_value_string("string_1", "aaa");
-        e.add_value_string("string_2", "bbb");
+        e.add_bool("bool", i % 2);
+        e.add_uint8("uint8_1", i % 256);
+        e.add_uint8("uint8_2", i % 256 + 1);
+        e.add_uint16("uint16_1", i);
+        e.add_uint16("uint16_2", i + 1);
+        e.add_uint32("uint32_1", i);
+        e.add_uint32("uint32_2", i + 1);
+        e.add_uint64("uint64_1", i);
+        e.add_uint64("uint64_2", i + 1);
+        e.add_string("string_1", "aaa");
+        e.add_string("string_2", "bbb");
         logger.log(e);
         #10;
     end

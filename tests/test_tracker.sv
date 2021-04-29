@@ -44,7 +44,7 @@ initial begin
 
     for (int i = 0; i < 2000; i++) begin
         e.reset();
-        e.add_value_uint8("uint8_1", i % 256);
+        e.add_uint8("uint8_1", i % 256);
         logger.log(e);
         #1;
     end
