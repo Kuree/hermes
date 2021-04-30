@@ -731,7 +731,10 @@ bool Loader::preload_table(const FileInfo *file,
     for (int row_group_id = 0; row_group_id < num_row_groups; row_group_id++) {
         std::shared_ptr<arrow::Table> table;
         auto res_t = file_reader->ReadRowGroup(row_group_id, &table);
-        if (!res_t.ok()) return false;
+        if (!res_t.ok()) {
+            std::cerr << "[ERROR]: " << res_t.ToString() << std::endl;
+            return false;
+        }
         {
             std::lock_guard guard(files_mutex_);
             tables_.emplace(std::make_pair(file, row_group_id), table);

@@ -115,7 +115,7 @@ T *get_pointer(svOpenArrayHandle array, int index) {
     }
 }
 
-template <typename T>
+template <typename T, typename K = T>
 void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle array) {
     auto low = svLeft(array, 1);
     auto high = svRight(array, 1);
@@ -124,9 +124,9 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
     auto names_low = svLeft(names, 1);
     auto names_high = svRight(names, 1);
     auto num_entries_names = static_cast<uint64_t>(names_high - names_low + 1l);
-    if (num_entries_names != num_entries) {
-        // frontend is not implement the logic correctly
-        std::cerr << "[ERROR]: log names does not match with the number of values. Expected "
+    if ((num_entries % num_entries_names) != 0) {
+        // frontend does not implement the logic correctly
+        std::cerr << "[ERROR]: log values are not multiple of entry names. Expected "
                   << num_entries_names << ", got " << num_entries << std::endl;
         return;
     }
@@ -138,17 +138,20 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
                   << logger->num_events() << ", got " << num_entries << std::endl;
         return;
     }
-    auto entries_per_event = num_entries / logger->num_events();
+    auto const entries_per_event = num_entries / logger->num_events();
 
     // allocate space
     std::vector<std::string> names_vector;
-    names_vector.reserve(num_entries);
-    std::vector<T> values_vector;
+    names_vector.reserve(num_entries_names);
+    for (auto i = 0; i < num_entries_names; i++) {
+        names_vector.emplace_back(*get_pointer<const char *>(names, static_cast<int>(i)));
+    }
+
+    std::vector<K> values_vector;
     values_vector.reserve(num_entries);
     for (auto i = 0; i < num_entries; i++) {
-        names_vector.emplace_back(*get_pointer<const char *>(names, static_cast<int>(i)));
         auto *v = get_pointer<T>(array, i);
-        T value;
+        K value;
         if constexpr (std::is_same<T, bool>::value) {
             auto *v_ptr = reinterpret_cast<unsigned char *>(v);
             value = *v_ptr != 0;
@@ -163,7 +166,7 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
         uint64_t counter = 0;
         for (auto i = 0u; i < num_events; i++) {
             for (auto j = 0; j < entries_per_event; j++) {
-                auto const &name = names_vector[counter];
+                auto const &name = names_vector[j];
                 auto v = values_vector[counter];
                 logger->template set_value(name, v, i);
                 counter++;
@@ -205,7 +208,7 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
 [[maybe_unused]] void hermes_set_values_string(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    set_values<char *>(l, names, array);
+    set_values<char *, std::string>(l, names, array);
 }
 
 [[maybe_unused]] void hermes_send_events(void *logger) {
