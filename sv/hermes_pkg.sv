@@ -122,7 +122,7 @@ class Logger;
     // the actual logger
     local chandle           logger_;
     // flush threshold
-    local static int        num_events_batch = 1024;
+    local static int        num_events_batch = 256;
     // all the loggers are here
     static Logger loggers[$];
     // trackers as well

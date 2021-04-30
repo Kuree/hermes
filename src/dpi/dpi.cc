@@ -140,66 +140,72 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
     }
     auto entries_per_event = num_entries / logger->num_events();
 
-    // Note:
-    // this is a somewhat dangerous thing to do since by the virtual of multi-threading,
-    // even though we keep the SV objects live during the thread execution, there is still
-    // chance that the simulator will remove the data-structures that used for DPI
-    // keep this implementation for now until it crashes.
-
-    uint64_t counter = 0;
-    for (auto i = 0u; i < num_events; i++) {
-        for (auto j = 0; j < entries_per_event; j++) {
-            auto **name = get_pointer<char *>(names, static_cast<int>(counter));
-            auto *v = get_pointer<T>(array, counter);
-            if constexpr (std::is_same<T, char *>::value) {
-                std::string value = *v;
-                logger->template set_value(*name, value, i);
-            } else if constexpr (std::is_same<T, bool>::value) {
-                auto *v_ptr = reinterpret_cast<unsigned char *>(v);
-                bool value = *v_ptr != 0;
-                logger->template set_value(*name, value, i);
-            } else {
-                logger->template set_value(*name, *v, i);
-            }
-            counter++;
+    // allocate space
+    std::vector<std::string> names_vector;
+    names_vector.reserve(num_entries);
+    std::vector<T> values_vector;
+    values_vector.reserve(num_entries);
+    for (auto i = 0; i < num_entries; i++) {
+        names_vector.emplace_back(*get_pointer<const char *>(names, static_cast<int>(i)));
+        auto *v = get_pointer<T>(array, i);
+        T value;
+        if constexpr (std::is_same<T, bool>::value) {
+            auto *v_ptr = reinterpret_cast<unsigned char *>(v);
+            value = *v_ptr != 0;
+        } else {
+            value = *v;
         }
+        values_vector.emplace_back(value);
     }
+
+    // thread block
+    logger->add_thread([=]() {
+        uint64_t counter = 0;
+        for (auto i = 0u; i < num_events; i++) {
+            for (auto j = 0; j < entries_per_event; j++) {
+                auto const &name = names_vector[counter];
+                auto v = values_vector[counter];
+                logger->template set_value(name, v, i);
+                counter++;
+            }
+        }
+    });
 }
 
 [[maybe_unused]] void hermes_set_values_uint8(void *logger, svOpenArrayHandle names,
                                               svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    l->add_thread([=]() { set_values<uint8_t>(l, names, array); });
+    set_values<uint8_t>(l, names, array);
 }
 
 [[maybe_unused]] void hermes_set_values_uint16(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    l->add_thread([=]() { set_values<uint16_t>(l, names, array); });
+    set_values<uint16_t>(l, names, array);
 }
 
 [[maybe_unused]] void hermes_set_values_uint32(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    l->add_thread([=]() { set_values<uint32_t>(l, names, array); });
+    set_values<uint32_t>(l, names, array);
 }
 
 [[maybe_unused]] void hermes_set_values_uint64(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    l->add_thread([=]() { set_values<uint64_t>(l, names, array); });
+    set_values<uint64_t>(l, names, array);
 }
 
 [[maybe_unused]] void hermes_set_values_bool(void *logger, svOpenArrayHandle names,
                                              svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    l->add_thread([=]() { set_values<bool>(l, names, array); });
+    set_values<bool>(l, names, array);
 }
 
 [[maybe_unused]] void hermes_set_values_string(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    l->add_thread([=]() { set_values<char *>(l, names, array); });
+    set_values<char *>(l, names, array);
 }
 
 [[maybe_unused]] void hermes_send_events(void *logger) {

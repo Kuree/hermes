@@ -32,11 +32,9 @@ public:
     template <typename T>
     inline void set_value(const std::string &name, const T &value, uint64_t idx) {
         if (events_.size() > idx && idx < max_events_size) {
-            {
-                event_locks_[idx].lock();
-                events_[idx]->template add_value(name, value);
-                event_locks_[idx].unlock();
-            }
+            event_locks_[idx].lock();
+            events_[idx]->template add_value(name, value);
+            event_locks_[idx].unlock();
         }
     }
     [[nodiscard]] uint64_t num_events() const { return events_.size(); }
