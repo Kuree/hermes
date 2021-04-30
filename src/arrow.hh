@@ -11,6 +11,8 @@ class RecordBatch;
 class Schema;
 class Scalar;
 class Table;
+class Field;
+class Array;
 
 namespace fs {
 class FileSystem;
@@ -19,9 +21,18 @@ class FileSystem;
 
 namespace hermes {
 
+class EventBatch;
+class TransactionBatch;
+
 // helper functions to deal with arrow
 std::shared_ptr<arrow::Buffer> serialize(const std::shared_ptr<arrow::RecordBatch> &batch,
                                          const std::shared_ptr<arrow::Schema> &schema);
+
+void serialize(const EventBatch *batch, std::vector<std::shared_ptr<arrow::Field>> &fields,
+               std::vector<std::shared_ptr<arrow::Array>> &arrays);
+void serialize(const TransactionBatch *batch, std::vector<std::shared_ptr<arrow::Field>> &fields,
+               std::vector<std::shared_ptr<arrow::Array>> &arrays);
+
 std::shared_ptr<arrow::Table> deserialize(const std::shared_ptr<arrow::Buffer> &buffer);
 
 std::shared_ptr<arrow::RecordBatch> get_batch(const std::shared_ptr<arrow::Buffer> &buffer);
@@ -43,7 +54,7 @@ std::vector<bool> get_bools(const std::shared_ptr<arrow::Scalar> &scalar);
 
 struct FileSystemInfo {
 public:
-    explicit FileSystemInfo(const std::string& path);
+    explicit FileSystemInfo(const std::string &path);
     std::string path;
     std::string access_key;
     std::string secret_key;

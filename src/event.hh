@@ -18,6 +18,8 @@ class Table;
 
 namespace hermes {
 
+using AttributeValue = std::variant<uint64_t, uint32_t, uint16_t, uint8_t, bool, std::string>;
+
 class Event : public std::enable_shared_from_this<Event> {
 public:
     static constexpr auto TIME_NAME = "time";
@@ -42,13 +44,6 @@ public:
         }
     }
 
-    template <typename T>
-    bool change_value(const std::string &name, const T &value) noexcept {
-        if (values_.find(name) == values_.end()) return false;
-        values_[name] = value;
-        return true;
-    }
-
     bool remove_value(const std::string &name);
     [[nodiscard]] bool has_value(const std::string &name) const noexcept {
         return values_.find(name) != values_.end();
@@ -63,12 +58,10 @@ public:
 
     [[nodiscard]] auto const &values() const { return values_; }
 
-    using EventValue = std::variant<uint64_t, uint32_t, uint16_t, uint8_t, bool, std::string>;
-
     void static reset_id() { event_id_count_ = 0; }
 
 private:
-    std::map<std::string, EventValue> values_;
+    std::map<std::string, AttributeValue> values_;
 
     static std::atomic<uint64_t> event_id_count_;
 };
@@ -173,6 +166,9 @@ bool parse_event_log_fmt(const std::string &filename, const std::string &event_n
 bool parse_event_log_fmt(const std::string &filename, const std::string &event_name,
                          const std::string &fmt, const std::vector<std::string> &fields,
                          MessageBus *bus);
+
+bool same_schema(const std::map<std::string, AttributeValue> &ref,
+                 const std::map<std::string, AttributeValue> &target);
 
 }  // namespace hermes
 

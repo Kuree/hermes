@@ -58,87 +58,12 @@ std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>>
 EventBatch::serialize() const noexcept {
     auto const error_return = std::make_pair(nullptr, nullptr);
     if (empty()) return error_return;
-    // we assume it is already validated
-    std::shared_ptr<arrow::Schema> schema;
-    {
-        auto *event = front().get();
-        schema = get_schema(event);
-    }
-    // we need to initialize the type builder
-    auto *pool = arrow::default_memory_pool();
-    std::vector<std::unique_ptr<arrow::ArrayBuilder>> builders;
-    // initialize the builders based on the index sequence
-    {
-        auto const &event = *(*this)[0];
-        for (auto const &[name, v] : event.values()) {
-            // visit the variant
-            std::visit(
-                overloaded{[pool, &builders](uint8_t) {
-                               builders.emplace_back(std::make_unique<arrow::UInt8Builder>(pool));
-                           },
-                           [pool, &builders](uint16_t) {
-                               builders.emplace_back(std::make_unique<arrow::UInt16Builder>(pool));
-                           },
-                           [pool, &builders](uint32_t) {
-                               builders.emplace_back(std::make_unique<arrow::UInt32Builder>(pool));
-                           },
-                           [pool, &builders](uint64_t) {
-                               builders.emplace_back(std::make_unique<arrow::UInt64Builder>(pool));
-                           },
-                           [pool, &builders](bool) {
-                               builders.emplace_back(std::make_unique<arrow::BooleanBuilder>(pool));
-                           },
-                           [pool, &builders](const std::string &) {
-                               builders.emplace_back(std::make_unique<arrow::StringBuilder>(pool));
-                           }},
-                v);
-        }
-    }
-    // write each row
-    for (auto const &event : *this) {
-        auto const &values = event->values();
-        uint64_t idx = 0;
-        for (auto const &[name, value] : values) {
-            auto *ptr = builders[idx++].get();
-            // visit the variant
-            std::visit(overloaded{[ptr](uint8_t arg) {
-                                      auto *p = reinterpret_cast<arrow::UInt8Builder *>(ptr);
-                                      (void)p->Append(arg);
-                                  },
-                                  [ptr](uint16_t arg) {
-                                      auto *p = reinterpret_cast<arrow::UInt16Builder *>(ptr);
-                                      (void)p->Append(arg);
-                                  },
-                                  [ptr](uint32_t arg) {
-                                      auto *p = reinterpret_cast<arrow::UInt32Builder *>(ptr);
-                                      (void)p->Append(arg);
-                                  },
-                                  [ptr](uint64_t arg) {
-                                      auto *p = reinterpret_cast<arrow::UInt64Builder *>(ptr);
-                                      (void)p->Append(arg);
-                                  },
-                                  [ptr](bool arg) {
-                                      auto *p = reinterpret_cast<arrow::BooleanBuilder *>(ptr);
-                                      (void)p->Append(arg);
-                                  },
-                                  [ptr](const std::string &arg) {
-                                      auto *p = reinterpret_cast<arrow::StringBuilder *>(ptr);
-                                      (void)p->Append(arg);
-                                  }},
-
-                       value);
-        }
-    }
-    // arrays
+    std::vector<std::shared_ptr<arrow::Field>> schema_vector;
     std::vector<std::shared_ptr<arrow::Array>> arrays;
-    arrays.reserve(builders.size());
-    for (auto &builder : builders) {
-        std::shared_ptr<arrow::Array> array;
-        (void)builder->Finish(&array);
-        arrays.emplace_back(array);
-    }
+    hermes::serialize(this, schema_vector, arrays);
+    auto schema = std::make_shared<arrow::Schema>(schema_vector);
 
-    auto batch = arrow::RecordBatch::Make(schema, size(), arrays);
+    auto batch = arrow::RecordBatch::Make(schema, static_cast<int64_t>(size()), arrays);
     return {batch, schema};
 }
 
@@ -208,13 +133,7 @@ bool EventBatch::validate() const noexcept {
     for (uint64_t i = 1; i < size(); i++) {
         auto const &event = (*this)[i];
         auto const &values = event->values();
-        if (values.size() != ref.size()) return false;
-        for (auto const &[name, v] : ref) {
-            if (values.find(name) == values.end()) {
-                return false;
-            }
-            if (v.index() != values.at(name).index()) return false;
-        }
+        if (!same_schema(ref, values)) return false;
     }
     return true;
 }
@@ -290,7 +209,6 @@ auto parse_fmt(const std::string &format, std::vector<ValueType> &types) {
     int state = 0;
     std::string regex_data;
     regex_data.reserve(format.size() * 2);
-    ;
 
     for (auto c : format) {
         if (state == 0) {
@@ -400,6 +318,19 @@ bool parse_event_log_fmt(const std::string &filename, const std::string &event_n
     stream.close();
 
     return true;
+}
+
+bool same_schema(const std::map<std::string, AttributeValue> &ref,
+                 const std::map<std::string, AttributeValue> &target) {
+    if (target.size() != ref.size()) return false;
+    return !std::any_of(ref.begin(), ref.end(), [&target](const auto &iter) {
+        auto const &[name, v] = iter;
+        if (target.find(name) == target.end()) {
+            return true;
+        }
+        if (v.index() != target.at(name).index()) return true;
+        return false;
+    });
 }
 
 }  // namespace hermes

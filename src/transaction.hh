@@ -1,6 +1,8 @@
 #ifndef HERMES_TRANSACTION_HH
 #define HERMES_TRANSACTION_HH
 
+#include <unordered_set>
+
 #include "event.hh"
 
 namespace hermes {
@@ -9,11 +11,20 @@ class TransactionBatch;
 
 class Transaction : public std::enable_shared_from_this<Transaction> {
 public:
+    static auto constexpr ID_NAME = "id";
+    static auto constexpr START_TIME_NAME = "start_time";
+    static auto constexpr END_TIME_NAME = "end_time";
+    static auto constexpr FINISHED_NAME = "finished";
+    static auto constexpr NAME_NAME = "name";
+    static auto constexpr EVENTS_NAME = "events";
+    static const std::unordered_set<std::string> reserved_attr_names;
+
     Transaction() noexcept;
     explicit Transaction(uint64_t id) noexcept : id_(id) {}
     bool add_event(const std::shared_ptr<Event> &event) { return add_event(event.get()); }
     bool add_event(const Event *event);
     void finish();
+
     [[nodiscard]] bool finished() const { return finished_; }
     [[nodiscard]] uint64_t id() const { return id_; }
     [[nodiscard]] const std::vector<uint64_t> &events() const { return events_ids_; }
@@ -22,6 +33,24 @@ public:
     [[nodiscard]] const std::string &name() const { return name_; }
     void set_name(const std::string &name) { name_ = name; }
     void set_on_finished(const std::function<void(Transaction *)> &func) { on_finished_ = func; }
+    // values is only for some meta-programming to reduce duplicated code
+    [[nodiscard]] auto const &values() const { return attrs_; }
+    [[nodiscard]] auto const &attrs() const { return attrs_; }
+
+    // we can add attribute to the transaction as well
+    template <typename T>
+    bool add_attr(const std::string &name, const T &value) {
+        if (reserved_attr_names.find(name) != reserved_attr_names.end()) return false;
+        attrs_[name] = value;
+    }
+
+    template <typename T>
+    std::optional<T> get_attr(const std::string &name) {
+        if (attrs_.find(name) == attrs_.end())
+            return std::nullopt;
+        else
+            return std::get<T>(attrs_.at(name));
+    }
 
     void static reset_id() { id_allocator_ = 0; }
 
@@ -34,6 +63,8 @@ private:
     std::vector<uint64_t> events_ids_;
 
     static std::atomic<uint64_t> id_allocator_;
+
+    std::map<std::string, AttributeValue> attrs_;
 
     // callback for trackers
     std::optional<std::function<void(Transaction *)>> on_finished_;
@@ -49,6 +80,7 @@ public:
     static std::unique_ptr<TransactionBatch> deserialize(const arrow::Table *table);
 
     TransactionBatch::iterator lower_bound(uint64_t time);
+    [[nodiscard]] bool validate() const noexcept;
 
     // we sort based on the finishing time (end time)
     void sort() override;

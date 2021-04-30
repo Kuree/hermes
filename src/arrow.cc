@@ -10,6 +10,7 @@
 #include "arrow/ipc/reader.h"
 #include "arrow/ipc/writer.h"
 #include "arrow/util/uri.h"
+#include "transaction.hh"
 #include "fmt/format.h"
 #include "parquet/arrow/reader.h"
 #include "parquet/file_reader.h"
@@ -43,6 +44,110 @@ std::shared_ptr<arrow::Buffer> serialize(const std::shared_ptr<arrow::RecordBatc
     (void)(*writer)->WriteRecordBatch(*batch);
     (void)(*writer)->Close();
     return buff;
+}
+
+void get_schema(const std::map<std::string, AttributeValue> &values,
+                std::vector<std::shared_ptr<arrow::Field>> &fields) {
+    for (auto const &[name, v] : values) {
+        std::shared_ptr<arrow::DataType> type;
+        std::visit(overloaded{[&type](uint8_t) { type = arrow::uint8(); },
+                              [&type](uint16_t) { type = arrow::uint16(); },
+                              [&type](uint32_t) { type = arrow::uint32(); },
+                              [&type](uint64_t) { type = arrow::uint64(); },
+                              [&type](bool) { type = arrow::boolean(); },
+                              [&type](const std::string &) { type = arrow::utf8(); }},
+                   v);
+        auto field = std::make_shared<arrow::Field>(name, type);
+        fields.emplace_back(field);
+    }
+}
+
+
+template <typename T>
+void serialize(const T *batch, std::vector<std::shared_ptr<arrow::Array>> &arrays) {
+    auto *pool = arrow::default_memory_pool();
+    std::vector<std::unique_ptr<arrow::ArrayBuilder>> builders;
+    // initialize the builders based on the index sequence
+    {
+        auto const &event = *(*batch)[0];
+        for (auto const &[name, v] : event.values()) {
+            // visit the variant
+            std::visit(
+                overloaded{[pool, &builders](uint8_t) {
+                  builders.emplace_back(std::make_unique<arrow::UInt8Builder>(pool));
+                },
+                           [pool, &builders](uint16_t) {
+                             builders.emplace_back(std::make_unique<arrow::UInt16Builder>(pool));
+                           },
+                           [pool, &builders](uint32_t) {
+                             builders.emplace_back(std::make_unique<arrow::UInt32Builder>(pool));
+                           },
+                           [pool, &builders](uint64_t) {
+                             builders.emplace_back(std::make_unique<arrow::UInt64Builder>(pool));
+                           },
+                           [pool, &builders](bool) {
+                             builders.emplace_back(std::make_unique<arrow::BooleanBuilder>(pool));
+                           },
+                           [pool, &builders](const std::string &) {
+                             builders.emplace_back(std::make_unique<arrow::StringBuilder>(pool));
+                           }},
+                v);
+        }
+    }
+    // write each row
+    for (auto const &event : *batch) {
+        auto const &values = event->values();
+        uint64_t idx = 0;
+        for (auto const &[name, value] : values) {
+            auto *ptr = builders[idx++].get();
+            // visit the variant
+            std::visit(overloaded{[ptr](uint8_t arg) {
+                         auto *p = reinterpret_cast<arrow::UInt8Builder *>(ptr);
+                         (void)p->Append(arg);
+                       },
+                                  [ptr](uint16_t arg) {
+                                    auto *p = reinterpret_cast<arrow::UInt16Builder *>(ptr);
+                                    (void)p->Append(arg);
+                                  },
+                                  [ptr](uint32_t arg) {
+                                    auto *p = reinterpret_cast<arrow::UInt32Builder *>(ptr);
+                                    (void)p->Append(arg);
+                                  },
+                                  [ptr](uint64_t arg) {
+                                    auto *p = reinterpret_cast<arrow::UInt64Builder *>(ptr);
+                                    (void)p->Append(arg);
+                                  },
+                                  [ptr](bool arg) {
+                                    auto *p = reinterpret_cast<arrow::BooleanBuilder *>(ptr);
+                                    (void)p->Append(arg);
+                                  },
+                                  [ptr](const std::string &arg) {
+                                    auto *p = reinterpret_cast<arrow::StringBuilder *>(ptr);
+                                    (void)p->Append(arg);
+                                  }},
+
+                       value);
+        }
+    }
+    // arrays
+    arrays.reserve(builders.size());
+    for (auto &builder : builders) {
+        std::shared_ptr<arrow::Array> array;
+        (void)builder->Finish(&array);
+        arrays.emplace_back(array);
+    }
+}
+
+void serialize(const EventBatch *batch, std::vector<std::shared_ptr<arrow::Field>> &fields,
+               std::vector<std::shared_ptr<arrow::Array>> &arrays) {
+    get_schema(batch->front()->values(), fields);
+    serialize(batch, arrays);
+}
+
+void serialize(const TransactionBatch *batch, std::vector<std::shared_ptr<arrow::Field>> &fields,
+               std::vector<std::shared_ptr<arrow::Array>> &arrays) {
+    get_schema(batch->front()->values(), fields);
+    serialize(batch, arrays);
 }
 
 std::shared_ptr<arrow::RecordBatch> get_batch(const std::shared_ptr<arrow::Buffer> &buffer) {

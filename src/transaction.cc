@@ -9,6 +9,9 @@ namespace hermes {
 
 std::atomic<uint64_t> Transaction::id_allocator_ = 0;
 
+const std::unordered_set<std::string> Transaction::reserved_attr_names = {
+    ID_NAME, START_TIME_NAME, END_TIME_NAME, FINISHED_NAME, NAME_NAME, EVENTS_NAME};
+
 Transaction::Transaction() noexcept : id_(id_allocator_++) {}
 
 bool Transaction::add_event(const Event *event) {
@@ -34,6 +37,9 @@ void Transaction::finish() {
 std::pair<std::shared_ptr<arrow::RecordBatch>, std::shared_ptr<arrow::Schema>>
 TransactionBatch::serialize() const noexcept {
     auto error_return = std::make_pair(nullptr, nullptr);
+    // need to check if the attributes are correct
+    if (!validate()) return error_return;
+
     // we need to serialize a list of event ids
     auto const &list = *this;
     auto *pool = arrow::default_memory_pool();
@@ -86,11 +92,15 @@ TransactionBatch::serialize() const noexcept {
         arrow::field("name", arrow::utf8()),
         arrow::field("finished", arrow::boolean()),
         arrow::field("events", arrow::list(arrow::uint64()))};
-    auto schema = std::make_shared<arrow::Schema>(schema_vector);
 
-    auto batch = arrow::RecordBatch::Make(
-        schema, static_cast<int64_t>(size()),
-        {id_array, start_array, end_array, name_array, finished_array, event_id_array});
+    std::vector<std::shared_ptr<arrow::Array>> arrays = {
+        id_array, start_array, end_array, name_array, finished_array, event_id_array};
+
+    // serialize atttr values
+    hermes::serialize(this, schema_vector, arrays);
+
+    auto schema = std::make_shared<arrow::Schema>(schema_vector);
+    auto batch = arrow::RecordBatch::Make(schema, static_cast<int64_t>(size()), arrays);
     return {batch, schema};
 }
 
@@ -144,6 +154,17 @@ TransactionBatch::iterator TransactionBatch::lower_bound(uint64_t time) {
     } else {
         return it->second;
     }
+}
+
+bool TransactionBatch::validate() const noexcept {
+    if (empty()) return true;
+    auto const &ref = this->front()->attrs_;
+    for (uint64_t i = 1; i < size(); i++) {
+        auto const &transaction = (*this)[i];
+        auto const &values = transaction->attrs_;
+        if (!same_schema(ref, values)) return false;
+    }
+    return true;
 }
 
 void TransactionBatch::build_time_index() {
@@ -290,7 +311,7 @@ TransactionGroupBatch::serialize() const noexcept {
     return {batch, schema};
 }
 
-std::unique_ptr<TransactionGroupBatch> TransactionGroupBatch::deserialize( // NOLINT
+std::unique_ptr<TransactionGroupBatch> TransactionGroupBatch::deserialize(  // NOLINT
     const arrow::Table *table) {
     uint64_t num_rows = table->num_rows();
     auto transactions = std::make_unique<TransactionGroupBatch>();

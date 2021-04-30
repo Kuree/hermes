@@ -1218,7 +1218,7 @@ uint64_t Loader::compute_table_size_in_memory(const std::shared_ptr<arrow::Table
     }
     // we also consider other data structures the batch uses
     row_size += sizeof(uint64_t) + sizeof(void *) +
-                sizeof(std::unordered_map<std::string, Event::EventValue>);
+                sizeof(std::unordered_map<std::string, AttributeValue>);
     auto total = row_size * num_row;
     total += sizeof(std::unordered_map<uint64_t, void *>);
     return total;
