@@ -108,6 +108,43 @@ TEST(serialization, transactions) {  // NOLINT
     EXPECT_EQ(transaction->name(), transaction_name);
 }
 
+TEST(serialization, transactions_attr) {  // NOLINT
+    TempDirectory dir;
+
+    hermes::TransactionBatch batch;
+    constexpr auto num_transactions = 1000;
+    constexpr auto transaction_name = "transaction-test";
+
+    for (auto i = 0; i < num_transactions; i++) {
+        auto t = std::make_shared<hermes::Transaction>(i);
+        for (uint32_t j = 0; j < (i % 10 + (i % 10 == 0 ? 1 : 0)); j++) {
+            auto e = std::make_shared<hermes::Event>(i);
+            e->set_time(i);
+            t->add_event(e);
+        }
+        t->add_attr<uint32_t>("size", i);
+        EXPECT_FALSE(t->add_attr<bool>("name", false));
+        batch.emplace_back(t);
+    }
+    batch.set_name(transaction_name);
+
+    // serialize it
+    hermes::Serializer s(dir.path());
+    s.serialize(batch);
+    s.finalize();
+
+    hermes::Loader loader(dir.path());
+    auto transaction_batches = loader.get_transactions(0, num_transactions);
+    EXPECT_EQ(transaction_batches.size(), 1);
+    auto const &transaction_batch = transaction_batches[0];
+    EXPECT_EQ(transaction_batch->size(), num_transactions);
+    auto const &transaction = (*transaction_batch)[42];
+    EXPECT_EQ(transaction->start_time(), 42);
+    EXPECT_EQ(transaction->events().size(), 42 % 10);
+    EXPECT_EQ(transaction->name(), transaction_name);
+    EXPECT_EQ(transaction->get_attr<uint32_t>("size"), 42);
+}
+
 TEST(serialization, get_events) {  // NOLINT
     TempDirectory dir;
 

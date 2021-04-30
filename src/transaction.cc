@@ -140,6 +140,15 @@ std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(const arrow::Tab
         }
     }
 
+    std::unordered_set<std::string> field_names;
+    auto all_names = table->schema()->field_names();
+    for (auto const &n : all_names) {
+        if (Transaction::reserved_attr_names.find(n) == Transaction::reserved_attr_names.end()) {
+            field_names.emplace(n);
+        }
+    }
+    hermes::deserialize(transactions.get(), table, field_names);
+
     return std::move(transactions);
 }
 

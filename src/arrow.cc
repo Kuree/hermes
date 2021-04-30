@@ -10,10 +10,10 @@
 #include "arrow/ipc/reader.h"
 #include "arrow/ipc/writer.h"
 #include "arrow/util/uri.h"
-#include "transaction.hh"
 #include "fmt/format.h"
 #include "parquet/arrow/reader.h"
 #include "parquet/file_reader.h"
+#include "transaction.hh"
 
 namespace hermes {
 
@@ -62,7 +62,6 @@ void get_schema(const std::map<std::string, AttributeValue> &values,
     }
 }
 
-
 template <typename T>
 void serialize(const T *batch, std::vector<std::shared_ptr<arrow::Array>> &arrays) {
     auto *pool = arrow::default_memory_pool();
@@ -74,22 +73,22 @@ void serialize(const T *batch, std::vector<std::shared_ptr<arrow::Array>> &array
             // visit the variant
             std::visit(
                 overloaded{[pool, &builders](uint8_t) {
-                  builders.emplace_back(std::make_unique<arrow::UInt8Builder>(pool));
-                },
+                               builders.emplace_back(std::make_unique<arrow::UInt8Builder>(pool));
+                           },
                            [pool, &builders](uint16_t) {
-                             builders.emplace_back(std::make_unique<arrow::UInt16Builder>(pool));
+                               builders.emplace_back(std::make_unique<arrow::UInt16Builder>(pool));
                            },
                            [pool, &builders](uint32_t) {
-                             builders.emplace_back(std::make_unique<arrow::UInt32Builder>(pool));
+                               builders.emplace_back(std::make_unique<arrow::UInt32Builder>(pool));
                            },
                            [pool, &builders](uint64_t) {
-                             builders.emplace_back(std::make_unique<arrow::UInt64Builder>(pool));
+                               builders.emplace_back(std::make_unique<arrow::UInt64Builder>(pool));
                            },
                            [pool, &builders](bool) {
-                             builders.emplace_back(std::make_unique<arrow::BooleanBuilder>(pool));
+                               builders.emplace_back(std::make_unique<arrow::BooleanBuilder>(pool));
                            },
                            [pool, &builders](const std::string &) {
-                             builders.emplace_back(std::make_unique<arrow::StringBuilder>(pool));
+                               builders.emplace_back(std::make_unique<arrow::StringBuilder>(pool));
                            }},
                 v);
         }
@@ -102,28 +101,28 @@ void serialize(const T *batch, std::vector<std::shared_ptr<arrow::Array>> &array
             auto *ptr = builders[idx++].get();
             // visit the variant
             std::visit(overloaded{[ptr](uint8_t arg) {
-                         auto *p = reinterpret_cast<arrow::UInt8Builder *>(ptr);
-                         (void)p->Append(arg);
-                       },
+                                      auto *p = reinterpret_cast<arrow::UInt8Builder *>(ptr);
+                                      (void)p->Append(arg);
+                                  },
                                   [ptr](uint16_t arg) {
-                                    auto *p = reinterpret_cast<arrow::UInt16Builder *>(ptr);
-                                    (void)p->Append(arg);
+                                      auto *p = reinterpret_cast<arrow::UInt16Builder *>(ptr);
+                                      (void)p->Append(arg);
                                   },
                                   [ptr](uint32_t arg) {
-                                    auto *p = reinterpret_cast<arrow::UInt32Builder *>(ptr);
-                                    (void)p->Append(arg);
+                                      auto *p = reinterpret_cast<arrow::UInt32Builder *>(ptr);
+                                      (void)p->Append(arg);
                                   },
                                   [ptr](uint64_t arg) {
-                                    auto *p = reinterpret_cast<arrow::UInt64Builder *>(ptr);
-                                    (void)p->Append(arg);
+                                      auto *p = reinterpret_cast<arrow::UInt64Builder *>(ptr);
+                                      (void)p->Append(arg);
                                   },
                                   [ptr](bool arg) {
-                                    auto *p = reinterpret_cast<arrow::BooleanBuilder *>(ptr);
-                                    (void)p->Append(arg);
+                                      auto *p = reinterpret_cast<arrow::BooleanBuilder *>(ptr);
+                                      (void)p->Append(arg);
                                   },
                                   [ptr](const std::string &arg) {
-                                    auto *p = reinterpret_cast<arrow::StringBuilder *>(ptr);
-                                    (void)p->Append(arg);
+                                      auto *p = reinterpret_cast<arrow::StringBuilder *>(ptr);
+                                      (void)p->Append(arg);
                                   }},
 
                        value);
@@ -168,6 +167,71 @@ std::shared_ptr<arrow::Table> deserialize(const std::shared_ptr<arrow::Buffer> &
     auto table = arrow::Table::FromRecordBatches({batch});
     if (!table.ok()) return nullptr;
     return *table;
+}
+
+template <typename T>
+bool deserialize_(T *batch, const arrow::Table *table,
+                 const std::unordered_set<std::string> &fields) {
+    if (fields.empty()) return true;
+
+    auto bool_ = arrow::boolean();
+    auto uint8 = arrow::uint8();
+    auto uint16 = arrow::uint16();
+    auto uint32 = arrow::uint32();
+    auto uint64 = arrow::uint64();
+    auto str_ = arrow::utf8();
+
+    auto const &schema = table->schema();
+    auto const &all_fields = schema->fields();
+
+    // look through each column and fill in data
+    for (int i = 0; i < table->num_columns(); i++) {
+        auto const &name = all_fields[i]->name();
+        if (fields.find(name) == fields.end()) continue;
+
+        auto type = all_fields[i]->type();
+        auto const &column_chunks = table->column(i);
+        for (auto chunk_idx = 0; chunk_idx < column_chunks->num_chunks(); chunk_idx++) {
+            auto const &column = column_chunks->chunk(chunk_idx);
+            for (int j = 0; j < column->length(); j++) {
+                auto r_ = column->GetScalar(j);
+                if (!r_.ok()) return false;
+                auto const &v = *r_;
+                if (type->Equals(str_)) {
+                    (*batch)[j]->add_value(name, get_string(v));
+                } else if (type->Equals(uint8)) {
+                    (*batch)[j]->add_value(name, get_uint8(v));
+                } else if (type->Equals(uint16)) {
+                    auto int_val_ = std::reinterpret_pointer_cast<arrow::UInt16Scalar>(v);
+                    (*batch)[j]->add_value(name, get_uint16(v));
+                } else if (type->Equals(uint32)) {
+                    auto int_val_ = std::reinterpret_pointer_cast<arrow::UInt32Scalar>(v);
+                    (*batch)[j]->add_value(name, get_uint32(v));
+                } else if (type->Equals(uint64)) {
+                    auto int_val = get_uint64(v);
+                    (*batch)[j]->add_value(name, int_val);
+                } else if (type->Equals(bool_)) {
+                    auto bool_val_ = std::reinterpret_pointer_cast<arrow::BooleanScalar>(v);
+                    (*batch)[j]->add_value(name, get_bool(v));
+                } else {
+                    auto error_msg =
+                        fmt::format("Unknown type {0} for column {1}", type->ToString(), name);
+                    throw std::runtime_error(error_msg);
+                }
+            }
+        }
+    }
+    return true;
+}
+
+bool deserialize(EventBatch *batch, const arrow::Table *table,
+                 const std::unordered_set<std::string> &fields) {
+    return deserialize_(batch, table, fields);
+}
+
+bool deserialize(TransactionBatch *batch, const arrow::Table *table,
+                 const std::unordered_set<std::string> &fields) {
+    return deserialize_(batch, table, fields);
 }
 
 std::shared_ptr<arrow::Table> load_table(const std::string &filename) {

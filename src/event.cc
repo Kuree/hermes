@@ -78,50 +78,10 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(const arrow::Table *table) {
         event_batch->emplace_back(std::make_shared<Event>(0));
     }
 
-    auto bool_ = arrow::boolean();
-    auto uint8 = arrow::uint8();
-    auto uint16 = arrow::uint16();
-    auto uint32 = arrow::uint32();
-    auto uint64 = arrow::uint64();
-    auto str_ = arrow::utf8();
-
-    // look through each column and fill in data
-    auto const &schema = table->schema();
-    auto const &fields = schema->fields();
-    for (int i = 0; i < table->num_columns(); i++) {
-        auto const &name = fields[i]->name();
-        auto type = fields[i]->type();
-        auto const &column_chunks = table->column(i);
-        for (auto chunk_idx = 0; chunk_idx < column_chunks->num_chunks(); chunk_idx++) {
-            auto const &column = column_chunks->chunk(chunk_idx);
-            for (int j = 0; j < column->length(); j++) {
-                auto r_ = column->GetScalar(j);
-                if (!r_.ok()) return nullptr;
-                auto const &v = *r_;
-                if (type->Equals(str_)) {
-                    (*event_batch)[j]->add_value(name, get_string(v));
-                } else if (type->Equals(uint8)) {
-                    (*event_batch)[j]->add_value(name, get_uint8(v));
-                } else if (type->Equals(uint16)) {
-                    auto int_val_ = std::reinterpret_pointer_cast<arrow::UInt16Scalar>(v);
-                    (*event_batch)[j]->add_value(name, get_uint16(v));
-                } else if (type->Equals(uint32)) {
-                    auto int_val_ = std::reinterpret_pointer_cast<arrow::UInt32Scalar>(v);
-                    (*event_batch)[j]->add_value(name, get_uint32(v));
-                } else if (type->Equals(uint64)) {
-                    auto int_val = get_uint64(v);
-                    (*event_batch)[j]->add_value(name, int_val);
-                } else if (type->Equals(bool_)) {
-                    auto bool_val_ = std::reinterpret_pointer_cast<arrow::BooleanScalar>(v);
-                    (*event_batch)[j]->add_value(name, get_bool(v));
-                } else {
-                    auto error_msg =
-                        fmt::format("Unknown type {0} for column {1}", type->ToString(), name);
-                    throw std::runtime_error(error_msg);
-                }
-            }
-        }
-    }
+    auto field_names = table->schema()->field_names();
+    // we need all the fields
+    auto fields = std::unordered_set<std::string>(field_names.begin(), field_names.end());
+    hermes::deserialize(event_batch.get(), table, fields);
 
     return std::move(event_batch);
 }

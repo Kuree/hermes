@@ -42,6 +42,12 @@ public:
     bool add_attr(const std::string &name, const T &value) {
         if (reserved_attr_names.find(name) != reserved_attr_names.end()) return false;
         attrs_[name] = value;
+        return true;
+    }
+    // same thing, used for template programming so it matches with event batch
+    template <typename T>
+    inline bool add_value(const std::string &name, const T &value) {
+        return add_attr(name, value);
     }
 
     template <typename T>

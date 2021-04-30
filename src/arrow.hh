@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_set>
 
 namespace arrow {
 class Buffer;
@@ -34,6 +35,10 @@ void serialize(const TransactionBatch *batch, std::vector<std::shared_ptr<arrow:
                std::vector<std::shared_ptr<arrow::Array>> &arrays);
 
 std::shared_ptr<arrow::Table> deserialize(const std::shared_ptr<arrow::Buffer> &buffer);
+bool deserialize(EventBatch *batch, const arrow::Table *table,
+                 const std::unordered_set<std::string> &fields);
+bool deserialize(TransactionBatch *batch, const arrow::Table *table,
+                 const std::unordered_set<std::string> &fields);
 
 std::shared_ptr<arrow::RecordBatch> get_batch(const std::shared_ptr<arrow::Buffer> &buffer);
 
