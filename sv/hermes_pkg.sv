@@ -1,6 +1,10 @@
 package hermes;
 
 // DPI imports
+// per LRM 35.5.1.3
+// since we're not accessing any SV objects except the arguments but with some side-effects
+// i.e. chaging the state of the logger, we don't need to declare DPI as context, but cannot
+// use pure either
 import "DPI-C" function void hermes_set_output_dir(input string directory);
 import "DPI-C" function chandle hermes_create_logger(input string directory);
 import "DPI-C" function void hermes_create_events(input chandle logger,

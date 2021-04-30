@@ -1,8 +1,10 @@
 #ifndef HERMES_DPI_HH
 #define HERMES_DPI_HH
 
+#include <atomic>
 #include <map>
 #include <mutex>
+#include <thread>
 
 #include "logger.hh"
 #include "serializer.hh"
@@ -10,6 +12,18 @@
 #include "tracker.hh"
 
 // all DPI uses default message bus
+constexpr auto max_events_size = 1 << 16;
+
+class SpinLock {
+    std::atomic_flag locked = ATOMIC_FLAG_INIT;
+
+public:
+    void lock() {
+        while (locked.test_and_set(std::memory_order_acquire))
+            ;
+    }
+    void unlock() { locked.clear(std::memory_order_release); }
+};
 
 class DPILogger : public hermes::Logger {
 public:
@@ -17,8 +31,12 @@ public:
 
     template <typename T>
     inline void set_value(const std::string &name, const T &value, uint64_t idx) {
-        if (events_.size() > idx) {
-            events_[idx]->template add_value(name, value);
+        if (events_.size() > idx && idx < max_events_size) {
+            {
+                event_locks_[idx].lock();
+                events_[idx]->template add_value(name, value);
+                event_locks_[idx].unlock();
+            }
         }
     }
     [[nodiscard]] uint64_t num_events() const { return events_.size(); }
@@ -32,12 +50,19 @@ public:
         return events_;
     }
 
+    void add_thread(const std::function<void()> &func);
+    void join();
+
     ~DPILogger();
 
 private:
     // batch
     std::mutex events_lock_;
     std::vector<std::shared_ptr<hermes::Event>> events_;
+    // atomic variables implemented as a spin lock to protect events
+    std::array<SpinLock, max_events_size> event_locks_;
+
+    std::vector<std::thread> threads_;
 };
 
 class DPITracker : public hermes::Tracker {

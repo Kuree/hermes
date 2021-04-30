@@ -38,6 +38,7 @@ public:
     }
 
     [[nodiscard]] const std::string &path() const { return path_; }
+    [[nodiscard]] static std::string cwd() { return fs::absolute("."); }
 
     ~TempDirectory() {
         if (fs::exists(path_)) {

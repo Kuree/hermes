@@ -11,6 +11,9 @@ void DPILogger::create_events(uint64_t num_events) {
     std::lock_guard guard(events_lock_);
     events_.resize(num_events);
     for (auto &ptr : events_) ptr = std::make_shared<hermes::Event>(0);
+    if (num_events > max_events_size) {
+        std::cerr << "Unable to allocate events which exceeds " << max_events_size << std::endl;
+    }
 }
 
 void DPILogger::send_events() {
@@ -25,6 +28,15 @@ void DPILogger::send_events() {
         }
         events_.clear();
     });
+}
+
+void DPILogger::add_thread(const std::function<void()> &func) {
+    threads_.emplace_back(std::thread(func));
+}
+
+void DPILogger::join() {
+    for (auto &t : threads_) t.join();
+    threads_.clear();
 }
 
 DPILogger::~DPILogger() {
@@ -128,10 +140,16 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
     }
     auto entries_per_event = num_entries / logger->num_events();
 
+    // Note:
+    // this is a somewhat dangerous thing to do since by the virtual of multi-threading,
+    // even though we keep the SV objects live during the thread execution, there is still
+    // chance that the simulator will remove the data-structures that used for DPI
+    // keep this implementation for now until it crashes.
+
     uint64_t counter = 0;
     for (auto i = 0u; i < num_events; i++) {
         for (auto j = 0; j < entries_per_event; j++) {
-            auto **name = get_pointer<char *>(names, counter);
+            auto **name = get_pointer<char *>(names, static_cast<int>(counter));
             auto *v = get_pointer<T>(array, counter);
             if constexpr (std::is_same<T, char *>::value) {
                 std::string value = *v;
@@ -151,41 +169,42 @@ void set_values(DPILogger *logger, svOpenArrayHandle names, svOpenArrayHandle ar
 [[maybe_unused]] void hermes_set_values_uint8(void *logger, svOpenArrayHandle names,
                                               svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    set_values<uint8_t>(l, names, array);
+    l->add_thread([=]() { set_values<uint8_t>(l, names, array); });
 }
 
 [[maybe_unused]] void hermes_set_values_uint16(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    set_values<uint16_t>(l, names, array);
+    l->add_thread([=]() { set_values<uint16_t>(l, names, array); });
 }
 
 [[maybe_unused]] void hermes_set_values_uint32(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    set_values<uint32_t>(l, names, array);
+    l->add_thread([=]() { set_values<uint32_t>(l, names, array); });
 }
 
 [[maybe_unused]] void hermes_set_values_uint64(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    set_values<uint64_t>(l, names, array);
+    l->add_thread([=]() { set_values<uint64_t>(l, names, array); });
 }
 
 [[maybe_unused]] void hermes_set_values_bool(void *logger, svOpenArrayHandle names,
                                              svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    set_values<bool>(l, names, array);
+    l->add_thread([=]() { set_values<bool>(l, names, array); });
 }
 
 [[maybe_unused]] void hermes_set_values_string(void *logger, svOpenArrayHandle names,
                                                svOpenArrayHandle array) {
     auto *l = get_logger(logger);
-    set_values<char *>(l, names, array);
+    l->add_thread([=]() { set_values<char *>(l, names, array); });
 }
 
 [[maybe_unused]] void hermes_send_events(void *logger) {
     auto *l = get_logger(logger);
+    l->join();
     l->send_events();
 }
 
