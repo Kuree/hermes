@@ -26,11 +26,10 @@ public:
     };
 
     using SubList = std::set<std::shared_ptr<Subscriber>, SubCmp>;
-    const SubList * get_subscribers(const std::string &topic) const;
+    const SubList *get_subscribers(const std::string &topic) const;
     void stop() const;
 
 private:
-
     std::unordered_map<std::string, SubList> subscribers_;
 };
 
@@ -58,11 +57,20 @@ public:
     static constexpr uint64_t default_priority = 100;
 
 protected:
-    virtual void on_message(const std::string &topic, const std::shared_ptr<Event> &event) {}
+    virtual void on_message(const std::string &topic, const std::shared_ptr<Event> &event) {
+        (void)topic;
+        (void)event;
+    }
     virtual void on_message(const std::string &topic,
-                            const std::shared_ptr<Transaction> &transaction) {}
+                            const std::shared_ptr<Transaction> &transaction) {
+        (void)topic;
+        (void)transaction;
+    }
     virtual void on_message(const std::string &topic,
-                            const std::shared_ptr<TransactionGroup> &group) {}
+                            const std::shared_ptr<TransactionGroup> &group) {
+        (void)topic;
+        (void)group;
+    }
 
     MessageBus *bus_ = nullptr;
 

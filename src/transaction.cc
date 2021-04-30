@@ -149,7 +149,7 @@ std::unique_ptr<TransactionBatch> TransactionBatch::deserialize(const arrow::Tab
     }
     hermes::deserialize(transactions.get(), table, field_names);
 
-    return std::move(transactions);
+    return transactions;
 }
 
 TransactionBatch::iterator TransactionBatch::lower_bound(uint64_t time) {
@@ -360,7 +360,7 @@ std::unique_ptr<TransactionGroupBatch> TransactionGroupBatch::deserialize(  // N
         }
     }
 
-    return std::move(transactions);
+    return transactions;
 }
 
 void TransactionGroupBatch::sort() {

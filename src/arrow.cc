@@ -302,7 +302,7 @@ std::vector<uint64_t> get_uint64s(const std::shared_ptr<arrow::Scalar> &scalar) 
     auto list_scalar = std::reinterpret_pointer_cast<arrow::ListScalar>(scalar);
     auto size = list_scalar->value->length();
     std::vector<uint64_t> result(size);
-    for (int64_t j = 0; j < result.size(); j++) {
+    for (int64_t j = 0; j < size; j++) {
         auto v = get_uint64(*list_scalar->value->GetScalar(j));
         result[j] = v;
     }
@@ -313,7 +313,7 @@ std::vector<bool> get_bools(const std::shared_ptr<arrow::Scalar> &scalar) {
     auto list_scalar = std::reinterpret_pointer_cast<arrow::ListScalar>(scalar);
     auto size = list_scalar->value->length();
     std::vector<bool> result(size);
-    for (int64_t j = 0; j < result.size(); j++) {
+    for (int64_t j = 0; j < size; j++) {
         auto v = get_bool(*list_scalar->value->GetScalar(j));
         result[j] = v;
     }

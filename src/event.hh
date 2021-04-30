@@ -127,6 +127,8 @@ public:
     }
     [[nodiscard]] const std::string &name() const { return name_; }
 
+    virtual ~Batch() = default;
+
 private:
     std::vector<std::shared_ptr<T>> array_;
     std::string name_;

@@ -48,7 +48,7 @@ void load_transaction_group(TransactionData::TransactionGroupData &data, Loader 
     auto const &ts = data.group->transactions();
     auto const &masks = data.group->transaction_masks();
     data.values.reserve(ts.size());
-    for (auto i = 0; i < data.group->size(); i++) {
+    for (auto i = 0u; i < data.group->size(); i++) {
         auto tid = ts[i];
         auto is_group = masks[i];
         TransactionData d;
@@ -486,12 +486,11 @@ std::shared_ptr<EventBatch> Loader::get_events(const std::string &name, uint64_t
 }
 
 std::shared_ptr<EventBatch> Loader::get_events(const Transaction &transaction) {
-    auto const &ids = transaction.events();
     auto result = std::make_shared<EventBatch>();
     result->resize(transaction.events().size(), nullptr);
     if (event_id_index_.empty()) return result;
 
-    for (auto i = 0; i < result->size(); i++) {
+    for (auto i = 0u; i < result->size(); i++) {
         auto const id = transaction.events()[i];
         // need to search for the correct able
         auto iter = event_id_index_.lower_bound(id);
@@ -1217,8 +1216,8 @@ uint64_t Loader::compute_table_size_in_memory(const std::shared_ptr<arrow::Table
         }
     }
     // we also consider other data structures the batch uses
-    row_size += sizeof(uint64_t) + sizeof(void *) +
-                sizeof(std::unordered_map<std::string, AttributeValue>);
+    row_size +=
+        sizeof(uint64_t) + sizeof(void *) + sizeof(std::unordered_map<std::string, AttributeValue>);
     auto total = row_size * num_row;
     total += sizeof(std::unordered_map<uint64_t, void *>);
     return total;

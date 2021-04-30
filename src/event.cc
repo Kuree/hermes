@@ -74,7 +74,7 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(const arrow::Table *table) {
 
     event_batch->reserve(num_rows);
     // create each batch
-    for (auto i = 0; i < num_rows; i++) {
+    for (auto i = 0u; i < num_rows; i++) {
         event_batch->emplace_back(std::make_shared<Event>(0));
     }
 
@@ -83,7 +83,7 @@ std::unique_ptr<EventBatch> EventBatch::deserialize(const arrow::Table *table) {
     auto fields = std::unordered_set<std::string>(field_names.begin(), field_names.end());
     hermes::deserialize(event_batch.get(), table, fields);
 
-    return std::move(event_batch);
+    return event_batch;
 }
 
 bool EventBatch::validate() const noexcept {
