@@ -14,6 +14,8 @@ void init_transaction(py::module &m) {
     transaction.def_property_readonly("finished", &hermes::Transaction::finished);
     transaction.def_property("name", &hermes::Transaction::name, &hermes::Transaction::set_name);
 
+    init_values(transaction, "add_attr");
+
     auto transaction_batch =
         py::class_<hermes::TransactionBatch, std::shared_ptr<hermes::TransactionBatch>>(
             m, "TransactionBatch");

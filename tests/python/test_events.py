@@ -59,7 +59,9 @@ def test_transaction():
         t.add_event(e)
         if i % 10 == 9:
             transaction_batch.append(t)
+        t.aa = i
     assert len(transaction_batch) == 10
+    assert transaction_batch[9].aa == 99
 
 
 if __name__ == "__main__":
