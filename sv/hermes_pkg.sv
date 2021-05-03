@@ -133,33 +133,33 @@ class Logger;
     local LogEvent       tracker_events[$];
     // whether to record where the logging happens. if true, raw location will
     // be stored in the event. default is false
-    static bit           store_location = 0;
+    bit                  store_location = 0;
+    local  bit           has_event_;
 
     function new(string event_name);
         this.logger_ = hermes_create_logger(event_name);
         loggers.push_back(this);
         this.num_events = 0;
         this.event_name = event_name;
+        this.has_event_ = 1'b0;
     endfunction
 
     function void log(LogEvent event_);
         // add it to the cached value
-        bit new_event = times.size() == 0;
         times.push_back(event_.time_);
 
         if (store_location) begin
             event_.string_["location"] = $sformatf("%m");
         end
 
-
         if (event_.bool.size() > 0) begin
             foreach(event_.bool[name]) begin
                 bool.push_back(event_.bool[name]);
-                if (new_event) begin
+                if (!has_event_) begin
                     bool_names.push_back(name);
                 end
             end
-            if (!new_event && event_.bool.size() != bool_names.size()) begin
+            if (has_event_ && event_.bool.size() != bool_names.size()) begin
                 $display("[ERROR]: unmatched log item names. Expected: %0d got %0d", bool_names.size(), event_.bool.size());
             end
         end
@@ -167,11 +167,11 @@ class Logger;
         if (event_.uint8.size() > 0) begin
             foreach(event_.uint8[name]) begin
                 uint8.push_back(event_.uint8[name]);
-                if (new_event) begin
+                if (!has_event_) begin
                     uint8_names.push_back(name);
                 end
             end
-            if (!new_event && event_.uint8.size() != uint8_names.size()) begin
+            if (has_event_ && event_.uint8.size() != uint8_names.size()) begin
                 $display("[ERROR]: unmatched log item names. Expected: %0d got %0d", uint8_names.size(), event_.uint8.size());
             end
         end
@@ -179,11 +179,11 @@ class Logger;
         if (event_.uint16.size() > 0) begin
             foreach(event_.uint16[name]) begin
                 uint16.push_back(event_.uint16[name]);
-                if (new_event) begin
+                if (!has_event_) begin
                     uint16_names.push_back(name);
                 end
             end
-            if (!new_event && event_.uint16.size() != uint16_names.size()) begin
+            if (has_event_ && event_.uint16.size() != uint16_names.size()) begin
                 $display("[ERROR]: unmatched log item names. Expected: %0d got %0d", uint16_names.size(), event_.uint16.size());
             end
         end
@@ -191,11 +191,11 @@ class Logger;
         if (event_.uint32.size() > 0) begin
             foreach(event_.uint32[name]) begin
                 uint32.push_back(event_.uint32[name]);
-                if (new_event) begin
+                if (!has_event_) begin
                     uint32_names.push_back(name);
                 end
             end
-            if (!new_event && event_.uint32.size() != uint32_names.size()) begin
+            if (has_event_ && event_.uint32.size() != uint32_names.size()) begin
                 $display("[ERROR]: unmatched log item names. Expected: %0d got %0d", uint32_names.size(), event_.uint32.size());
             end
         end
@@ -203,11 +203,11 @@ class Logger;
         if (event_.uint64.size() > 0) begin
             foreach(event_.uint64[name]) begin
                 uint64.push_back(event_.uint64[name]);
-                if (new_event) begin
+                if (!has_event_) begin
                     uint64_names.push_back(name);
                 end
             end
-            if (!new_event && event_.uint64.size() != uint64_names.size()) begin
+            if (has_event_ && event_.uint64.size() != uint64_names.size()) begin
                 $display("[ERROR]: unmatched log item names. Expected: %0d got %0d", uint64_names.size(), event_.uint64.size());
             end
         end
@@ -215,11 +215,11 @@ class Logger;
         if (event_.string_.size() > 0) begin
             foreach(event_.string_[name]) begin
                 string_.push_back(event_.string_[name]);
-                if (new_event) begin
+                if (!has_event_) begin
                     string_names.push_back(name);
                 end
             end
-            if (!new_event && event_.string_.size() != string_names.size()) begin
+            if (has_event_ && event_.string_.size() != string_names.size()) begin
                 $display("[ERROR]: unmatched log item names. Expected: %0d got %0d", string_names.size(), event_.string_.size());
             end
         end
@@ -232,6 +232,8 @@ class Logger;
         if (this.num_events >= this.num_events_batch) begin
             this.flush();
         end
+
+        has_event_ = 1'b1;
     endfunction
 
     local function automatic void flush();
@@ -327,17 +329,11 @@ class Logger;
         num_events = 0;
         times.delete();
         bool.delete();
-        bool_names.delete();
         uint8.delete();
-        uint8_names.delete();
         uint16.delete();
-        uint16_names.delete();
         uint32.delete();
-        uint32_names.delete();
         uint64.delete();
-        uint64_names.delete();
         string_.delete();
-        string_names.delete();
     endfunction
 
     static function void final_();
