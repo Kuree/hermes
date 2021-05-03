@@ -131,6 +131,9 @@ class Logger;
     static local Tracker trackers[string][$];
     // unused funless trackers are used
     local LogEvent       tracker_events[$];
+    // whether to record where the logging happens. if true, raw location will
+    // be stored in the event. default is false
+    static bit           store_location = 0;
 
     function new(string event_name);
         this.logger_ = hermes_create_logger(event_name);
@@ -143,6 +146,11 @@ class Logger;
         // add it to the cached value
         bit new_event = times.size() == 0;
         times.push_back(event_.time_);
+
+        if (store_location) begin
+            event_.string_["location"] = $sformatf("%m");
+        end
+
 
         if (event_.bool.size() > 0) begin
             foreach(event_.bool[name]) begin
@@ -341,6 +349,16 @@ class Logger;
 
     static function void add_tracker(string topic, Tracker tracker);
         trackers[topic].push_back(tracker);
+    endfunction
+
+    static function void set_num_event_batch(int num);
+        num_events_batch = num;
+    endfunction
+
+    static function void flush_all();
+        foreach (loggers[i]) begin
+            loggers[i].flush();
+        end
     endfunction
 
 endclass
